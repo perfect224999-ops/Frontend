@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { rangerApi } from "@/service/api";
+import { ShieldAlert, Lock, ArrowLeft } from "lucide-react";
 
 export default function RangerDashboardLayout({
   children,
@@ -15,6 +17,60 @@ export default function RangerDashboardLayout({
   // สถานะ hover ของแต่ละเมนู
   const [showParkDropdown, setShowParkDropdown] = useState(false);
   const [showReportDropdown, setShowReportDropdown] = useState(false);
+  const [rangerUser, setRangerUser] = useState<string>("");
+  const [parkName, setParkName] = useState<string>("");
+  const [rangerRoles, setRangerRoles] = useState<string[]>([
+    "สแกนแสตมป์", "ประกาศข่าวสาร", "แก้ไขรายละเอียด", "รายงานความคืบหน้าของเหตุการณ์"
+  ]);
+
+  useEffect(() => {
+    const loadRangerInfo = async () => {
+      const u = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
+      const p = typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null;
+      if (u) setRangerUser(u);
+      if (p) setParkName(p);
+
+      // Load roles for current ranger
+      const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
+      if (savedRoles) {
+        try {
+          const parsed = JSON.parse(savedRoles);
+          if (Array.isArray(parsed)) setRangerRoles(parsed);
+        } catch (e) {}
+      }
+
+      if (u) {
+        try {
+          const res = await rangerApi.getRangerByUsername(u);
+          const rangerObj = res?.result || res?.data;
+          if (rangerObj) {
+            if (rangerObj.park) {
+              setParkName(rangerObj.park.name || "");
+              if (typeof window !== "undefined") {
+                localStorage.setItem("ranger_park_name", rangerObj.park.name || "");
+                localStorage.setItem("ranger_park_id", String(rangerObj.park.parkId));
+              }
+            }
+
+            // Sync database boolean flags to roles array if available
+            const apiRoles: string[] = [];
+            if (rangerObj.canIssueStamp) apiRoles.push("สแกนแสตมป์");
+            if (rangerObj.canAnnouncement) apiRoles.push("ประกาศข่าวสาร");
+            if (rangerObj.canEditParkDetails) apiRoles.push("แก้ไขรายละเอียด");
+            if (rangerObj.canProgressReport) apiRoles.push("รายงานความคืบหน้าของเหตุการณ์");
+
+            if (apiRoles.length > 0) {
+              setRangerRoles(apiRoles);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("ranger_roles", JSON.stringify(apiRoles));
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    };
+    loadRangerInfo();
+  }, []);
 
   // รายการเมนูนำทางหลัก
   const navItems = [
@@ -25,9 +81,9 @@ export default function RangerDashboardLayout({
       hasDropdown: true,
       dropdownType: "park"
     },
-    { name: "สำรวจเขาใหญ่", href: "#" },
-    { name: "วางแผนการเดินทาง", href: "#" },
-    { name: "จุดเดินป่าและเส้นทางการเดิน", href: "#" },
+    { name: "สำรวจอุทยาน", href: "/ranger/explore-khaoyai" },
+    { name: "วางแผนการเดินทาง", href: "/ranger/travel-plan" },
+    { name: "จุดเดินป่าและเส้นทางการเดิน", href: "/ranger/hiking-trails" },
     { name: "ติดต่อเรา", href: "#" },
     { 
       name: "รายงาน", 
@@ -38,6 +94,24 @@ export default function RangerDashboardLayout({
     { name: "สถิติ", href: "/ranger/view-visit-statistics" }
   ];
 
+  // Role Permission Guard Logic for current pathname
+  let isAccessDenied = false;
+  let missingRoleName = "";
+
+  if (pathname === "/ranger/scan-checkin-qrcode" && !rangerRoles.includes("สแกนแสตมป์")) {
+    isAccessDenied = true;
+    missingRoleName = "สแกนแสตมป์";
+  } else if ((pathname === "/ranger/announce-news" || pathname === "/ranger/edit-news-details") && !rangerRoles.includes("ประกาศข่าวสาร")) {
+    isAccessDenied = true;
+    missingRoleName = "ประกาศข่าวสาร";
+  } else if (pathname === "/ranger/edit-park-details" && !rangerRoles.includes("แก้ไขรายละเอียด")) {
+    isAccessDenied = true;
+    missingRoleName = "แก้ไขรายละเอียด";
+  } else if ((pathname === "/ranger/list-report-member" || pathname.startsWith("/ranger/view-report-member-detail")) && !rangerRoles.includes("รายงานความคืบหน้าของเหตุการณ์")) {
+    isAccessDenied = true;
+    missingRoleName = "รายงานความคืบหน้าของเหตุการณ์";
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-zinc-100 text-zinc-950 font-sans">
       
@@ -45,16 +119,7 @@ export default function RangerDashboardLayout({
       <header className="w-full bg-[#0a5829] text-white shadow-md relative z-40">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14 relative">
           
-          {/* โลโก้วงกลมทับยื่นขอบล่างตามต้นแบบ */}
-          <div className="absolute left-4 top-1 z-50">
-            <img 
-              src="/logo-khaoyai.svg" 
-              alt="อุทยานแห่งชาติเขาใหญ่" 
-              className="h-24 w-24 drop-shadow-md select-none pointer-events-none" 
-            />
-          </div>
-
-          <div className="w-24 shrink-0" />
+          {/* (เอาโลโก้ออกตามคำสั่ง) */}
 
           {/* เมนูบาร์นำทางหลัก */}
           <nav className="hidden lg:flex items-center gap-6 flex-1 justify-center h-full px-4">
@@ -164,8 +229,8 @@ export default function RangerDashboardLayout({
                     </button>
 
                     {isVisible && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-32 pt-3 z-50 transition-all select-none">
-                        <div className="bg-[#06441b] rounded shadow-lg border border-[#0d592a] py-2 px-3 text-center relative">
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-48 pt-3 z-50 transition-all select-none">
+                        <div className="bg-[#06441b] rounded shadow-lg border border-[#0d592a] text-[10px] overflow-hidden p-3 space-y-2 relative text-center">
                           
                           {/* ลูกศรสามเหลี่ยมชี้ขึ้นด้านบนหาคำว่า "รายงาน" */}
                           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#06441b] border-t border-l border-[#0d592a] rotate-45" />
@@ -204,9 +269,23 @@ export default function RangerDashboardLayout({
 
           {/* โปรไฟล์ */}
           <div className="flex items-center gap-3">
+            {rangerUser && (
+              <div className="text-right text-xs hidden sm:block">
+                <span className="font-bold text-white block">{rangerUser}</span>
+                {parkName && (
+                  <span className="text-[10px] text-emerald-300 block leading-tight">{parkName}</span>
+                )}
+              </div>
+            )}
             <button 
-              onClick={() => router.push("/ranger/login-park-ranger")}
-              className="h-8 w-8 rounded-full bg-zinc-400 flex items-center justify-center text-zinc-800 hover:bg-zinc-350 cursor-pointer"
+              onClick={() => {
+                localStorage.removeItem("ranger_username");
+                localStorage.removeItem("ranger_park_id");
+                localStorage.removeItem("ranger_park_name");
+                localStorage.removeItem("ranger_roles");
+                router.push("/ranger/login-park-ranger");
+              }}
+              className="h-8 w-8 rounded-full bg-zinc-400 flex items-center justify-center text-zinc-800 hover:bg-zinc-350 cursor-pointer shadow-sm"
               title="ออกจากระบบ"
             >
               👤

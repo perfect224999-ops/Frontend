@@ -2,6 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  ClipboardList,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  Filter,
+  UserCheck,
+  Eye,
+  Check,
+  Sparkles
+} from "lucide-react";
 
 interface ReportItem {
   id: string;
@@ -19,20 +31,20 @@ const INITIAL_REPORTS: ReportItem[] = [
     id: "1",
     reportDate: "10/02/2567",
     category: "ขยะสิ่งแวดล้อม",
-    status: "แจ้งรายงาน",
-    reportDetails: "พบเจอขยะพลาสติกและเศษขวดแก้วจำนวนมากบริเวณจุดชมวิวทางขึ้นอุทยาน",
+    status: "กำลังดำเนินการ",
+    reportDetails: "พบเจอช้างป่าหลุดบริเวณทางเข้าอุทยาน",
     ranger: "ใจดี มากๆ",
-    startDate: "-",
+    startDate: "10/02/2567",
     completedDate: "-"
   },
   {
     id: "2",
     reportDate: "15/02/2567",
     category: "ความสะอาด",
-    status: "แจ้งรายงาน",
+    status: "กำลังดำเนินการ",
     reportDetails: "พบกิ่งไม้ขนาดใหญ่ล้มขวางเส้นทางศึกษาธรรมชาติกิโลเมตรที่ 4",
-    ranger: "D3D3D3\n-",
-    startDate: "-",
+    ranger: "D3D3D3",
+    startDate: "15/02/2567",
     completedDate: "-"
   },
   {
@@ -60,6 +72,10 @@ const INITIAL_REPORTS: ReportItem[] = [
 export default function ListReportMember() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [selectedDate, setSelectedDate] = useState("All");
+  const [activeToggles, setActiveToggles] = useState<Record<string, boolean>>({
+    "1": true,
+    "2": true
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem("greenpass_member_reports");
@@ -70,9 +86,25 @@ export default function ListReportMember() {
           id: String(idx + 1),
           reportDate: r.reportDate || "10/02/2567",
           category: r.category || "ทั่วไป",
-          status: r.status === "New" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status,
+          status:
+            r.status === "New"
+              ? "แจ้งรายงาน"
+              : r.status === "InProgress"
+              ? "กำลังดำเนินการ"
+              : r.status === "Completed"
+              ? "ดำเนินการแก้ไขสำเร็จ"
+              : r.status,
           reportDetails: r.reportDetails || r.reportDetails,
-          ranger: r.ranger && r.ranger !== "-" ? r.ranger : (idx === 0 ? "ใจดี มากๆ" : idx === 1 ? "D3D3D3\n-" : idx === 2 ? "ใจดี มากๆ" : "สมชาย อังยอง"),
+          ranger:
+            r.ranger && r.ranger !== "-"
+              ? r.ranger
+              : idx === 0
+              ? "ใจดี มากๆ"
+              : idx === 1
+              ? "D3D3D3"
+              : idx === 2
+              ? "ใจดี มากๆ"
+              : "สมชาย อังยอง",
           startDate: r.startDate || "-",
           completedDate: r.completedDate || "-"
         }));
@@ -86,142 +118,242 @@ export default function ListReportMember() {
     }
   }, []);
 
-  const totalCount = reports.length;
-  const newCount = reports.filter(r => r.status === "แจ้งรายงาน").length;
-  const inProgressCount = reports.filter(r => r.status === "กำลังดำเนินการ").length;
-  const completedCount = reports.filter(r => r.status === "ดำเนินการแก้ไขสำเร็จ" || r.status === "ดำเนินการสำเร็จ").length;
+  const handleToggle = (id: string) => {
+    setActiveToggles((prev) => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
-  const filteredReports = selectedDate === "All"
-    ? reports
-    : reports.filter(r => r.reportDate.startsWith(selectedDate));
+  const totalCount = reports.length;
+  const newCount = reports.filter((r) => r.status === "แจ้งรายงาน").length;
+  const inProgressCount = reports.filter((r) => r.status === "กำลังดำเนินการ").length;
+  const completedCount = reports.filter(
+    (r) => r.status === "ดำเนินการแก้ไขสำเร็จ" || r.status === "ดำเนินการสำเร็จ"
+  ).length;
+
+  const filteredReports =
+    selectedDate === "All"
+      ? reports
+      : reports.filter((r) => r.reportDate.startsWith(selectedDate));
 
   return (
-    <div className="w-[95%] max-w-6xl mx-auto font-sans relative pt-2">
+    <div className="w-[98%] max-w-6xl mx-auto font-sans relative py-4 space-y-6">
       
-      {/* บล็อกเนื้อหาหลักสีพีชเบจอ่อนตามภาพสเก็ตช์ 3.3.60 (ลบกล่องดูประวัติรายงานออกเพื่อนำไปทำเป็นเฮดเดอร์ชี้แบบลอยตัวแทน) */}
-      <div className="bg-[#f6ebe6] border border-zinc-200 rounded-lg p-6 space-y-6 shadow-sm">
+      {/* Container หลัก */}
+      <div className="bg-emerald-950/5 backdrop-blur-md border border-emerald-800/10 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-emerald-950/5">
         
-        {/* บล็อกสถิติตัวนับ 4 กล่องเรียงหน้าแบบลอยตัว ไร้เส้นตารางคั่นตามรูปต้นฉบับ */}
-        <div className="grid grid-cols-4 gap-4 text-center mt-2">
+        {/* Header Title Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-900/10 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20">
+              <ClipboardList className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                ประวัติรายงานและข้อเสนอแนะจากนักท่องเที่ยว
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  {totalCount} รายการ
+                </span>
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                ติดตามและจัดการสถานะรายงานเหตุฉุกเฉินความชำรุดในเขตอุทยาน
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 Summary Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
-          {/* จำนวนรายงานจากนักท่องเที่ยว */}
-          <div className="flex flex-col items-center justify-between">
-            <span className="text-[11px] font-bold text-zinc-900 mb-2 h-8 flex items-center justify-center">
-              จำนวนรายงานจากนักท่องเที่ยว
-            </span>
-            <div className="bg-[#cccccc] text-zinc-900 text-xs font-bold py-1.5 px-6 rounded shadow-sm">
-              {totalCount}
+          {/* Card 1: รวมทั้งหมด */}
+          <div className="bg-white/80 backdrop-blur border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between group">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 group-hover:text-emerald-700 transition-colors">
+                จำนวนรายงานจากนักท่องเที่ยว
+              </p>
+              <h3 className="text-2xl font-extrabold text-slate-800 mt-1">
+                {totalCount} <span className="text-xs font-normal text-slate-400">รายการ</span>
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-emerald-50 text-slate-600 group-hover:text-emerald-600 flex items-center justify-center transition-colors">
+              <ClipboardList className="w-5 h-5" />
             </div>
           </div>
 
-          {/* แจ้งรายงาน */}
-          <div className="flex flex-col items-center justify-between">
-            <span className="text-[11px] font-bold text-zinc-900 mb-2 h-8 flex items-center justify-center">
-              แจ้งรายงาน
-            </span>
-            <div className="bg-[#cccccc] text-zinc-900 text-xs font-bold py-1.5 px-6 rounded shadow-sm">
-              {newCount}
+          {/* Card 2: แจ้งรายงานใหม่ */}
+          <div className="bg-white/80 backdrop-blur border border-amber-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between group">
+            <div>
+              <p className="text-xs font-semibold text-amber-700">
+                แจ้งรายงาน
+              </p>
+              <h3 className="text-2xl font-extrabold text-amber-800 mt-1">
+                {newCount} <span className="text-xs font-normal text-amber-600/70">รายการ</span>
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5" />
             </div>
           </div>
 
-          {/* กำลังดำเนิน */}
-          <div className="flex flex-col items-center justify-between">
-            <span className="text-[11px] font-bold text-zinc-900 mb-2 h-8 flex items-center justify-center">
-              กำลังดำเนิน
-            </span>
-            <div className="bg-[#cccccc] text-zinc-900 text-xs font-bold py-1.5 px-6 rounded shadow-sm">
-              {inProgressCount}
+          {/* Card 3: กำลังดำเนินการ */}
+          <div className="bg-white/80 backdrop-blur border border-sky-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between group">
+            <div>
+              <p className="text-xs font-semibold text-sky-700">
+                กำลังดำเนินการ
+              </p>
+              <h3 className="text-2xl font-extrabold text-sky-800 mt-1">
+                {inProgressCount} <span className="text-xs font-normal text-sky-600/70">รายการ</span>
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+              <Clock className="w-5 h-5 animate-pulse" />
             </div>
           </div>
 
-          {/* ดำเนินการสำเร็จ */}
-          <div className="flex flex-col items-center justify-between">
-            <span className="text-[11px] font-bold text-zinc-900 mb-2 h-8 flex items-center justify-center">
-              ดำเนินการสำเร็จ
-            </span>
-            <div className="bg-[#cccccc] text-zinc-900 text-xs font-bold py-1.5 px-6 rounded shadow-sm">
-              {completedCount}
+          {/* Card 4: ดำเนินการสำเร็จ */}
+          <div className="bg-white/80 backdrop-blur border border-emerald-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between group">
+            <div>
+              <p className="text-xs font-semibold text-emerald-700">
+                ดำเนินการสำเร็จ
+              </p>
+              <h3 className="text-2xl font-extrabold text-emerald-800 mt-1">
+                {completedCount} <span className="text-xs font-normal text-emerald-600/70">รายการ</span>
+              </h3>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
 
         </div>
 
-        {/* ตัวกรองดรอปดาวน์ วัน/เดือน/ปี อยู่ทางซ้ายเหนือตาราง */}
-        <div className="flex justify-start text-[10px] font-bold text-zinc-800">
-          <select
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-1 bg-[#dfdfdf] hover:bg-[#d0d0d0] border border-zinc-400 rounded focus:outline-none cursor-pointer"
-          >
-            <option value="All">เลือกวัน/เดือน/ปี ▼</option>
-            <option value="10/02">10/02/2567</option>
-            <option value="15/02">15/02/2567</option>
-            <option value="25/02">25/02/2567</option>
-            <option value="27/02">27/02/2567</option>
-          </select>
+        {/* Filter Controls Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white/90 p-3.5 rounded-2xl border border-slate-200/90 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+            <Filter className="w-4 h-4 text-emerald-600" />
+            <span>กรองข้อมูลตามวันที่:</span>
+          </div>
+
+          <div className="relative inline-flex items-center">
+            <Calendar className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
+            <select
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="pl-9 pr-8 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer appearance-none shadow-sm"
+            >
+              <option value="All">ทุกวันที่ (แสดงทั้งหมด)</option>
+              <option value="10/02">10 กุมภาพันธ์ 2567</option>
+              <option value="15/02">15 กุมภาพันธ์ 2567</option>
+              <option value="25/02">25 กุมภาพันธ์ 2567</option>
+              <option value="27/02">27 กุมภาพันธ์ 2567</option>
+            </select>
+            <div className="absolute right-2.5 pointer-events-none text-slate-400 text-[10px]">
+              ▼
+            </div>
+          </div>
         </div>
 
-        {/* ตารางแสดงผลประวัติรายงานพร้อมเส้นขอบแบ่งช่องแนวตั้งชัดเจนสีเข้มตามต้นฉบับ */}
-        <div className="border border-[#888888] rounded overflow-hidden">
-          <table className="w-full text-left text-[11px] border-collapse bg-[#cccccc]">
-            <thead>
-              <tr className="bg-[#b3b3b3] border-b border-[#888888] text-zinc-900 font-bold">
-                <th className="py-2.5 px-4 w-14 text-center border-r border-[#888888]">ลำดับ</th>
-                <th className="py-2.5 px-4 w-32 border-r border-[#888888]">วันที่แจ้งรายงาน</th>
-                <th className="py-2.5 px-4 w-28 border-r border-[#888888]">สถานะ</th>
-                <th className="py-2.5 px-4 w-40 border-r border-[#888888]">เจ้าหน้าที่ผู้รับผิดชอบ</th>
-                <th className="py-2.5 px-4 text-center border-r border-[#888888]">รายละเอียดการรายงาน</th>
-                <th className="py-2.5 px-3 w-16 text-center"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#888888] text-zinc-900">
-              {filteredReports.map((report) => (
-                <tr key={report.id} className="hover:bg-zinc-350/40">
-                  
-                  {/* ลำดับ */}
-                  <td className="py-2.5 px-4 text-center border-r border-[#888888] font-bold">{report.id}</td>
-                  
-                  {/* วันที่แจ้งรายงาน */}
-                  <td className="py-2.5 px-4 border-r border-[#888888] font-mono">{report.reportDate}</td>
-                  
-                  {/* สถานะ (ปรับสีวงกลมแสดงผลตรงตามรูปต้นแบบ) */}
-                  <td className="py-2.5 px-4 border-r border-[#888888] font-bold">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className={`w-2.5 h-2.5 rounded-full border border-black/10 ${
-                        report.status === "แจ้งรายงาน" || report.status === "ดำเนินการแก้ไขสำเร็จ" || report.status === "ดำเนินการสำเร็จ" ? "bg-[#39db5c]" : "bg-[#f8c325]"
-                      }`} />
-                      {report.status}
-                    </span>
-                  </td>
-                  
-                  {/* เจ้าหน้าที่ผู้รับผิดชอบ */}
-                  <td className="py-2.5 px-4 border-r border-[#888888] font-semibold whitespace-pre-line">{report.ranger}</td>
-                  
-                  {/* ปุ่มนำทางไปหน้ารายละเอียดการรายงาน (ปรับสีเป็นสีเขียวสว่างสะท้อนแสง #00ff40 ตามแบบเป๊ะ) */}
-                  <td className="py-2.5 px-4 border-r border-[#888888] text-center">
-                    <Link
-                      href={`/ranger/view-report-member-detail?id=${report.id}`}
-                      className="inline-block px-5 py-1.5 bg-[#00ff40] hover:bg-[#00e039] text-zinc-900 text-[10px] font-extrabold rounded-full transition-colors cursor-pointer"
-                    >
-                      รายละเอียดการรายงาน
-                    </Link>
-                  </td>
-                  
-                  {/* คอลัมน์ปุ่มสวิตช์ (Toggle) สีเขียวพร้อมเครื่องหมายถูกเฉพาะสำหรับลำดับที่ 1 และ 2 ตามรูป */}
-                  <td className="py-2 px-3 text-center flex items-center justify-center min-h-[36px]">
-                    {(report.id === "1" || report.id === "2") && (
-                      <div className="w-11 h-5 bg-[#00ff40] rounded-full p-0.5 flex items-center justify-start cursor-pointer shadow-inner">
-                        <div className="bg-white w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-[#00ff40] font-bold shadow-sm ml-auto">
-                          ✔
-                        </div>
-                      </div>
-                    )}
-                  </td>
-
+        {/* Table View */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              
+              {/* Header */}
+              <thead>
+                <tr className="bg-slate-800 text-slate-100 font-semibold border-b border-slate-700">
+                  <th className="py-3.5 px-4 w-16 text-center">ลำดับ</th>
+                  <th className="py-3.5 px-4 w-36">วันที่แจ้งรายงาน</th>
+                  <th className="py-3.5 px-4 w-44">สถานะ</th>
+                  <th className="py-3.5 px-4 w-48">เจ้าหน้าที่ผู้รับผิดชอบ</th>
+                  <th className="py-3.5 px-4 min-w-[260px] text-center">รายละเอียดเหตุการณ์</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              {/* Body */}
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredReports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                      ไม่พบข้อมูลรายงานตามวันที่เลือก
+                    </td>
+                  </tr>
+                ) : (
+                  filteredReports.map((report) => {
+                    return (
+                      <tr
+                        key={report.id}
+                        className="hover:bg-emerald-50/40 transition-colors duration-150 group"
+                      >
+                        
+                        {/* ลำดับ */}
+                        <td className="py-3.5 px-4 text-center font-bold text-slate-500">
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 inline-flex items-center justify-center text-xs group-hover:bg-emerald-100 group-hover:text-emerald-800 transition-colors">
+                            {report.id}
+                          </span>
+                        </td>
+
+                        {/* วันที่แจ้งรายงาน */}
+                        <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>วันที่ {report.reportDate}</span>
+                          </div>
+                        </td>
+
+                        {/* สถานะ */}
+                        <td className="py-3.5 px-4">
+                          {report.status === "แจ้งรายงาน" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                              {report.status}
+                            </span>
+                          ) : report.status === "กำลังดำเนินการ" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                              <span className="w-2 h-2 rounded-full bg-sky-500" />
+                              {report.status}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              {report.status}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* เจ้าหน้าที่ผู้รับผิดชอบ */}
+                        <td className="py-3.5 px-4 font-medium text-slate-800">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0">
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="whitespace-pre-line">{report.ranger}</span>
+                          </div>
+                        </td>
+
+                        {/* รายละเอียดเหตุการณ์ */}
+                        <td className="py-3.5 px-4 max-w-sm">
+                          <div className="space-y-1.5">
+                            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-slate-800 text-xs font-medium leading-relaxed shadow-2xs">
+                              {report.reportDetails}
+                            </div>
+                            <Link
+                              href={`/ranger/view-report-member-detail?id=${report.id}`}
+                              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>แก้ไขสถานะ/ดูเพิ่มเติม &gt;</span>
+                            </Link>
+                          </div>
+                        </td>
+
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </div>
@@ -229,3 +361,4 @@ export default function ListReportMember() {
     </div>
   );
 }
+

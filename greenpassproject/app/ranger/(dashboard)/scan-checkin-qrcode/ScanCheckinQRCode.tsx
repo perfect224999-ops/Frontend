@@ -2,78 +2,64 @@
 
 import { useState, useEffect } from "react";
 import { stampApi } from "@/service/api";
+import { QrCode, CheckCircle2, User, Sparkles, MapPin, RefreshCw, AlertTriangle, Clock, XCircle, Maximize2 } from "lucide-react";
 
 export default function ScanCheckinQRCode() {
   const [isScanning, setIsScanning] = useState(true);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  const [scannedUserData, setScannedUserData] = useState<{
+    fullName: string;
+    username: string;
+    phone?: string;
+    parkName?: string;
+    timestamp: string;
+  } | null>(null);
 
-  // เริ่มต้นและจัดการกับสแกนเนอร์กล้องจริง
   useEffect(() => {
     let html5QrCode: any;
     let isActive = true;
 
     const startScanner = async () => {
       try {
-        // อิมพอร์ตไลบรารีบนฝั่งไคลเอนต์เท่านั้นเพื่อความปลอดภัยจาก Next.js SSR
         const { Html5Qrcode } = await import("html5-qrcode");
         
-        // รอให้ Element ปรากฏบน DOM
         await new Promise((resolve) => setTimeout(resolve, 150));
         if (!isActive) return;
 
         html5QrCode = new Html5Qrcode("qr-reader");
         await html5QrCode.start(
-          { facingMode: "environment" }, // เลือกใช้กล้องหลังของมือถือ
+          { facingMode: "environment" },
           {
-            fps: 10,
+            fps: 15,
             qrbox: (width: number, height: number) => {
               const min = Math.min(width, height);
-              const size = Math.floor(min * 0.7);
+              const size = Math.floor(min * 0.88);
               return { width: size, height: size };
             },
           },
           async (decodedText: string) => {
-            // เมื่อกล้องสแกนสำเร็จ
             if (!isActive) return;
             try {
               setIsScanning(false);
-              // หยุดกล้องสดทันที
               await html5QrCode.stop();
 
-              // ดึงข้อมูล Ranger จาก Local Storage
-              const rangerUsername = localStorage.getItem("ranger_username") || "ranger01";
-
-              // ยิง API ไปหา Spring Boot Backend จริง
-              const response = await stampApi.scanCheckinQrCode({
-                token: decodedText,
-                parkRangerId: 0,
-                parkRangerUsername: rangerUsername
-              });
-
-              if (response && response.success) {
-                // แสดงป๊อปอัปผลการทำงานสำเร็จ
-                setShowSuccessPopup(true);
-              } else {
-                alert("สแกนมอบสแตมป์ล้มเหลว: " + (response.message || "ไม่ทราบสาเหตุ"));
-                setIsScanning(true);
-              }
+              processScanResult(decodedText);
             } catch (err: any) {
               console.error("Error during scan checkin:", err);
-              const errMsg = err.response?.data?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์หลังบ้าน";
-              alert("สแกนมอบสแตมป์ล้มเหลว: " + errMsg);
               setIsScanning(true);
             }
           },
-          (errorMessage: string) => {
-            // เมินเฉยต่อการอ่านเฟรมที่ไม่ได้ QR code
-          }
+          () => {}
         );
       } catch (err) {
         console.error("Failed to start html5-qrcode scanner:", err);
       }
     };
 
-    if (isScanning && !showSuccessPopup) {
+    if (isScanning && !showSuccessPopup && !showErrorPopup) {
       startScanner();
     }
 
@@ -85,17 +71,71 @@ export default function ScanCheckinQRCode() {
         }
       }
     };
-  }, [isScanning, showSuccessPopup]);
+  }, [isScanning, showSuccessPopup, showErrorPopup]);
 
-  const handleClosePopup = () => {
-    setShowSuccessPopup(false);
-    setIsScanning(true); // กลับไปเริ่มสแกนใหม่
+  const processScanResult = async (decodedToken: string) => {
+    const rangerUsername = typeof window !== "undefined" ? localStorage.getItem("ranger_username") || "ranger01" : "ranger01";
+
+    try {
+      const response = await stampApi.scanCheckinQrCode({
+        token: decodedToken,
+        parkRangerId: 0,
+        parkRangerUsername: rangerUsername
+      });
+
+      const resultData = response?.result || response?.data;
+
+      if (response && (response.success || response.status) && resultData) {
+        const cleanParkName = (n?: string) => {
+          if (!n) return typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ" : "อุทยานแห่งชาติ";
+          const stripped = n.replace(/^(อุทยานแห่งชาติ)+/g, "").trim();
+          return `อุทยานแห่งชาติ${stripped}`;
+        };
+
+        const uName = resultData.username || decodedToken;
+        const fName = resultData.fullName || 
+          (`${resultData.firstname || ""} ${resultData.lastname || ""}`).trim() || 
+          uName;
+
+        setScannedUserData({
+          fullName: fName,
+          username: uName,
+          phone: resultData.phone || "-",
+          parkName: cleanParkName(resultData.parkName),
+          timestamp: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น."
+        });
+
+        setShowSuccessPopup(true);
+      } else {
+        const msg = response?.message || "ไม่สามารถมอบสแตมป์ให้ได้เนื่องจากเงื่อนไขระบบ";
+        setErrorMessage(msg);
+        setShowErrorPopup(true);
+      }
+    } catch (err: any) {
+      console.error("Error scan checkin:", err);
+      const msg = err?.response?.data?.message || "ไม่พบข้อมูลนักท่องเที่ยวในฐานข้อมูล หรือสแกนซ้ำภายใน 1 วัน";
+      setErrorMessage(msg);
+      setShowErrorPopup(true);
+    }
   };
 
+  const handleCloseSuccessPopup = () => {
+    setShowSuccessPopup(false);
+    setScannedUserData(null);
+    setIsScanning(true);
+  };
+
+  const handleCloseErrorPopup = () => {
+    setShowErrorPopup(false);
+    setErrorMessage("");
+    setIsScanning(true);
+  };
+
+  const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว");
+
   return (
-    <div className="max-w-4xl mx-auto bg-white border border-zinc-200 shadow-sm rounded-lg p-6 font-sans space-y-4">
+    <div className="max-w-6xl mx-auto space-y-6 font-sans">
       
-      {/* เพิ่ม CSS พิเศษสำหรับจัดหน้าตาของสตรีมวิดีโอจากกล้อง */}
       <style dangerouslySetInnerHTML={{__html: `
         #qr-reader {
           border: none !important;
@@ -106,43 +146,187 @@ export default function ScanCheckinQRCode() {
           width: 100% !important;
           height: 100% !important;
           object-fit: cover !important;
-          border-radius: 8px;
+          border-radius: 20px;
         }
       `}} />
 
-      {/* ส่วนหัวคาร์ดสแกนเนอร์ */}
-      <div className="flex justify-between items-center border-b border-zinc-150 pb-2.5">
-        <h2 className="text-sm font-bold text-zinc-700">QR Code Scanner</h2>
-        <span className="bg-[#dfdfdf] text-zinc-650 px-2 py-0.5 rounded text-[10px] font-bold">
-          {isScanning ? "Scanning" : "Idle"}
-        </span>
+      {/* Header Banner */}
+      <div className="bg-[#0a5829] text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs uppercase tracking-wider">
+            <QrCode className="w-4 h-4" /> Check-in &amp; Stamp Terminal
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold">สแกน QR Code มอบสแตมป์อุทยาน</h1>
+          <p className="text-emerald-100 text-xs sm:text-sm max-w-2xl">
+            นำกล้องส่องไปยัง QR Code บนมือถือนักท่องเที่ยวเพื่อตรวจสอบรายชื่อและมอบสแตมป์สะสมจากฐานข้อมูล
+          </p>
+        </div>
+
+        <div className="relative z-10 flex items-center space-x-2 bg-emerald-800/90 px-4 py-2 rounded-full border border-emerald-500/40 text-xs sm:text-sm font-bold text-emerald-100 shadow-md">
+          <span className={`w-3 h-3 rounded-full ${isScanning ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
+          <span>{isScanning ? "กำลังสแกนกล้องสด..." : "พักการสแกน"}</span>
+        </div>
       </div>
 
-      {/* กล่องแสดงผลจากกล้องจริง */}
-      <div className="relative w-full aspect-video max-w-xl mx-auto bg-zinc-950 rounded-lg overflow-hidden flex items-center justify-center border border-zinc-800">
+      {/* Large Camera Stream Frame Card */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-md space-y-4">
         
-        {/* ตัวกล้องสตรีมสดจริง */}
-        <div id="qr-reader" className="w-full h-full" />
+        <div className="relative w-full h-[480px] sm:h-[580px] lg:h-[640px] bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-800 shadow-2xl">
+          
+          {/* Real Live Camera Stream */}
+          <div id="qr-reader" className="w-full h-full" />
 
-        {/* หน้าต่างแจ้งความสำเร็จซ้อนกลางหน้าจอกล้อง (เมื่อสแกนสำเร็จ) */}
-        {showSuccessPopup && (
-          <div className="absolute z-10 w-64 bg-[#e2ecd5] rounded-xl p-6 text-center shadow-2xl flex flex-col items-center justify-center space-y-4 border border-[#c5d8a8] animate-scale-up">
+          {/* Scanner Guide Frame overlay */}
+          {isScanning && !showSuccessPopup && !showErrorPopup && (
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="w-72 h-72 sm:w-96 sm:h-96 lg:w-[420px] lg:h-[420px] border-4 border-emerald-400 rounded-3xl relative animate-pulse shadow-[0_0_35px_rgba(52,211,153,0.45)]">
+                <div className="absolute top-3 left-3 w-8 h-8 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg" />
+                <div className="absolute top-3 right-3 w-8 h-8 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg" />
+                <div className="absolute bottom-3 left-3 w-8 h-8 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg" />
+                <div className="absolute bottom-3 right-3 w-8 h-8 border-b-4 border-r-4 border-emerald-400 rounded-br-lg" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-emerald-300 text-xs font-bold bg-slate-950/70 px-3 py-1 rounded-full border border-emerald-500/40 backdrop-blur-xs flex items-center gap-1.5">
+                    <Maximize2 className="w-3.5 h-3.5" /> วาง QR Code ให้อยู่ในกรอบ
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
-            <p className="text-zinc-900 font-bold text-xs">
-              ทำการมอบสแตมป์เรียบร้อย
-            </p>
+        </div>
 
-            <button
-              onClick={handleClosePopup}
-              className="px-8 py-1.5 bg-[#30bf43] hover:bg-[#27a336] text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
-            >
-              ปิด
-            </button>
+      </div>
+
+      {/* POPUP MODAL 1: SUCCESS POPUP */}
+      {showSuccessPopup && scannedUserData && (
+        <div className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-slate-200 space-y-6 animate-scale-up">
+            
+            {/* Animated Checkmark Badge */}
+            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner border-2 border-emerald-300 animate-bounce">
+              <CheckCircle2 className="w-12 h-12" />
+            </div>
+
+            {/* Title */}
+            <div className="space-y-1.5">
+              <span className="px-3.5 py-1 bg-emerald-50 text-emerald-800 font-extrabold text-xs rounded-full border border-emerald-200 uppercase tracking-wider inline-flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-emerald-600" /> มอบสแตมป์สำเร็จ
+              </span>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">ทำการมอบสแตมป์เรียบร้อยแล้ว</h3>
+            </div>
+
+            {/* Tourist Details Box */}
+            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-left space-y-3.5 text-xs sm:text-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                <span className="text-slate-500 font-bold flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-emerald-600" />
+                  ชื่อนักท่องเที่ยว:
+                </span>
+                <span className="font-extrabold text-slate-900 text-base text-right text-emerald-800">
+                  {scannedUserData.fullName}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-bold">ชื่อบัญชี (Username):</span>
+                <span className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                  {scannedUserData.username}
+                </span>
+              </div>
+
+              {scannedUserData.phone && scannedUserData.phone !== "-" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-bold">เบอร์โทรศัพท์:</span>
+                  <span className="font-semibold text-slate-700">{scannedUserData.phone}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                <span className="text-slate-500 font-bold flex items-center gap-1">
+                  <MapPin className="w-4 h-4 text-emerald-600" />
+                  สถานที่สะสม:
+                </span>
+                <span className="font-bold text-slate-800">{scannedUserData.parkName || "อุทยานแห่งชาติ"}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+                <span>สถานะระบบ:</span>
+                <span>บันทึกลงฐานข้อมูลแล้ว • {scannedUserData.timestamp}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={handleCloseSuccessPopup}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>สแกนคนถัดไป</span>
+              </button>
+            </div>
+
           </div>
-        )}
+        </div>
+      )}
+
+      {/* POPUP MODAL 2: ERROR / DUPLICATE SCAN WARNING POPUP */}
+      {showErrorPopup && (
+        <div className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-amber-200 space-y-6 animate-scale-up">
+            
+            {/* Warning Icon Badge */}
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-inner border-2 ${
+              isDuplicateError ? "bg-amber-100 text-amber-600 border-amber-300" : "bg-rose-100 text-rose-600 border-rose-300"
+            }`}>
+              {isDuplicateError ? <Clock className="w-11 h-11" /> : <XCircle className="w-11 h-11" />}
+            </div>
+
+            {/* Title Badge */}
+            <div className="space-y-1.5">
+              <span className={`px-3 py-1 font-extrabold text-xs rounded-full border uppercase tracking-wider inline-flex items-center gap-1.5 ${
+                isDuplicateError ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-rose-50 text-rose-800 border-rose-200"
+              }`}>
+                <AlertTriangle className="w-4 h-4" /> 
+                {isDuplicateError ? "ไม่อนุญาตให้สแกนซ้ำภายใน 1 วัน" : "สแกนไม่สำเร็จ"}
+              </span>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">
+                {isDuplicateError ? "พบการสแกนสแตมป์ซ้ำในวันนี้" : "ไม่สามารถมอบสแตมป์ได้"}
+              </h3>
+            </div>
+
+            {/* Error Details Box */}
+            <div className={`rounded-2xl p-5 border text-left space-y-2.5 text-xs sm:text-sm ${
+              isDuplicateError ? "bg-amber-50/80 border-amber-200 text-amber-900" : "bg-rose-50/80 border-rose-200 text-rose-900"
+            }`}>
+              <div className="font-semibold text-sm sm:text-base leading-relaxed flex items-start gap-2">
+                <span className="mt-0.5">•</span>
+                <span>{errorMessage.replace(/\s*\([a-zA-Z0-9_-]+\)/g, "")}</span>
+              </div>
+              <p className="text-xs opacity-80 pt-2 border-t border-amber-200/60">
+                {isDuplicateError 
+                  ? "ระบบเปิดใช้งานเงื่อนไขความปลอดภัย: นักท่องเที่ยว 1 คน สามารถสแกนรับสแตมป์ได้ 1 ครั้ง ต่อ 1 อุทยานในแต่ละวันเท่านั้น" 
+                  : "กรุณาตรวจสอบ QR Code หรือข้อมูลนักท่องเที่ยวในระบบใหม่อีกครั้ง"}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleCloseErrorPopup}
+                className={`w-full py-3 text-white font-bold text-sm rounded-2xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2 ${
+                  isDuplicateError ? "bg-amber-600 hover:bg-amber-500" : "bg-rose-600 hover:bg-rose-500"
+                }`}
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>รับทราบ / สแกนคนถัดไป</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
-
-  </div>
   );
 }

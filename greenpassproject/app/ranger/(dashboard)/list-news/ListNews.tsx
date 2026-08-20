@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Megaphone, Plus, Search, Calendar, Edit3, Trash2, AlertCircle, FileText, ImageIcon, CheckCircle2 } from "lucide-react";
 import { announcementApi } from "../../../../service/api";
 
 interface NewsItem {
   id: string;
   date: string;
+  category?: string;
   title: string;
   content: string;
   image?: string;
@@ -16,14 +18,18 @@ const DEFAULT_NEWS: NewsItem[] = [
   {
     id: "1",
     date: "24 ตุลาคม 2567",
+    category: "🚨 ประกาศสำคัญ/ด่วน",
     title: "แจ้งปิดจุดท่องเที่ยวบริเวณน้ำตกเหวนรกชั่วคราวเนื่องจากระดับน้ำสูง",
-    content: "เนื่องด้วยสถานการณ์ฝนตกหนักในพื้นที่ป่าต้นน้ำ ทำให้น้ำตกเหวนรกมีระดับน้ำเพิ่มสูงขึ้นอย่างรวดเร็วและมีความเป็นไปได้ที่จะทำให้เกิดอันตรายแก่นักท่องเที่ยว"
+    content: "เนื่องด้วยสถานการณ์ฝนตกหนักในพื้นที่ป่าต้นน้ำ ทำให้น้ำตกเหวนรกมีระดับน้ำเพิ่มสูงขึ้นอย่างรวดเร็วและมีความเป็นไปได้ที่จะทำให้เกิดอันตรายแก่นักท่องเที่ยว",
+    image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=800&q=80"
   },
   {
     id: "2",
     date: "20 ตุลาคม 2567",
-    title: "หัวข้อ ////",
-    content: "รายละเอียดเนื้อหาประกาศความสำคัญอื่นๆ ของอุทยานแห่งชาติเขาใหญ่"
+    category: "📢 กิจกรรม & ข่าวทั่วไป",
+    title: "โครงการปลูกป่าฟื้นฟูระบบนิเวศอุทยานแห่งชาติเขาใหญ่ ประจำปี 2567",
+    content: "ขอเชิญชวนจิตอาสาร่วมกิจกรรมปลูกป่าเพื่อเพิ่มพื้นที่สีเขียวและสร้างแหล่งอาหารให้แก่สัตว์ป่า ณ บริเวณลานกางเต็นท์ผากล้วยไม้",
+    image: "https://images.unsplash.com/photo-1511497584788-876761c144ee?auto=format&fit=crop&w=800&q=80"
   }
 ];
 
@@ -46,42 +52,55 @@ const formatThaiDateLong = (dateStr: string) => {
 export default function ListNews() {
   const router = useRouter();
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDeleteId, setSelectedDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchNews = async () => {
+      // 1. Read local storage first (contains newly published announcements and images)
+      const saved = localStorage.getItem("greenpass_news_data");
+      let localList: NewsItem[] = [];
+      if (saved) {
+        try {
+          localList = JSON.parse(saved);
+        } catch (e) {
+          localList = [];
+        }
+      }
+
+      let apiList: NewsItem[] = [];
       try {
-        // ยิง API ไปยัง Backend Spring Boot
         const result = await announcementApi.getAllAnnouncements();
-        if (result.success && result.result) {
-          const mappedNews = result.result.map((item: any) => ({
+        const apiData = result?.result || result?.data;
+        if (result && (result.success || result.status) && Array.isArray(apiData) && apiData.length > 0) {
+          apiList = apiData.map((item: any) => ({
             id: String(item.announcementId || item.id || Math.random()),
             date: formatThaiDateLong(item.postDate) || item.createdAt || item.date || "ไม่ระบุวันที่",
+            category: item.category || "📢 ประกาศข่าวสาร",
             title: item.announcementTitle || item.title || "ไม่มีหัวข้อ",
             content: item.description || item.content || "",
             image: item.image || null
           }));
-          setNews(mappedNews);
-          localStorage.setItem("greenpass_news_data", JSON.stringify(mappedNews));
-          return;
         }
       } catch (error) {
         console.error("Failed to fetch news from API:", error);
       }
 
-      // กรณีดึง API ไม่สำเร็จ ให้ใช้ข้อมูลจาก localStorage หรือ DEFAULT_NEWS สำรอง
-      const saved = localStorage.getItem("greenpass_news_data");
-      if (saved) {
-        try {
-          setNews(JSON.parse(saved));
-        } catch (e) {
-          setNews(DEFAULT_NEWS);
+      // Merge localList and apiList, keeping localList (newly added items) at the top
+      const map = new Map<string, NewsItem>();
+      localList.forEach(item => map.set(String(item.id), item));
+      apiList.forEach(item => {
+        if (!map.has(String(item.id))) {
+          map.set(String(item.id), item);
         }
-      } else {
-        setNews(DEFAULT_NEWS);
-        localStorage.setItem("greenpass_news_data", JSON.stringify(DEFAULT_NEWS));
-      }
+      });
+
+      const mergedList = Array.from(map.values());
+      const finalList = mergedList.length > 0 ? mergedList : DEFAULT_NEWS;
+
+      setNews(finalList);
+      localStorage.setItem("greenpass_news_data", JSON.stringify(finalList));
     };
 
     fetchNews();
@@ -96,124 +115,173 @@ export default function ListNews() {
     if (!selectedDeleteId) return;
     try {
       await announcementApi.deleteAnnouncement(selectedDeleteId);
+    } catch (error) {
+      console.error("Failed to delete announcement from database:", error);
+    } finally {
       const updated = news.filter((item) => item.id !== selectedDeleteId);
       setNews(updated);
       localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
-    } catch (error) {
-      console.error("Failed to delete announcement from database:", error);
-      alert("เกิดข้อผิดพลาดในการลบข้อมูลประกาศจากฐานข้อมูล");
-    } finally {
       setShowDeleteModal(false);
       setSelectedDeleteId(null);
     }
   };
 
-  const handleCancelDelete = () => {
-    setShowDeleteModal(false);
-    setSelectedDeleteId(null);
-  };
+  const filteredNews = news.filter(
+    (item) =>
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div
-      className="min-h-[80vh] w-full rounded-2xl overflow-hidden bg-cover bg-center p-6 flex items-center justify-center font-sans relative"
-      style={{ backgroundImage: "url('https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&w=1200&q=80')" }} // พื้นหลังวิวป่าไม้เดียวกับประกาศข่าว
-    >
+    <div className="max-w-5xl mx-auto space-y-6 font-sans">
+      
+      {/* Header Banner */}
+      <div className="bg-[#0a5829] text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs uppercase tracking-wider">
+            <Megaphone className="w-4 h-4" /> Park Announcements Repository
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold">รายการข่าวสารและประกาศอุทยาน</h1>
+          <p className="text-emerald-100 text-xs sm:text-sm max-w-xl">
+            จัดการ แก้ไข และระงับข่าวสารประกาศของอุทยานแห่งชาติเขาใหญ่ ({news.length} รายการ)
+          </p>
+        </div>
 
-      {/* การ์ดสีขาวหลักตามภาพสเก็ตช์ 2 */}
-      <div className="w-full max-w-2xl bg-white border border-zinc-200 shadow-2xl rounded-2xl p-6 space-y-4 relative">
+        <button
+          onClick={() => router.push("/ranger/announce-news")}
+          className="relative z-10 inline-flex items-center space-x-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-full shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>สร้างประกาศข่าวสารใหม่</span>
+        </button>
+      </div>
 
-        {/* หัวเรื่องการ์ด */}
-        <h2 className="text-center font-bold text-[#0c592b] text-[15px]">
-          ประกาศข่าวสารอุทยานแห่งชาติเขาใหญ่
-        </h2>
+      {/* Search Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center gap-3">
+        <Search className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="ค้นหาหัวข้อประกาศ หรือเนื้อหาข่าวสาร..."
+          className="w-full text-xs font-medium text-slate-800 bg-transparent focus:outline-none placeholder:text-slate-400"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery("")} className="text-xs text-slate-400 hover:text-slate-600 font-bold">
+            ล้างคำค้น
+          </button>
+        )}
+      </div>
 
-        {/* แถบรายการแบบ Scrollable */}
-        <div className="max-h-[350px] overflow-y-auto pr-2 space-y-4 text-xs">
-          {news.length === 0 ? (
-            <div className="text-center text-zinc-400 py-10">ไม่มีประกาศข่าวสาร</div>
-          ) : (
-            news.map((item) => (
-              <div
-                key={item.id}
-                className="bg-[#dcdcdc] rounded p-4 border border-zinc-350 space-y-3 shadow-sm relative"
-              >
-                {/* แถวหัวข้อการทำงาน: วันที่, ถังขยะลบ, และปุ่มแก้ไข */}
-                <div className="flex items-center justify-between border-b border-zinc-300 pb-1.5 font-bold text-zinc-700">
-                  <div className="flex items-center gap-1">
-                    <span>📅 {item.date}</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {/* ไอคอนถังขยะลบข่าวสาร */}
-                    <button
-                      onClick={() => handleDeleteClick(item.id)}
-                      className="text-zinc-500 hover:text-red-600 text-sm cursor-pointer"
-                      title="ลบประกาศข่าวสาร"
-                    >
-                      🗑
-                    </button>
-                    {/* ปุ่มแก้ไข */}
-                    <button
-                      onClick={() => router.push(`/ranger/edit-news-details?id=${item.id}`)}
-                      className="px-4 py-0.5 bg-[#4ce161] hover:bg-[#3cd051] text-zinc-900 font-bold rounded cursor-pointer text-[10px]"
-                    >
-                      แก้ไข
-                    </button>
-                  </div>
+      {/* News List Grid */}
+      <div className="space-y-4">
+        {filteredNews.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3 shadow-sm">
+            <AlertCircle className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="text-xs font-bold text-slate-600">ไม่พบรายการข่าวสารประกาศ</p>
+            <button
+              onClick={() => router.push("/ranger/announce-news")}
+              className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs rounded-xl hover:bg-emerald-100"
+            >
+              + เพิ่มประกาศแรก
+            </button>
+          </div>
+        ) : (
+          filteredNews.map((item) => (
+            <div
+              key={item.id}
+              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all duration-200 space-y-4 border-l-4 border-l-[#0a5829]"
+            >
+              {/* Top Row: Date, Category & Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2 text-xs">
+                  <span className="inline-flex items-center text-slate-500 font-bold">
+                    <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                    {item.date}
+                  </span>
+                  {item.category && (
+                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 font-bold text-[10px] rounded-full border border-emerald-200">
+                      {item.category}
+                    </span>
+                  )}
                 </div>
 
-                {/* โครงร่างภาพจำลองและข้อมูลประกาศข่าว (ตามรูปสเก็ตช์ 2) */}
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => router.push(`/ranger/edit-news-details?id=${item.id}`)}
+                    className="inline-flex items-center space-x-1 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-200 transition-all cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>แก้ไข</span>
+                  </button>
 
-                  {/* กล่องรูปภาพจริง หรือรูปภาพจำลอง */}
+                  <button
+                    onClick={() => handleDeleteClick(item.id)}
+                    className="inline-flex items-center space-x-1 px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>ลบ</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Content Layout */}
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                
+                {/* Thumbnail Image */}
+                <div className="w-full sm:w-44 h-28 bg-slate-100 rounded-xl overflow-hidden shrink-0 border border-slate-200 relative group">
                   {item.image ? (
-                    <img 
-                      src={item.image} 
-                      alt={item.title} 
-                      className="w-full sm:w-36 h-20 object-cover rounded border border-zinc-400 shrink-0" 
-                    />
+                    <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
-                    <div className="w-full sm:w-36 h-20 bg-[#969696] rounded flex items-center justify-center border border-zinc-400 shrink-0">
-                      <span className="text-zinc-900 font-bold text-[10px]">รูปภาพ</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50">
+                      <ImageIcon className="w-6 h-6 mb-1 text-slate-300" />
+                      <span className="text-[10px] font-bold">ไม่มีรูปประกอบ</span>
                     </div>
                   )}
+                </div>
 
-                  {/* คำโปรยหัวข้อสำคัญ */}
-                  <div className="text-zinc-800 font-bold leading-relaxed flex-1">
-                    <span className="text-zinc-650 block mb-1">หัวข้อประกาศสำคัญ :</span>
-                    <p className="line-clamp-3">{item.title}</p>
-                  </div>
-
+                {/* Details */}
+                <div className="space-y-2 flex-1">
+                  <h3 className="text-sm font-bold text-slate-900 leading-snug hover:text-emerald-700 transition-colors">
+                    {item.title}
+                  </h3>
+                  <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed font-medium">
+                    {item.content}
+                  </p>
                 </div>
 
               </div>
-            ))
-          )}
-        </div>
-
+            </div>
+          ))
+        )}
       </div>
 
-      {/* ป๊อปอัปยืนยันการลบตรงตามรูปสเก็ตช์ 4 (Remove News) */}
+      {/* Styled Delete Modal Dialog */}
       {showDeleteModal && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-white rounded-lg p-5 text-center border border-zinc-200 shadow-2xl animate-scale-up">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 text-center border border-slate-200 shadow-2xl space-y-5 animate-scale-up">
+            
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
 
-            <p className="text-zinc-900 font-bold text-xs mb-5">
-              คุณต้องการลบรายการข่าวสารนี้ใช่หรือไม่?
-            </p>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-slate-900">ยืนยันการลบประกาศข่าวสาร</h4>
+              <p className="text-xs text-slate-500">คุณต้องการลบรายการข่าวสารนี้ออกจากระบบใช่หรือไม่?</p>
+            </div>
 
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-3 pt-2">
               <button
-                onClick={handleConfirmDelete}
-                className="px-6 py-1 bg-[#4ce161] hover:bg-[#3cd051] text-zinc-900 font-bold rounded text-xs cursor-pointer"
-              >
-                ตกลง
-              </button>
-              <button
-                onClick={handleCancelDelete}
-                className="px-6 py-1 bg-[#4ce161] hover:bg-[#3cd051] text-zinc-900 font-bold rounded text-xs cursor-pointer"
+                onClick={() => setShowDeleteModal(false)}
+                className="w-1/2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
               >
                 ยกเลิก
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="w-1/2 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer"
+              >
+                ยืนยันการลบ
               </button>
             </div>
 
@@ -224,3 +292,4 @@ export default function ListNews() {
     </div>
   );
 }
+

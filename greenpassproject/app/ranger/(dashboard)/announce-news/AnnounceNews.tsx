@@ -2,13 +2,21 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Megaphone, Calendar, Tag, Image as ImageIcon, UploadCloud, CheckCircle2, X, ArrowLeft, Send } from "lucide-react";
 import { announcementApi } from "../../../../service/api";
 
+const CATEGORIES = [
+  "🚨 ประกาศสำคัญ/ด่วน",
+  "📢 กิจกรรม & ข่าวทั่วไป",
+  "⚠️ ปิดบริการชั่วคราว",
+  "🌿 สภาพอากาศ & ธรรมชาติ"
+];
 
 export default function AnnounceNews() {
   const router = useRouter();
   const [publishDate, setPublishDate] = useState("24 ตุลาคม 2567");
   const [title, setTitle] = useState("แจ้งปิดจุดท่องเที่ยวบริเวณน้ำตกเหวนรกชั่วคราวเนื่องจากระดับน้ำสูง");
+  const [category, setCategory] = useState("🚨 ประกาศสำคัญ/ด่วน");
   const [content, setContent] = useState("เนื่องด้วยสถานการณ์ฝนตกหนักในพื้นที่ป่าต้นน้ำ ทำให้น้ำตกเหวนรกมีระดับน้ำเพิ่มสูงขึ้นอย่างรวดเร็วและมีความเป็นไปได้ที่จะทำให้เกิดอันตรายแก่นักท่องเที่ยว");
   const [image, setImage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -35,19 +43,18 @@ export default function AnnounceNews() {
     try {
       const username = localStorage.getItem("ranger_username") || "ranger01";
 
-      // 1. บันทึกลงฐานข้อมูล Spring Boot ผ่าน API
       await announcementApi.addAnnouncement({
         title,
-        content,
+        content: `[${category}] ${content}`,
         publishDate,
         username,
         image
       });
 
-      // 2. บันทึกลง localStorage สำรองเพื่อรองรับการทำงานของ frontend
       const newPost = {
         id: String(Date.now()),
         date: publishDate,
+        category: category,
         title: title,
         content: content,
         image: image
@@ -63,100 +70,204 @@ export default function AnnounceNews() {
         }
       }
       
-      newsList.unshift(newPost); // เอาขึ้นบนสุด
+      newsList.unshift(newPost);
       localStorage.setItem("greenpass_news_data", JSON.stringify(newsList));
 
-      setSuccess("บันทึกประกาศข่าวสารอุทยานสำเร็จ!");
+      setSuccess("บันทึกและประกาศข่าวสารอุทยานสำเร็จเรียบร้อยแล้ว!");
       setTimeout(() => {
         router.push("/ranger/list-news");
-      }, 1000);
+      }, 1200);
     } catch (err: any) {
       console.error("Failed to save announcement to database:", err);
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล");
+      // Local storage fallback for smooth flow
+      const newPost = {
+        id: String(Date.now()),
+        date: publishDate,
+        category: category,
+        title: title,
+        content: content,
+        image: image
+      };
+      const savedNews = localStorage.getItem("greenpass_news_data");
+      let newsList = [];
+      if (savedNews) {
+        try { newsList = JSON.parse(savedNews); } catch (e) { newsList = []; }
+      }
+      newsList.unshift(newPost);
+      localStorage.setItem("greenpass_news_data", JSON.stringify(newsList));
+
+      setSuccess("บันทึกประกาศข่าวสารเรียบร้อยแล้ว (โหมดออฟไลน์)");
+      setTimeout(() => {
+        router.push("/ranger/list-news");
+      }, 1200);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div 
-      className="min-h-[80vh] w-full rounded-2xl overflow-hidden bg-cover bg-center p-6 flex items-center justify-center font-sans relative"
-      style={{ backgroundImage: "url('https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&w=1200&q=80')" }} // จำลองพื้นหลังแนวป่าไม้ทึบเขียวขจีตามรูปสเก็ตช์ 1
-    >
+    <div className="max-w-4xl mx-auto space-y-6 font-sans">
       
-      {/* การ์ดสีขาวแสดงฟอร์มตรงกลาง */}
-      <form onSubmit={handleSubmit} className="w-full max-w-2xl bg-white border border-zinc-200 shadow-2xl rounded-2xl p-6 sm:p-8 space-y-6">
-        
-        {/* กล่องอัปโหลดและพรีวิวรูปภาพประกอบ */}
-        <div className="w-full max-w-sm mx-auto flex flex-col items-center gap-3">
-          <div className="w-full h-40 bg-[#969696] rounded flex items-center justify-center border border-zinc-400 overflow-hidden relative">
-            {image ? (
-              <img src={image} alt="Preview" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-zinc-900 font-bold text-sm">ยังไม่มีรูปภาพประกาศ</span>
-            )}
+      {/* Toast Notification */}
+      {success && (
+        <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{success}</span>
           </div>
-          <label className="cursor-pointer px-4 py-1.5 bg-[#cccccc] hover:bg-[#b5b5b5] text-zinc-900 font-bold rounded transition-colors border border-zinc-300 text-xs">
-            เลือกรูปภาพประกาศ...
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageChange}
-            />
-          </label>
+          <button onClick={() => setSuccess("")} className="text-emerald-600 hover:text-emerald-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Header Banner */}
+      <div className="bg-[#0a5829] text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs uppercase tracking-wider">
+            <Megaphone className="w-4 h-4" /> News &amp; Announcements Center
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold">สร้างประกาศข่าวสารอุทยาน</h1>
+          <p className="text-emerald-100 text-xs sm:text-sm max-w-xl">
+            เผยแพร่ข้อมูลข่าวสาร การแจ้งเตือน และกิจกรรมสำคัญให้แก่นักท่องเที่ยวและเจ้าหน้าที่
+          </p>
         </div>
 
-        {/* ฟิลด์กรอกข้อมูลต่างๆ */}
-        <div className="space-y-4 text-xs font-bold text-zinc-800">
+        <button
+          onClick={() => router.push("/ranger/list-news")}
+          className="relative z-10 inline-flex items-center space-x-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all duration-200 shrink-0 cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>ดูรายการข่าวสารทั้งหมด</span>
+        </button>
+      </div>
+
+      {/* Main Form Card */}
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        
+        {/* Upload Image Section */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <ImageIcon className="w-4 h-4 text-emerald-600" />
+            <span>รูปภาพประกอบประกาศ</span>
+          </label>
+
+          <div className="w-full h-52 bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl transition-all flex flex-col items-center justify-center relative overflow-hidden group">
+            {image ? (
+              <>
+                <img src={image} alt="Preview" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <label className="px-4 py-2 bg-white text-slate-900 font-bold text-xs rounded-xl cursor-pointer shadow-md hover:bg-slate-100">
+                    เปลี่ยนรูปภาพ
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setImage("")}
+                    className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md hover:bg-rose-500"
+                  >
+                    ลบรูปภาพ
+                  </button>
+                </div>
+              </>
+            ) : (
+              <label className="flex flex-col items-center justify-center cursor-pointer p-6 w-full h-full text-center">
+                <UploadCloud className="w-10 h-10 text-emerald-600 mb-2 animate-bounce" />
+                <span className="text-xs font-bold text-slate-700 mb-1">คลิกเพื่ออัปโหลดรูปภาพข่าวสาร</span>
+                <span className="text-[11px] text-slate-400">รองรับไฟล์ PNG, JPG, WEBP (แนะนำขนาด 1200x630px)</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              </label>
+            )}
+          </div>
+        </div>
+
+        {/* Inputs Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
-          {/* วันที่ประกาศข่าวสาร */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <label className="sm:w-40" htmlFor="publishDate">วันที่ประกาศข่าวสาร :</label>
+          {/* วันที่ประกาศ */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5" htmlFor="publishDate">
+              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+              <span>วันที่ประกาศข่าวสาร</span>
+            </label>
             <input
               id="publishDate"
               type="text"
               value={publishDate}
               onChange={(e) => setPublishDate(e.target.value)}
-              className="bg-[#cccccc] text-zinc-900 px-3 py-2 rounded focus:outline-none w-full sm:w-2/3 border border-zinc-300"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all"
+              placeholder="เช่น 24 ตุลาคม 2567"
             />
           </div>
 
-          {/* หัวข้อข่าวสาร */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <label className="sm:w-40" htmlFor="title">หัวข้อข่าวสาร :</label>
-            <input
-              id="title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="bg-[#cccccc] text-zinc-900 px-3 py-2 rounded focus:outline-none w-full sm:w-2/3 border border-zinc-300"
-            />
-          </div>
-
-          {/* รายละเอียดข่าวสาร */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <label className="sm:w-40 pt-2" htmlFor="content">รายละเอียดข่าวสาร :</label>
-            <textarea
-              id="content"
-              rows={4}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="bg-[#cccccc] text-zinc-900 p-3 rounded focus:outline-none w-full sm:w-2/3 border border-zinc-300 leading-relaxed font-bold"
-            />
+          {/* หมวดหมู่ข่าวสาร */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-emerald-600" />
+              <span>หมวดหมู่ประกาศ</span>
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all cursor-pointer"
+            >
+              {CATEGORIES.map((cat, idx) => (
+                <option key={idx} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
         </div>
 
-        {/* ปุ่มยืนยันตกลงด้านล่างขวา */}
-        <div className="flex justify-end pt-2">
-          {success && <span className="text-emerald-600 text-xs mr-4 self-center font-bold">{success}</span>}
+        {/* หัวข้อข่าวสาร */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="title">
+            หัวข้อประกาศข่าวสาร <span className="text-rose-500">*</span>
+          </label>
+          <input
+            id="title"
+            type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all"
+            placeholder="กรอกหัวข้อข่าวสารที่ต้องการประกาศ..."
+          />
+        </div>
+
+        {/* รายละเอียดข่าวสาร */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="content">
+            รายละเอียดเนื้อหาประกาศ <span className="text-rose-500">*</span>
+          </label>
+          <textarea
+            id="content"
+            required
+            rows={5}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all leading-relaxed font-medium"
+            placeholder="กรอกรายละเอียดเนื้อหาเพิ่มเติม..."
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => router.push("/ranger/list-news")}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+          >
+            ยกเลิก
+          </button>
+
           <button
             type="submit"
             disabled={isLoading}
-            className="px-6 py-2 bg-[#6df17c] hover:bg-[#5ae069] disabled:bg-zinc-200 text-zinc-900 font-bold rounded-lg transition-colors cursor-pointer text-xs"
+            className="inline-flex items-center space-x-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
           >
-            {isLoading ? "กำลังประมวลผล..." : "ตกลง"}
+            <Send className="w-3.5 h-3.5" />
+            <span>{isLoading ? "กำลังบันทึกข้อมูล..." : "เผยแพร่ประกาศข่าวสาร"}</span>
           </button>
         </div>
 
@@ -165,3 +276,4 @@ export default function AnnounceNews() {
     </div>
   );
 }
+

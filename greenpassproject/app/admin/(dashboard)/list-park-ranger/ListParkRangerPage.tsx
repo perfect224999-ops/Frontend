@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { rangerApi } from "../../../../service/api";
-
+import { Search, Filter, ChevronDown, UserCheck, Plus, ShieldCheck } from "lucide-react";
 
 interface Ranger {
   id: string;
@@ -61,13 +61,11 @@ const formatPhone = (phoneStr: string) => {
 };
 
 const INITIAL_RANGERS: Ranger[] = [
-  { id: "01", name: "สมชาย ใจดี", phone: "065-5249531", email: "perfasd@gmail.com", role: "หัวหน้าอุทยาน", parkName: "อุทยานแห่งชาติเขาใหญ่" },
-  { id: "02", name: "สมหญิง พูนสุข", phone: "054-5478536", email: "asdaddsd@gmail.com", role: "เจ้าหน้าที่พิทักษ์ป่า", parkName: "อุทยานแห่งชาติเขาใหญ่" },
+  { id: "01", name: "สมชาย ใจดี", phone: "089-1234567", email: "ranger01@park.go.th", role: "เจ้าหน้าที่อุทยาน", parkName: "ดอยอินทนนท์" },
+  { id: "02", name: "สมหญิง รักษ์ป่า", phone: "089-7654321", email: "ranger02@park.go.th", role: "เจ้าหน้าที่อุทยาน", parkName: "ดอยอินทนนท์" },
   { id: "03", name: "อนันต์ ศรีสุข", phone: "085-4785236", email: "sdperfasd@gmail.com", role: "เจ้าหน้าที่บริการนักท่องเที่ยว", parkName: "อุทยานแห่งชาติเขาใหญ่" },
   { id: "04", name: "จอนนี่ จิ้มเอม", phone: "057-1425756", email: "xcperfasd@gmail.com", role: "เจ้าหน้าที่ประชาสัมพันธ์", parkName: "อุทยานแห่งชาติแก่งกระจาน" },
-  { id: "05", name: "วิทยา พรหมมา", phone: "095-7845889", email: "ewperfasd@gmail.com", role: "เจ้าหน้าที่ธุรการ", parkName: "อุทยานแห่งชาติแก่งกระจาน" },
-  { id: "06", name: "สมชิง สมานอารมณ์", phone: "086-4525696", email: "scvperfasd@gmail.com", role: "เจ้าหน้าที่บริการนักท่องเที่ยว", parkName: "อุทยานแห่งชาติแก่งกระจาน" },
-  { id: "07", name: "สมพง สนองเกียรติ", phone: "065-8421557", email: "sdpxdwerd@gmail.com", role: "เจ้าหน้าที่พิทักษ์ป่า", parkName: "อุทยานแห่งชาติเขาใหญ่" }
+  { id: "05", name: "วิทยา พรหมมา", phone: "095-7845889", email: "ewperfasd@gmail.com", role: "เจ้าหน้าที่ธุรการ", parkName: "อุทยานแห่งชาติแก่งกระจาน" }
 ];
 
 export default function ListParkRangerPage() {
@@ -87,8 +85,8 @@ export default function ListParkRangerPage() {
             name: `${item.firstname} ${item.surname}`,
             phone: formatPhone(item.mobilephone),
             email: item.email,
-            role: item.position,
-            parkName: item.park?.name || "ไม่ระบุอุทยาน",
+            role: item.position || "เจ้าหน้าที่อุทยาน",
+            parkName: item.park?.name || "ดอยอินทนนท์",
             // Additional detail fields
             firstName: item.firstname,
             lastName: item.surname,
@@ -106,8 +104,25 @@ export default function ListParkRangerPage() {
               item.canProgressReport && "รายงานความคืบหน้าของเหตุการณ์"
             ].filter(Boolean) as string[]
           }));
-          setRangers(mapped);
-          localStorage.setItem("greenpass_rangers", JSON.stringify(mapped));
+
+          // Reverse mapped list so the latest added ranger is at the top
+          const reversedMapped = [...mapped].reverse();
+
+          // Merge with localStorage rangers if present (preserving newest at top)
+          const saved = localStorage.getItem("greenpass_rangers");
+          if (saved) {
+            try {
+              const localList: Ranger[] = JSON.parse(saved);
+              const apiUsernames = new Set(mapped.map(r => r.id));
+              const extraLocal = localList.filter(r => !apiUsernames.has(r.id));
+              setRangers([...extraLocal, ...reversedMapped]);
+              return;
+            } catch (e) {
+              console.error(e);
+            }
+          }
+
+          setRangers(reversedMapped);
         }
       } catch (error) {
         console.error("Failed to load rangers from backend, using localStorage fallback:", error);
@@ -116,96 +131,144 @@ export default function ListParkRangerPage() {
           try {
             setRangers(JSON.parse(saved));
           } catch (e) {
-            setRangers(INITIAL_RANGERS);
+            setRangers([...INITIAL_RANGERS].reverse());
           }
+        } else {
+          setRangers([...INITIAL_RANGERS].reverse());
         }
       }
     };
     fetchRangers();
   }, []);
 
+
   const filteredRangers = rangers.filter((r) => {
-    const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          r.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPark = selectedPark === "ทั้งหมด" || r.parkName === selectedPark;
     return matchesSearch && matchesPark;
   });
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-[#1b1212]/95 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative z-10 text-white font-sans text-[11px] my-6">
+    <div className="w-full max-w-7xl xl:max-w-[1380px] mx-auto font-sans relative py-4 space-y-6 my-2 px-2 sm:px-4">
       
-      {/* Search Header Bar (ตามรูปที่ 3.3.90 ในเอกสาร) */}
-      <div className="bg-[#2a1b1b] border border-zinc-700/40 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 mb-5">
-        <div className="relative w-full md:max-w-md">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ค้นหาชื่อ-นามสกุล"
-            className="w-full bg-white text-zinc-900 rounded-md px-3 py-1.5 focus:outline-none placeholder-zinc-500 font-bold border-none text-[10px]"
-          />
-        </div>
+      {/* Container หลัก สีขาว */}
+      <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl shadow-slate-200/50 text-slate-800">
         
-        <div className="w-full md:w-auto">
-          <select
-            value={selectedPark}
-            onChange={(e) => setSelectedPark(e.target.value)}
-            className="w-full md:w-auto bg-[#423131] hover:bg-[#4d3b3b] text-white rounded-md px-4 py-1.5 focus:outline-none font-bold border-none cursor-pointer text-[10px]"
-          >
-            <option value="ทั้งหมด">เลือกอุทยาน ▼</option>
-            <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
-            <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
-            <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
-          </select>
-        </div>
-      </div>
+        {/* Header Title & Add Action */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20">
+              <UserCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                รายชื่อเจ้าหน้าที่อุทยาน
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  {rangers.length} ท่าน
+                </span>
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                ค้นหาและจัดการข้อมูลประวัติเจ้าหน้าที่ปฏิบัติตามรายอุทยานทั่วประเทศ
+              </p>
+            </div>
+          </div>
 
-      {/* Table Container */}
-      <div className="overflow-x-auto rounded-xl border border-zinc-800">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="border-b border-zinc-800 text-zinc-400 font-bold bg-[#140b0b]">
-              <th className="px-4 py-3">ลำดับ</th>
-              <th className="px-4 py-3">ชื่อ-นามสกุล</th>
-              <th className="px-4 py-3">เบอร์มือถือ</th>
-              <th className="px-4 py-3">อีเมล</th>
-              <th className="px-4 py-3">ตำแหน่ง</th>
-              <th className="px-4 py-3">อุทยานแห่งชาติ</th>
-              <th className="px-4 py-3 text-center">รายละเอียด</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/80 font-medium">
-            {filteredRangers.length > 0 ? (
-              filteredRangers.map((ranger, idx) => (
-                <tr key={ranger.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 font-bold text-zinc-400">
-                    {String(idx + 1).padStart(2, "0")}
-                  </td>
-                  <td className="px-4 py-3 text-white font-bold">{ranger.name}</td>
-                  <td className="px-4 py-3 text-zinc-300">{ranger.phone}</td>
-                  <td className="px-4 py-3 text-zinc-300 underline font-normal">{ranger.email}</td>
-                  <td className="px-4 py-3 text-rose-300">{ranger.role}</td>
-                  <td className="px-4 py-3 text-zinc-300">{ranger.parkName}</td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => router.push(`/admin/view-park-ranger-detail?id=${ranger.id}`)}
-                      className="px-3 py-1 bg-[#27a336] hover:bg-[#1e8529] text-white text-[10px] font-bold rounded-lg cursor-pointer transition-colors shadow-sm"
-                    >
-                      รายละเอียด
-                    </button>
-                  </td>
+          <button
+            onClick={() => router.push("/admin/add-park-ranger")}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-600/20 hover:shadow-emerald-600/30 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>เพิ่มเจ้าหน้าที่ใหม่</span>
+          </button>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-3.5">
+          <div className="relative w-full md:max-w-md">
+            <Search className="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาตามชื่อ - นามสกุล หรือ อีเมล..."
+              className="w-full bg-white text-slate-800 placeholder-slate-400 rounded-xl pl-10 pr-4 py-2 text-xs font-medium border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
+            />
+          </div>
+          
+          <div className="relative w-full md:w-auto">
+            <Filter className="w-3.5 h-3.5 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              value={selectedPark}
+              onChange={(e) => setSelectedPark(e.target.value)}
+              className="w-full md:w-64 bg-white text-slate-800 rounded-xl pl-9 pr-10 py-2 text-xs font-medium border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer"
+            >
+              <option value="ทั้งหมด">เลือกอุทยานทั้งหมด</option>
+              <option value="ดอยอินทนนท์">อุทยานแห่งชาติดอยอินทนนท์</option>
+              <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
+              <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
+              <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Data Table */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white font-semibold">
+                  <th className="px-4 py-3.5">ลำดับ</th>
+                  <th className="px-4 py-3.5">ชื่อ-นามสกุล</th>
+                  <th className="px-4 py-3.5">เบอร์มือถือ</th>
+                  <th className="px-4 py-3.5">อีเมล</th>
+                  <th className="px-4 py-3.5">ตำแหน่ง</th>
+                  <th className="px-4 py-3.5">อุทยานแห่งชาติ</th>
+                  <th className="px-4 py-3.5 text-center">รายละเอียด</th>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500 font-bold">
-                  ไม่พบข้อมูลรายชื่อเจ้าหน้าที่อุทยาน
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {filteredRangers.length > 0 ? (
+                  filteredRangers.map((ranger, idx) => (
+                    <tr key={ranger.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3.5 font-bold text-slate-400 whitespace-nowrap">
+                        {String(idx + 1).padStart(2, "0")}
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap">{ranger.name}</td>
+                      <td className="px-4 py-3.5 text-slate-600 font-medium whitespace-nowrap">{ranger.phone}</td>
+                      <td className="px-4 py-3.5 text-emerald-700 underline font-normal whitespace-nowrap">{ranger.email}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          {ranger.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-700 font-medium whitespace-nowrap">{ranger.parkName}</td>
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <button
+                          onClick={() => router.push(`/admin/view-park-ranger-detail?id=${ranger.id}`)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl cursor-pointer transition-colors shadow-sm"
+                        >
+                          รายละเอียด
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400 font-medium">
+                      ไม่พบข้อมูลรายชื่อเจ้าหน้าที่อุทยาน
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
     </div>
   );
 }
+

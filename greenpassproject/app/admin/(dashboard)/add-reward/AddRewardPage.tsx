@@ -3,11 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { rewardApi } from "../../../../service/api";
+import {
+  Gift,
+  Trees,
+  FileText,
+  UploadCloud,
+  Check,
+  ArrowLeft,
+  Sparkles,
+  AlertCircle,
+  Image as ImageIcon,
+  X
+} from "lucide-react";
 
 export default function AddRewardPage() {
   const router = useRouter();
   
-  // Form states based on Page 165
   const [parkCount, setParkCount] = useState("156 แห่ง");
   const [rewardTitle, setRewardTitle] = useState("");
   const [rewardDetails, setRewardDetails] = useState("");
@@ -54,7 +65,7 @@ export default function AddRewardPage() {
         image
       });
 
-      // 2. บันทึกลง localStorage สำรองเพื่อรองรับการทำงานของ frontend
+      // 2. บันทึกลง localStorage สำรอง
       const saved = localStorage.getItem("greenpass_rewards");
       let list = [];
       if (saved) {
@@ -80,14 +91,15 @@ export default function AddRewardPage() {
 
       list.push(newReward);
       localStorage.setItem("greenpass_rewards", JSON.stringify(list));
-      setSuccess("เพิ่มข้อมูลของรางวัลสำเร็จแล้ว!");
+      setSuccess("เพิ่มข้อมูลของรางวัลสำเร็จแล้ว! กำลังนำคุณไปยังหน้าแสดงของรางวัล...");
 
       setTimeout(() => {
         setRewardTitle("");
         setRewardDetails("");
         setImage("");
-        router.push("/admin/view-reward-admin");
-      }, 1000);
+        window.location.href = "/admin/view-reward-admin";
+      }, 500);
+
 
     } catch (err: any) {
       console.error("Failed to add reward to database:", err);
@@ -99,84 +111,122 @@ export default function AddRewardPage() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-white border border-zinc-200 rounded-2xl p-8 shadow-2xl relative z-10 text-zinc-800 font-sans text-[11px] my-6">
+    <div className="w-full max-w-5xl xl:max-w-6xl mx-auto font-sans relative py-4 my-2 px-2 sm:px-4">
       
-      {/* Notifications */}
-      {error && (
-        <div className="mb-4 p-2 bg-red-50 border border-red-200 text-red-700 rounded text-center font-bold">
-          {error}
+      {/* Container หลัก */}
+      <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl shadow-slate-200/50">
+        
+        {/* Header Title Section */}
+        <div className="flex items-center gap-3.5 border-b border-slate-200/80 pb-5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20">
+            <Gift className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              เพิ่มของรางวัลใหม่
+              <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Reward Catalog
+              </span>
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              สร้างรายการของรางวัลสะสมแต้มสำหรับนักท่องเที่ยวอุทยานแห่งชาติ
+            </p>
+          </div>
         </div>
-      )}
-      {success && (
-        <div className="mb-4 p-2 bg-emerald-50 border border-emerald-250 text-emerald-700 rounded text-center font-bold">
-          {success}
-        </div>
-      )}
 
-      {/* Form (ตามรูปที่ 3.3.102 ในเอกสาร) */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="text-center font-bold text-sm pb-1 mb-4 text-zinc-800 uppercase tracking-wide">
-          เพิ่มของรางวัล
-        </div>
+        {/* Notifications */}
+        {error && (
+          <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-medium flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+            <span>{error}</span>
+          </div>
+        )}
+        {success && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+            <Check className="w-4 h-4 text-emerald-600" />
+            <span>{success}</span>
+          </div>
+        )}
 
-        <div className="space-y-3.5">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          
           {/* จำนวนอุทยาน */}
-          <div className="grid grid-cols-3 items-center gap-2">
-            <label className="font-bold text-zinc-650 text-right">จำนวนอุทยาน :</label>
-            <div className="col-span-2">
-              <input
-                type="text"
-                value={parkCount}
-                onChange={(e) => setParkCount(e.target.value)}
-                className="w-full bg-zinc-200 text-zinc-800 rounded px-3 py-1.5 focus:outline-none font-bold border-none"
-                disabled={isLoading}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+              <Trees className="w-3.5 h-3.5 text-emerald-600" />
+              เงื่อนไขจำนวนอุทยานที่ต้องท่องเที่ยว :
+            </label>
+            <input
+              type="text"
+              value={parkCount}
+              onChange={(e) => setParkCount(e.target.value)}
+              className="w-full bg-slate-50 text-slate-900 text-xs font-bold border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+              disabled={isLoading}
+            />
           </div>
 
           {/* หัวข้อรางวัล */}
-          <div className="grid grid-cols-3 items-center gap-2">
-            <label className="font-bold text-zinc-650 text-right">หัวข้อรางวัล :</label>
-            <div className="col-span-2">
-              <input
-                type="text"
-                value={rewardTitle}
-                onChange={(e) => setRewardTitle(e.target.value)}
-                placeholder="กรอกชื่อรางวัล"
-                className="w-full bg-zinc-200 text-zinc-800 rounded px-3 py-1.5 focus:outline-none font-medium border-none placeholder-zinc-400"
-                disabled={isLoading}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+              <Gift className="w-3.5 h-3.5 text-emerald-600" />
+              หัวข้อของรางวัล :
+            </label>
+            <input
+              type="text"
+              value={rewardTitle}
+              onChange={(e) => setRewardTitle(e.target.value)}
+              placeholder="เช่น บัตรผ่านเข้าอุทยานฟรี 1 ปีเต็ม ทุกอุทยานทั่วประเทศ"
+              className="w-full bg-slate-50 text-slate-900 text-xs font-medium border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+              disabled={isLoading}
+            />
           </div>
 
           {/* รายละเอียดเพิ่มเติม */}
-          <div className="grid grid-cols-3 items-start gap-2">
-            <label className="font-bold text-zinc-650 text-right pt-1.5">รายละเอียดเพิ่มเติม :</label>
-            <div className="col-span-2">
-              <textarea
-                rows={3}
-                value={rewardDetails}
-                onChange={(e) => setRewardDetails(e.target.value)}
-                placeholder="รายละเอียดเพิ่มเติมของของรางวัล"
-                className="w-full bg-zinc-200 text-zinc-800 rounded px-3 py-1.5 focus:outline-none font-medium border-none placeholder-zinc-400 leading-relaxed"
-                disabled={isLoading}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-emerald-600" />
+              รายละเอียดของรางวัลเพิ่มเติม :
+            </label>
+            <textarea
+              rows={3}
+              value={rewardDetails}
+              onChange={(e) => setRewardDetails(e.target.value)}
+              placeholder="อธิบายรายละเอียด สิทธิประโยชน์ และเงื่อนไขการรับรางวัล..."
+              className="w-full bg-slate-50 text-slate-900 text-xs font-medium border border-slate-200 rounded-xl p-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 leading-relaxed"
+              disabled={isLoading}
+            />
           </div>
 
           {/* รูปภาพประกอบ */}
-          <div className="grid grid-cols-3 items-start gap-2">
-            <label className="font-bold text-zinc-650 text-right pt-1.5">รูปภาพประกอบ :</label>
-            <div className="col-span-2 space-y-2">
-              <div className="w-full h-28 bg-zinc-200 rounded border border-zinc-300 flex items-center justify-center text-zinc-500 font-bold overflow-hidden relative shadow-inner">
-                {image ? (
-                  <img src={image} alt="Reward Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[10px]">รูปภาพประกอบ</span>
-                )}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+              รูปภาพประกอบของรางวัล :
+            </label>
+
+            {image ? (
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner group h-44 bg-slate-100">
+                <img src={image} alt="Reward Preview" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setImage("")}
+                  className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-colors cursor-pointer shadow-md"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <label className="w-full cursor-pointer flex justify-center py-1.5 bg-[#cccccc] hover:bg-[#b5b5b5] text-zinc-900 font-bold rounded transition-colors border border-zinc-300 text-[10px]">
-                เลือกรูปภาพประกอบ...
+            ) : (
+              <label className="w-full border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/70 hover:bg-emerald-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group text-center">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-semibold text-slate-700 group-hover:text-emerald-700">
+                  คลิกเพื่อเลือกไฟล์รูปภาพประกอบ...
+                </span>
+                <span className="text-[10px] text-slate-400 mt-1">
+                  รองรับไฟล์ภาพ JPG, PNG, WEBP
+                </span>
                 <input
                   type="file"
                   accept="image/*"
@@ -185,23 +235,38 @@ export default function AddRewardPage() {
                   disabled={isLoading}
                 />
               </label>
-            </div>
+            )}
           </div>
-        </div>
 
-        {/* Buttons */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-150">
-          <button
-            type="submit"
-            className="px-5 py-1.5 bg-[#27a336] hover:bg-[#1e8529] text-white text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
-            disabled={isLoading}
-          >
-            {isLoading && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            ยืนยัน
-          </button>
-        </div>
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => router.push("/admin/view-reward-admin")}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 flex items-center gap-2"
+            >
+              {isLoading ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Check className="w-4 h-4 stroke-[3]" />
+              )}
+              ยืนยันการเพิ่มของรางวัล
+            </button>
+          </div>
 
-      </form>
+        </form>
+
+      </div>
+
     </div>
   );
 }
+

@@ -3,11 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/service/api";
+import {
+  ShieldCheck,
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowRight,
+  Sparkles,
+  Check
+} from "lucide-react";
 
 export default function LoginAdminPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -78,98 +90,145 @@ export default function LoginAdminPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 font-sans p-4 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 font-sans p-4 relative overflow-hidden">
+      
+      {/* Dynamic Ambient Background Glows */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Title */}
-      <h1 className="text-xl font-bold text-zinc-900 mb-5 tracking-wide text-center">
-        GreenPass Thailand Admin
-      </h1>
-
-      {/* Centered White Card Box (ตามรูปที่ 3.3.84 ในเอกสาร) */}
-      <div className="w-full max-w-sm bg-white border border-zinc-200 rounded-xl p-8 shadow-[0_4px_25px_rgba(0,0,0,0.06)] relative z-10 text-zinc-800">
-
-        {/* Subtitle */}
-        <h2 className="text-base font-bold text-zinc-800 mb-6 tracking-tight">
-          Login Account Admin
-        </h2>
-
-        {/* Error notification */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-xs">
-            <span>{error}</span>
+      {/* Main Container */}
+      <div className="w-full max-w-md relative z-10 space-y-6">
+        
+        {/* Top Header Logo */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-xl shadow-emerald-500/20 mb-2 border border-emerald-400/30">
+            <ShieldCheck className="w-9 h-9" />
           </div>
-        )}
+          <h1 className="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
+            GreenPass <span className="text-emerald-400 font-semibold">Admin</span>
+          </h1>
+          <p className="text-xs text-emerald-200/70">
+            ระบบจัดการสำหรับผู้ดูแลระบบอุทยานแห่งชาติ
+          </p>
+        </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        {/* Card Box */}
+        <div className="bg-white/95 backdrop-blur-2xl border border-white/20 rounded-3xl p-7 sm:p-9 shadow-2xl shadow-black/40 text-slate-800 space-y-6">
+          
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              เข้าสู่ระบบสำหรับ Admin
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              กรุณากรอก Username และ Password เพื่อเข้าใช้งาน
+            </p>
+          </div>
 
-          {/* Username */}
-          <div className="space-y-1">
-            <label className="block text-xs font-bold text-zinc-500" htmlFor="admin-username">
-              Username
-            </label>
-            <input
-              id="admin-username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-white text-zinc-800 text-xs border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-zinc-400 font-medium"
+          {/* Error Notification Alert */}
+          {error && (
+            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-medium flex items-center gap-2.5 animate-shake">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            
+            {/* Username Input */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600" htmlFor="admin-username">
+                ชื่อผู้ใช้งาน (Username)
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="admin-username"
+                  type="text"
+                  placeholder="กรอกชื่อผู้ใช้ เช่น admin01"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-900 text-xs border border-slate-200 rounded-xl pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white font-medium transition-all"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* Password Input */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600" htmlFor="admin-password">
+                รหัสผ่าน (Password)
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="admin-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="กรอกรหัสผ่าน"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-900 text-xs border border-slate-200 rounded-xl pl-10 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white font-medium transition-all"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 accent-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                />
+                <span>จดจำการเข้าสู่ระบบ 30 วัน</span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
               disabled={isLoading}
-            />
-          </div>
+              className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 disabled:opacity-70 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:-translate-y-0.5 mt-4 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  กำลังเข้าสู่ระบบ...
+                </>
+              ) : (
+                <>
+                  <span>เข้าสู่ระบบ Admin</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
 
-          {/* Password */}
-          <div className="space-y-1">
-            <label className="block text-xs font-bold text-zinc-500" htmlFor="admin-password">
-              Password
-            </label>
-            <input
-              id="admin-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white text-zinc-800 text-xs border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-zinc-400 font-medium"
-              disabled={isLoading}
-            />
-          </div>
+          </form>
 
-          {/* Remember Me */}
-          <div className="flex items-center justify-between text-xs text-zinc-650 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer select-none text-zinc-500">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="accent-emerald-500 rounded border-zinc-300"
-              />
-              <span>Remember for 30 day</span>
-            </label>
-          </div>
+        </div>
 
-          {/* Submit Button */}
+        {/* Link back to Park Ranger Login */}
+        <div className="text-center">
           <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2 bg-[#00ff3c] hover:bg-[#00e035] bg-[#00f339] disabled:bg-emerald-800 text-black text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-sm mt-6 flex items-center justify-center gap-2"
+            onClick={() => router.push("/ranger/login-park-ranger")}
+            className="inline-flex items-center gap-1.5 text-xs text-emerald-300 hover:text-emerald-200 font-semibold transition-all hover:underline cursor-pointer group"
           >
-            {isLoading ? (
-              <>
-                <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                Signing In...
-              </>
-            ) : (
-              "Sign in"
-            )}
+            <span>เข้าสู่ระบบสำหรับเจ้าหน้าที่อุทยาน (Park Ranger)</span>
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
           </button>
-        </form>
+        </div>
+
       </div>
 
-      {/* Footer back to ranger portal link */}
-      <button
-        onClick={() => router.push("/ranger/login-park-ranger")}
-        className="mt-6 text-xs text-emerald-400 hover:text-emerald-300 font-bold transition-all underline cursor-pointer"
-      >
-        เข้าสู่ระบบฝั่งเจ้าหน้าที่อุทยาน (Park Ranger) &gt;
-      </button>
     </div>
   );
 }
+

@@ -35,6 +35,10 @@ export const stampApi = {
   scanCheckinQrCode: async (payload: { token: string; parkRangerId: number; parkRangerUsername: string }) => {
     const response = await api.post('/stamp', payload);
     return response.data;
+  },
+  getStatistics: async () => {
+    const response = await api.get('/stamp/statistics');
+    return response.data;
   }
 };
 
@@ -95,7 +99,7 @@ export const rangerApi = {
     const response = await api.get('/ranger/all');
     return response.data;
   },
-  updateRanger: async (username: string, payload: {
+  updateRanger: async (username: string, payload: Partial<{
     employeeId: string;
     firstName: string;
     lastName: string;
@@ -109,8 +113,16 @@ export const rangerApi = {
     gender: string;
     phone: string;
     email: string;
-  }) => {
+    canIssueStamp: boolean;
+    canAnnouncement: boolean;
+    canEditParkDetails: boolean;
+    canProgressReport: boolean;
+  }>) => {
     const response = await api.post(`/ranger/update?username=${username}`, payload);
+    return response.data;
+  },
+  getRangerByUsername: async (username: string) => {
+    const response = await api.get(`/ranger/get?username=${username}`);
     return response.data;
   }
 };
@@ -127,6 +139,25 @@ export const rewardApi = {
     image: string;
   }) => {
     const response = await api.post('/reward/add', payload);
+    return response.data;
+  },
+  updateReward: async (id: string, payload: {
+    rewardTitle: string;
+    rewardDetails: string;
+    image?: string;
+  }) => {
+    const response = await api.post(`/reward/update?id=${id}`, payload);
+    return response.data;
+  }
+};
+
+export const parkApi = {
+  getParkById: async (id: number = 1) => {
+    const response = await api.get(`/park/get?id=${id}`);
+    return response.data;
+  },
+  updatePark: async (payload: any) => {
+    const response = await api.post('/park/update', payload);
     return response.data;
   }
 };
