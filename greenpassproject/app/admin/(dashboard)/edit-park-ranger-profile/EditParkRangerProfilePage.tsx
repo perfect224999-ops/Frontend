@@ -376,26 +376,26 @@ function EditProfileContent() {
 
     setIsLoading(true);
     try {
-      if (currentRanger.id.startsWith("ranger")) {
-        try {
-          await rangerApi.updateRanger(currentRanger.id, {
-            employeeId,
-            firstName,
-            lastName,
-            birthDate,
-            position,
-            parkName,
-            startDate,
-            district,
-            subDistrict,
-            province,
-            gender,
-            phone,
-            email
-          });
-        } catch (apiErr) {
-          console.warn("Could not update ranger in backend DB API:", apiErr);
-        }
+      const targetUsername = (currentRanger.employeeId || currentRanger.id || employeeId).toLowerCase();
+
+      try {
+        await rangerApi.updateRanger(targetUsername, {
+          employeeId,
+          firstName,
+          lastName,
+          birthDate,
+          position,
+          parkName,
+          startDate,
+          district,
+          subDistrict,
+          province,
+          gender,
+          phone,
+          email
+        });
+      } catch (apiErr) {
+        console.warn("Could not update ranger in backend DB API:", apiErr);
       }
 
       const updatedObj = {

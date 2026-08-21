@@ -56,43 +56,53 @@ export default function ViewRewardAdminPage() {
 
   useEffect(() => {
     const fetchRewards = async () => {
-      // 1. อ่านจาก localStorage ก่อนเพื่อแสดงผลข้อมูลล่าสุดที่ผู้ใช้แก้ไขทันที
-      const saved = localStorage.getItem("greenpass_rewards");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.length > 0) {
-            setRewards(parsed);
-            return;
-          }
-        } catch (e) {
-          console.error("Failed to parse rewards from localStorage:", e);
-        }
-      }
-
-      // 2. หากยังไม่มีใน localStorage ให้ดึงจาก Backend API
+      let apiList: Reward[] = [];
       try {
         const response = await rewardApi.getAllRewards();
-        if (response.success && response.result && response.result.length > 0) {
-          const mapped: Reward[] = response.result.map((item: any) => ({
-            id: String(item.rewardId),
-            rewardTitle: item.rewardTitle,
-            rewardDetails: item.rewardDetails,
-            rewardAnnounmentDate: formatThaiDateLong(item.rewardAnnouncementDate),
+        const data = response?.result || response?.data;
+        if (response && (response.success || response.status) && Array.isArray(data) && data.length > 0) {
+          apiList = data.map((item: any) => ({
+            id: String(item.rewardId || item.id || Math.random()),
+            rewardTitle: item.rewardTitle || "ไม่มีชื่อของรางวัล",
+            rewardDetails: item.rewardDetails || "",
+            rewardAnnounmentDate: formatThaiDateLong(item.rewardAnnouncementDate) || "ไม่ระบุวันที่",
             parkCount: "156 แห่ง",
-            image: item.image
+            image: item.image || null
           }));
-          setRewards(mapped);
-          localStorage.setItem("greenpass_rewards", JSON.stringify(mapped));
-          return;
         }
       } catch (error) {
-        console.error("Failed to load rewards from backend, using default fallback:", error);
+        console.error("Failed to load rewards from backend API:", error);
       }
 
-      // 3. Fallback เป็นค่าเริ่มต้นกรณีเพิ่งเริ่มต้นใช้งานครั้งแรก
-      setRewards(DEFAULT_REWARDS);
-      localStorage.setItem("greenpass_rewards", JSON.stringify(DEFAULT_REWARDS));
+      const saved = localStorage.getItem("greenpass_rewards");
+      let localList: Reward[] = [];
+      if (saved) {
+        try {
+          localList = JSON.parse(saved);
+        } catch (e) {
+          localList = [];
+        }
+      }
+
+      const map = new Map<string, Reward>();
+      apiList.forEach((item) => map.set(String(item.id), item));
+      localList.forEach((item) => {
+        if (!map.has(String(item.id))) {
+          map.set(String(item.id), item);
+        }
+      });
+
+      const merged = Array.from(map.values());
+      merged.sort((a, b) => {
+        const numA = parseInt(a.id) || 0;
+        const numB = parseInt(b.id) || 0;
+        return numB - numA;
+      });
+
+      const finalList = merged.length > 0 ? merged : DEFAULT_REWARDS;
+
+      setRewards(finalList);
+      localStorage.setItem("greenpass_rewards", JSON.stringify(finalList));
     };
 
     fetchRewards();

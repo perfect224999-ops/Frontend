@@ -58,26 +58,28 @@ export default function AddRewardPage() {
 
     setIsLoading(true);
     try {
-      // 1. บันทึกลงฐานข้อมูล Spring Boot ผ่าน API
-      await rewardApi.addReward({
+      // 1. บันทึกลงฐานข้อมูล MySQL ผ่าน Spring Boot API
+      const result = await rewardApi.addReward({
         rewardTitle,
         rewardDetails,
         image
       });
 
-      // 2. บันทึกลง localStorage สำรอง
+      const newRewardId = result?.result?.rewardId || String(Date.now());
+
+      // 2. อัปเดต localStorage เพื่อความรวดเร็วในการแสดงผลฝั่ง Frontend
       const saved = localStorage.getItem("greenpass_rewards");
       let list = [];
       if (saved) {
         try {
           list = JSON.parse(saved);
         } catch (e) {
-          console.error(e);
+          list = [];
         }
       }
 
       const newReward = {
-        id: String(list.length + 1),
+        id: String(newRewardId),
         rewardTitle,
         rewardDetails,
         parkCount,
@@ -89,21 +91,20 @@ export default function AddRewardPage() {
         image
       };
 
-      list.push(newReward);
+      list.unshift(newReward);
       localStorage.setItem("greenpass_rewards", JSON.stringify(list));
-      setSuccess("เพิ่มข้อมูลของรางวัลสำเร็จแล้ว! กำลังนำคุณไปยังหน้าแสดงของรางวัล...");
+      setSuccess("เพิ่มข้อมูลของรางวัลลงฐานข้อมูลสำเร็จเรียบร้อยแล้ว!");
 
       setTimeout(() => {
         setRewardTitle("");
         setRewardDetails("");
         setImage("");
-        window.location.href = "/admin/view-reward-admin";
-      }, 500);
-
+        router.push("/admin/view-reward-admin");
+      }, 600);
 
     } catch (err: any) {
       console.error("Failed to add reward to database:", err);
-      const errMsg = err.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล";
+      const errMsg = err.response?.data?.message || err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล";
       setError(errMsg);
     } finally {
       setIsLoading(false);
