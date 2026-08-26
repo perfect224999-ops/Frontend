@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authApi } from "@/service/api";
+import { authApi, parkApi } from "@/service/api";
 import {
   Trees,
   User,
@@ -48,10 +48,28 @@ export default function LoginParkRanger() {
       if (isSuccess) {
         const rangerData = response.result || response.data;
         localStorage.setItem("ranger_username", cleanUsername);
-        
-        if (rangerData && rangerData.park && rangerData.park.parkId) {
-          localStorage.setItem("ranger_park_id", String(rangerData.park.parkId));
-          localStorage.setItem("ranger_park_name", rangerData.park.name || "");
+        localStorage.removeItem("greenpass_park_saved_data");
+
+        const targetParkId = rangerData?.park?.parkId || rangerData?.parkId;
+        if (targetParkId) {
+          localStorage.setItem("ranger_park_id", String(targetParkId));
+          const PARK_NAMES: Record<number, string> = {
+            1: "อุทยานแห่งชาติเขาใหญ่",
+            2: "อุทยานแห่งชาติแก่งกระจาน",
+            3: "อุทยานแห่งชาติเอราวัณ",
+            4: "อุทยานแห่งชาติดอยสุเทพ-ปุย",
+            5: "อุทยานแห่งชาติดอยอินทนนท์"
+          };
+          const pName = rangerData?.park?.name || PARK_NAMES[Number(targetParkId)] || "อุทยานแห่งชาติ";
+          localStorage.setItem("ranger_park_name", pName);
+
+          try {
+            const pRes = await parkApi.getParkById(Number(targetParkId));
+            const freshName = pRes?.result?.name || pRes?.data?.name;
+            if (freshName) {
+              localStorage.setItem("ranger_park_name", freshName);
+            }
+          } catch (e) {}
         } else if (cleanUsername === "ranger03") {
           localStorage.setItem("ranger_park_id", "2");
           localStorage.setItem("ranger_park_name", "อุทยานแห่งชาติแก่งกระจาน");
@@ -71,22 +89,17 @@ export default function LoginParkRanger() {
 
         // Save roles and permissions for active session
         let userRoles: string[] = [];
-        if (rangerData) {
+        const savedRoles = localStorage.getItem(`greenpass_ranger_roles_${cleanUsername}`);
+        if (savedRoles) {
+          try {
+            const parsed = JSON.parse(savedRoles);
+            if (Array.isArray(parsed)) userRoles = parsed;
+          } catch (e) {}
+        } else if (rangerData) {
           if (rangerData.canIssueStamp) userRoles.push("สแกนแสตมป์");
           if (rangerData.canAnnouncement) userRoles.push("ประกาศข่าวสาร");
           if (rangerData.canEditParkDetails) userRoles.push("แก้ไขรายละเอียด");
           if (rangerData.canProgressReport) userRoles.push("รายงานความคืบหน้าของเหตุการณ์");
-        }
-        
-        const savedRoles = localStorage.getItem(`greenpass_ranger_roles_${cleanUsername}`);
-        if (savedRoles && userRoles.length === 0) {
-          try {
-            userRoles = JSON.parse(savedRoles);
-          } catch (e) {}
-        }
-        
-        if (userRoles.length === 0) {
-          userRoles = ["สแกนแสตมป์", "ประกาศข่าวสาร", "แก้ไขรายละเอียด", "รายงานความคืบหน้าของเหตุการณ์"];
         }
 
         localStorage.setItem("ranger_roles", JSON.stringify(userRoles));

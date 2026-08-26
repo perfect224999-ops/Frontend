@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Megaphone, Calendar, Tag, Image as ImageIcon, UploadCloud, CheckCircle2, X, ArrowLeft, Send } from "lucide-react";
+import { Megaphone, Calendar, Tag, Image as ImageIcon, UploadCloud, CheckCircle2, X, ArrowLeft, Send, Lock } from "lucide-react";
 import { announcementApi } from "../../../../service/api";
 
 const CATEGORIES = [
@@ -12,9 +12,21 @@ const CATEGORIES = [
   "🌿 สภาพอากาศ & ธรรมชาติ"
 ];
 
+const formatTodayThaiDate = () => {
+  const months = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+  const today = new Date();
+  const day = today.getDate();
+  const month = months[today.getMonth()];
+  const year = today.getFullYear() + 543;
+  return `${day} ${month} ${year}`;
+};
+
 export default function AnnounceNews() {
   const router = useRouter();
-  const [publishDate, setPublishDate] = useState("24 ตุลาคม 2567");
+  const [publishDate] = useState(formatTodayThaiDate());
   const [title, setTitle] = useState("แจ้งปิดจุดท่องเที่ยวบริเวณน้ำตกเหวนรกชั่วคราวเนื่องจากระดับน้ำสูง");
   const [category, setCategory] = useState("🚨 ประกาศสำคัญ/ด่วน");
   const [content, setContent] = useState("เนื่องด้วยสถานการณ์ฝนตกหนักในพื้นที่ป่าต้นน้ำ ทำให้น้ำตกเหวนรกมีระดับน้ำเพิ่มสูงขึ้นอย่างรวดเร็วและมีความเป็นไปได้ที่จะทำให้เกิดอันตรายแก่นักท่องเที่ยว");
@@ -41,15 +53,20 @@ export default function AnnounceNews() {
 
     setIsLoading(true);
     try {
-      const username = localStorage.getItem("ranger_username") || "ranger01";
+      const username = localStorage.getItem("ranger_username") || "pr12";
+      const isoDate = new Date().toISOString().split("T")[0];
+      const apiImage = (image && image.length <= 255) ? image : "src/news1.jpg";
 
       await announcementApi.addAnnouncement({
         title,
         content: `[${category}] ${content}`,
-        publishDate,
+        publishDate: isoDate,
         username,
-        image
+        image: apiImage
       });
+
+      const currentParkId = localStorage.getItem("ranger_park_id") || "1";
+      const currentParkName = localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ";
 
       const newPost = {
         id: String(Date.now()),
@@ -57,7 +74,9 @@ export default function AnnounceNews() {
         category: category,
         title: title,
         content: content,
-        image: image
+        image: image,
+        parkId: Number(currentParkId),
+        parkName: currentParkName
       };
 
       const savedNews = localStorage.getItem("greenpass_news_data");
@@ -190,14 +209,16 @@ export default function AnnounceNews() {
               <Calendar className="w-3.5 h-3.5 text-emerald-600" />
               <span>วันที่ประกาศข่าวสาร</span>
             </label>
-            <input
-              id="publishDate"
-              type="text"
-              value={publishDate}
-              onChange={(e) => setPublishDate(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all"
-              placeholder="เช่น 24 ตุลาคม 2567"
-            />
+            <div className="relative">
+              <input
+                id="publishDate"
+                type="text"
+                value={publishDate}
+                readOnly
+                className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-500 cursor-not-allowed select-none transition-all pr-8"
+              />
+              <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            </div>
           </div>
 
           {/* หมวดหมู่ข่าวสาร */}

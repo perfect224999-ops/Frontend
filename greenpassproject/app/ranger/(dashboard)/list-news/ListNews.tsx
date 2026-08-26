@@ -12,6 +12,8 @@ interface NewsItem {
   title: string;
   content: string;
   image?: string;
+  parkId?: number;
+  parkName?: string;
 }
 
 const DEFAULT_NEWS: NewsItem[] = [
@@ -21,7 +23,9 @@ const DEFAULT_NEWS: NewsItem[] = [
     category: "🚨 ประกาศสำคัญ/ด่วน",
     title: "แจ้งปิดจุดท่องเที่ยวบริเวณน้ำตกเหวนรกชั่วคราวเนื่องจากระดับน้ำสูง",
     content: "เนื่องด้วยสถานการณ์ฝนตกหนักในพื้นที่ป่าต้นน้ำ ทำให้น้ำตกเหวนรกมีระดับน้ำเพิ่มสูงขึ้นอย่างรวดเร็วและมีความเป็นไปได้ที่จะทำให้เกิดอันตรายแก่นักท่องเที่ยว",
-    image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=800&q=80"
+    image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=800&q=80",
+    parkId: 1,
+    parkName: "อุทยานแห่งชาติเขาใหญ่"
   },
   {
     id: "2",
@@ -29,7 +33,9 @@ const DEFAULT_NEWS: NewsItem[] = [
     category: "📢 กิจกรรม & ข่าวทั่วไป",
     title: "โครงการปลูกป่าฟื้นฟูระบบนิเวศอุทยานแห่งชาติเขาใหญ่ ประจำปี 2567",
     content: "ขอเชิญชวนจิตอาสาร่วมกิจกรรมปลูกป่าเพื่อเพิ่มพื้นที่สีเขียวและสร้างแหล่งอาหารให้แก่สัตว์ป่า ณ บริเวณลานกางเต็นท์ผากล้วยไม้",
-    image: "https://images.unsplash.com/photo-1511497584788-876761c144ee?auto=format&fit=crop&w=800&q=80"
+    image: "https://images.unsplash.com/photo-1511497584788-876761c144ee?auto=format&fit=crop&w=800&q=80",
+    parkId: 1,
+    parkName: "อุทยานแห่งชาติเขาใหญ่"
   }
 ];
 
@@ -55,10 +61,33 @@ export default function ListNews() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDeleteId, setSelectedDeleteId] = useState<string | null>(null);
+  const [canAnnouncement, setCanAnnouncement] = useState(true);
+  const [parkName, setParkName] = useState("อุทยานแห่งชาติ");
+  const [parkId, setParkId] = useState<number>(1);
+
+  useEffect(() => {
+    const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
+    if (savedRoles) {
+      try {
+        const parsed = JSON.parse(savedRoles);
+        if (Array.isArray(parsed)) {
+          setCanAnnouncement(parsed.includes("ประกาศข่าวสาร"));
+        }
+      } catch (e) {}
+    }
+
+    const savedParkName = typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null;
+    const savedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
+    if (savedParkName) setParkName(savedParkName);
+    if (savedParkId && !isNaN(Number(savedParkId))) setParkId(Number(savedParkId));
+  }, []);
 
   useEffect(() => {
     const fetchNews = async () => {
-      // 1. Read local storage first (contains newly published announcements and images)
+      const activeParkId = typeof window !== "undefined" ? Number(localStorage.getItem("ranger_park_id") || 1) : 1;
+      const activeParkName = typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") || "" : "";
+
+      // 1. Read local storage first
       const saved = localStorage.getItem("greenpass_news_data");
       let localList: NewsItem[] = [];
       if (saved) {
@@ -80,14 +109,16 @@ export default function ListNews() {
             category: item.category || "📢 ประกาศข่าวสาร",
             title: item.announcementTitle || item.title || "ไม่มีหัวข้อ",
             content: item.description || item.content || "",
-            image: item.image || null
+            image: item.image || null,
+            parkId: item.parkId ? Number(item.parkId) : (item.parkName?.includes("เอราวัณ") ? 3 : item.parkName?.includes("แก่งกระจาน") ? 2 : 1),
+            parkName: item.parkName || activeParkName
           }));
         }
       } catch (error) {
         console.error("Failed to fetch news from API:", error);
       }
 
-      // Merge localList and apiList, keeping localList (newly added items) at the top
+      // Merge localList and apiList
       const map = new Map<string, NewsItem>();
       localList.forEach(item => map.set(String(item.id), item));
       apiList.forEach(item => {
@@ -97,14 +128,14 @@ export default function ListNews() {
       });
 
       const mergedList = Array.from(map.values());
-      const finalList = mergedList.length > 0 ? mergedList : DEFAULT_NEWS;
-
-      setNews(finalList);
-      localStorage.setItem("greenpass_news_data", JSON.stringify(finalList));
+      setNews(mergedList);
+      localStorage.setItem("greenpass_news_data", JSON.stringify(mergedList));
     };
 
     fetchNews();
   }, []);
+
+  const [deleteSuccess, setDeleteSuccess] = useState("");
 
   const handleDeleteClick = (id: string) => {
     setSelectedDeleteId(id);
@@ -123,18 +154,38 @@ export default function ListNews() {
       localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
       setShowDeleteModal(false);
       setSelectedDeleteId(null);
+      setDeleteSuccess("ลบประกาศข่าวสารอุทยานเรียบร้อยแล้ว!");
+      setTimeout(() => setDeleteSuccess(""), 3000);
     }
   };
 
-  const filteredNews = news.filter(
-    (item) =>
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Strictly filter news for the active ranger's park
+  const parkNews = news.filter(item => {
+    if (item.parkId && item.parkId === parkId) return true;
+    if (item.parkName && parkName && (item.parkName.includes(parkName) || parkName.includes(item.parkName))) return true;
+    // Default fallback for items with no park info when on Khao Yai (parkId=1)
+    if (!item.parkId && !item.parkName && parkId === 1) return true;
+    return false;
+  });
+
+  const filteredNews = parkNews.filter(item => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    return item.title.toLowerCase().includes(query) || item.content.toLowerCase().includes(query);
+  });
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 font-sans">
       
+      {deleteSuccess && (
+        <div className="p-4 bg-rose-50 border border-rose-300 text-rose-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-rose-600" />
+            <span>{deleteSuccess}</span>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-[#0a5829] text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative z-10 space-y-2">
@@ -143,17 +194,19 @@ export default function ListNews() {
           </div>
           <h1 className="text-xl sm:text-2xl font-bold">รายการข่าวสารและประกาศอุทยาน</h1>
           <p className="text-emerald-100 text-xs sm:text-sm max-w-xl">
-            จัดการ แก้ไข และระงับข่าวสารประกาศของอุทยานแห่งชาติเขาใหญ่ ({news.length} รายการ)
+            จัดการ แก้ไข และระงับข่าวสารประกาศของ{parkName} ({filteredNews.length} รายการ)
           </p>
         </div>
 
-        <button
-          onClick={() => router.push("/ranger/announce-news")}
-          className="relative z-10 inline-flex items-center space-x-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-full shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>สร้างประกาศข่าวสารใหม่</span>
-        </button>
+        {canAnnouncement && (
+          <button
+            onClick={() => router.push("/ranger/announce-news")}
+            className="relative z-10 inline-flex items-center space-x-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-full shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>สร้างประกาศข่าวสารใหม่</span>
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -179,12 +232,14 @@ export default function ListNews() {
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3 shadow-sm">
             <AlertCircle className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-xs font-bold text-slate-600">ไม่พบรายการข่าวสารประกาศ</p>
-            <button
-              onClick={() => router.push("/ranger/announce-news")}
-              className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs rounded-xl hover:bg-emerald-100"
-            >
-              + เพิ่มประกาศแรก
-            </button>
+            {canAnnouncement && (
+              <button
+                onClick={() => router.push("/ranger/announce-news")}
+                className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs rounded-xl hover:bg-emerald-100"
+              >
+                + เพิ่มประกาศแรก
+              </button>
+            )}
           </div>
         ) : (
           filteredNews.map((item) => (
@@ -206,23 +261,25 @@ export default function ListNews() {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => router.push(`/ranger/edit-news-details?id=${item.id}`)}
-                    className="inline-flex items-center space-x-1 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-200 transition-all cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>แก้ไข</span>
-                  </button>
+                {canAnnouncement && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => router.push(`/ranger/edit-news-details?id=${item.id}`)}
+                      className="inline-flex items-center space-x-1 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-200 transition-all cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>แก้ไข</span>
+                    </button>
 
-                  <button
-                    onClick={() => handleDeleteClick(item.id)}
-                    className="inline-flex items-center space-x-1 px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition-all cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>ลบ</span>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => handleDeleteClick(item.id)}
+                      className="inline-flex items-center space-x-1 px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition-all cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>ลบ</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Main Content Layout */}

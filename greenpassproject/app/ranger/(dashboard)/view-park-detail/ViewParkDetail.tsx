@@ -66,36 +66,51 @@ export default function ViewParkDetail() {
     }
 
     const fetchParkFromDb = async () => {
-      setIsLoading(true);
+      // 1. Instant local cache hydration (0ms load)
+      const savedParkData = typeof window !== "undefined" ? localStorage.getItem("greenpass_park_saved_data") : null;
+      const storedRanger = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
+      const storedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
+
+      let targetParkId = 1;
+      if (storedParkId && !isNaN(Number(storedParkId)) && Number(storedParkId) > 0) {
+        targetParkId = Number(storedParkId);
+      }
+
+      if (savedParkData) {
+        try {
+          const parsed = JSON.parse(savedParkData);
+          if (parsed && parsed.name && (parsed.parkId === targetParkId || !parsed.parkId)) {
+            setParkData({
+              parkId: targetParkId,
+              parkName: parsed.name,
+              openHours: parsed.openHours || "เปิดทุกวัน ตั้งแต่เวลา 06.00 น. - 18.00 น.",
+              description: parsed.description || "",
+              address: parsed.address || "",
+              location: parsed.location || "",
+              eventNote: "เปิดให้บริการตามปกติ",
+              status: parsed.status || "เปิดตามปกติ",
+              image: "https://images.unsplash.com/photo-1511497584788-8767611136f6"
+            });
+            setIsLoading(false);
+          }
+        } catch (e) {}
+      } else {
+        setIsLoading(true);
+      }
+
       try {
-        let targetParkId = 1;
-        const storedRanger = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
-        
-        const RANGER_PARK_MAP: Record<string, number> = {
-          "ranger01": 1,
-          "ranger02": 1,
-          "ranger03": 2,
-          "ranger04": 3,
-          "ranger05": 4,
-          "ranger06": 5
-        };
-
-        if (storedRanger && RANGER_PARK_MAP[storedRanger]) {
-          targetParkId = RANGER_PARK_MAP[storedRanger];
-        }
-
         if (storedRanger) {
           try {
             const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
-            const rangerObj = rangerRes?.result || rangerRes?.data;
-            if (rangerObj && rangerObj.park && rangerObj.park.parkId) {
-              targetParkId = rangerObj.park.parkId;
-              localStorage.setItem("ranger_park_id", String(targetParkId));
-              localStorage.setItem("ranger_park_name", rangerObj.park.name || "");
+            const rObj = rangerRes?.result || rangerRes?.data;
+            const rParkId = rObj?.park?.parkId || rObj?.parkId;
+            if (rParkId) {
+              targetParkId = Number(rParkId);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("ranger_park_id", String(targetParkId));
+              }
             }
-          } catch (err) {
-            console.warn("Could not fetch ranger profile", err);
-          }
+          } catch (e) {}
         }
 
         const res = await parkApi.getParkById(targetParkId);
@@ -110,24 +125,25 @@ export default function ViewParkDetail() {
           const openStr = dbPark.openTime ? formatTime(dbPark.openTime) : "06.00";
           const closeStr = dbPark.closeTime ? formatTime(dbPark.closeTime) : "18.00";
 
+          const FULL_DEFAULT_DESC = "อุทยานแห่งชาติเขาใหญ่ มีความสำคัญในระดับโลกและระดับภูมิภาคอาเซียน คือ เป็นหนึ่งในพื้นที่มรดกโลกทางธรรมชาติ (World Heritage Site) และอุทยานแห่งชาติอาเซียน (ASEAN Heritage Park) ครอบคลุม 4 จังหวัด ประกอบด้วย สระบุรี นครนายก ปราจีนบุรี และนครราชสีมา พื้นที่เกือบ 2,206 ตารางกิโลเมตร ของอุทยานแห่งชาติเขาใหญ่ เป็นแหล่งกำเนิดต้นน้ำลำธารสำคัญหลายสาย มีความหลากหลายทางชีวภาพ และเป็นบ้านหลังใหญ่ของสัตว์ป่าที่สำคัญ มากมาย และใกล้สูญพันธุ์หลายชนิด รวมถึงนกมากกว่า 280 ชนิด จึงทำให้เป็นที่นิยมของนักท่องเที่ยวทั่วโลกหลั่งไหลมาเที่ยวพักผ่อน";
+
           setParkData({
             parkId: dbPark.parkId || targetParkId,
             parkName: cleanName(dbPark.name),
             openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openStr} น. - ${closeStr} น.`,
-            description: dbPark.description || "",
+            description: (dbPark.description && !dbPark.description.endsWith("...")) ? dbPark.description : FULL_DEFAULT_DESC,
             address: dbPark.address || "",
             location: dbPark.location || "",
-            eventNote: dbPark.eventNote || "-",
+            eventNote: dbPark.eventNote || "เปิดให้บริการตามปกติ",
             status: dbPark.status || "เปิดตามปกติ",
             image: dbPark.image || "https://images.unsplash.com/photo-1511497584788-8767611136f6"
           });
-          setIsLoading(false);
-          return;
         }
       } catch (e) {
         console.warn("Could not fetch park detail from DB API", e);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     fetchParkFromDb();
   }, []);
@@ -168,13 +184,15 @@ export default function ViewParkDetail() {
               <span className="text-white font-semibold">{parkData.parkName}</span>
             </div>
 
-            <button
-              onClick={() => router.push("/ranger/edit-park-details")}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-full shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>แก้ไขข้อมูลอุทยาน</span>
-            </button>
+            {canEditDetails && (
+              <button
+                onClick={() => router.push("/ranger/edit-park-details")}
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-full shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>แก้ไขข้อมูลอุทยาน</span>
+              </button>
+            )}
           </div>
 
           {/* Main Title & Dynamic Badges */}

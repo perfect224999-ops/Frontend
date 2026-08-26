@@ -155,23 +155,41 @@ export default function AddParkRangerPage() {
       return;
     }
 
+    const PARK_NAME_TO_ID_MAP: Record<string, number> = {
+      "อุทยานแห่งชาติเขาใหญ่": 1,
+      "อุทยานแห่งชาติดอยอินทนนท์": 2,
+      "อุทยานแห่งชาติเอราวัณ": 3,
+      "อุทยานแห่งชาติภูกระดึง": 4,
+      "อุทยานแห่งชาติหมู่เกาะสิมิลัน": 5
+    };
+
+    const genderInt = gender === "หญิง" ? 2 : 1;
+    const parkIdNum = PARK_NAME_TO_ID_MAP[parkName] || 1;
+    const cleanUsername = employeeId.trim().toLowerCase();
+    const cleanPhone = phone.replace(/[^0-9]/g, "").slice(0, 10);
+    const cleanEmail = email.trim().slice(0, 50);
+
     setIsLoading(true);
     try {
       // 1. บันทึกลงฐานข้อมูล Spring Boot ผ่าน API
       await rangerApi.addRanger({
-        employeeId,
-        firstName,
-        lastName,
+        username: cleanUsername,
+        password: "pass1234",
+        employeeId: cleanUsername,
+        firstName: firstName.trim().slice(0, 50),
+        lastName: lastName.trim().slice(0, 50),
         birthDate,
-        position,
+        position: position.trim().slice(0, 25),
         parkName,
+        parkId: parkIdNum,
         startDate,
-        district,
-        subDistrict,
-        province,
-        gender,
-        phone,
-        email
+        district: district.trim().slice(0, 20),
+        subDistrict: subDistrict.trim().slice(0, 20),
+        province: province.trim().slice(0, 20),
+        zipcode: "10000",
+        gender: genderInt,
+        phone: cleanPhone,
+        email: cleanEmail
       });
 
       // 2. บันทึกลง localStorage สำรองเพื่อรองรับการทำงานของ frontend (ให้อยู่ลำดับบนสุด)
@@ -477,8 +495,8 @@ export default function AddParkRangerPage() {
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
                     disabled={isLoading}
                   >
-                    {subDistrictsList.map((sd) => (
-                      <option key={sd} value={sd}>{sd}</option>
+                    {subDistrictsList.map((sd, idx) => (
+                      <option key={`${sd}-${idx}`} value={sd}>{sd}</option>
                     ))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />

@@ -32,12 +32,24 @@ export const authApi = {
 
 // stampApi สำหรับหน้าแสตมป์
 export const stampApi = {
-  scanCheckinQrCode: async (payload: { token: string; parkRangerId: number; parkRangerUsername: string }) => {
+  scanCheckinQrCode: async (payload: { token: string; parkRangerId?: number; parkRangerUsername?: string }) => {
     const response = await api.post('/stamp', payload);
     return response.data;
   },
   getStatistics: async () => {
     const response = await api.get('/stamp/statistics');
+    return response.data;
+  },
+  getQr: async (username: string) => {
+    const response = await api.get('/stamp/qr', { headers: { username } });
+    return response.data;
+  },
+  getMyStamps: async (username: string) => {
+    const response = await api.get('/stamp/my-stamps', { headers: { username } });
+    return response.data;
+  },
+  getStampDetails: async (username: string, parkId: number) => {
+    const response = await api.get(`/stamp/stamp-details?parkId=${parkId}`, { headers: { username } });
     return response.data;
   }
 };
@@ -46,6 +58,10 @@ export const stampApi = {
 export const announcementApi = {
   getAllAnnouncements: async () => {
     const response = await api.get('/announcement/all-announcement');
+    return response.data;
+  },
+  getAnnouncementDetails: async (announcementId: number) => {
+    const response = await api.get(`/announcement/announcement-details?announcementId=${announcementId}`);
     return response.data;
   },
   addAnnouncement: async (payload: {
@@ -78,17 +94,21 @@ export const announcementApi = {
 // rangerApi สำหรับจัดการบัญชีเจ้าหน้าที่อุทยาน
 export const rangerApi = {
   addRanger: async (payload: {
-    employeeId: string;
+    employeeId?: string;
+    username?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     birthDate: string;
     position: string;
-    parkName: string;
+    parkName?: string;
+    parkId?: number;
     startDate: string;
     district: string;
     subDistrict: string;
     province: string;
-    gender: string;
+    zipcode?: string;
+    gender: string | number;
     phone: string;
     email: string;
   }) => {
@@ -130,7 +150,11 @@ export const rangerApi = {
 // rewardApi สำหรับจัดการของรางวัล
 export const rewardApi = {
   getAllRewards: async () => {
-    const response = await api.get('/reward/all');
+    const response = await api.get('/reward/reward-all');
+    return response.data;
+  },
+  getRewardById: async (id: number) => {
+    const response = await api.get(`/reward/${id}`);
     return response.data;
   },
   addReward: async (payload: {
@@ -141,9 +165,9 @@ export const rewardApi = {
     const response = await api.post('/reward/add', payload);
     return response.data;
   },
-  updateReward: async (id: string, payload: {
-    rewardTitle: string;
-    rewardDetails: string;
+  updateReward: async (id: number | string, payload: {
+    rewardTitle?: string;
+    rewardDetails?: string;
     image?: string;
   }) => {
     const response = await api.post(`/reward/update?id=${id}`, payload);
@@ -151,13 +175,59 @@ export const rewardApi = {
   }
 };
 
+// parkApi สำหรับจัดการข้อมูลอุทยาน
 export const parkApi = {
   getParkById: async (id: number = 1) => {
-    const response = await api.get(`/park/get?id=${id}`);
+    const response = await api.get(`/park/get?parkId=${id}`);
+    return response.data;
+  },
+  searchParks: async (keyword: string = '') => {
+    const response = await api.get(`/park/search?keyword=${encodeURIComponent(keyword)}`);
     return response.data;
   },
   updatePark: async (payload: any) => {
     const response = await api.post('/park/update', payload);
+    return response.data;
+  }
+};
+
+// reportApi สำหรับจัดการรายงาน/เรื่องร้องเรียน
+export const reportApi = {
+  getMyReports: async (username: string) => {
+    const response = await api.get('/report/my-reports', {
+      headers: { username }
+    });
+    return response.data;
+  },
+  addReport: async (username: string, payload: {
+    name: string;
+    description: string;
+    image?: string;
+    parkId: number;
+  }) => {
+    const response = await api.post('/report/add-report', payload, {
+      headers: { username }
+    });
+    return response.data;
+  },
+  getReportById: async (id: number) => {
+    const response = await api.get(`/report/${id}`);
+    return response.data;
+  }
+};
+
+// userApi สำหรับจัดการบัญชีผู้ใช้งานทั่วไป
+export const userApi = {
+  register: async (payload: any) => {
+    const response = await api.post('/user/register', payload);
+    return response.data;
+  },
+  login: async (payload: { username: string; password: string }) => {
+    const response = await api.post('/user/login', payload);
+    return response.data;
+  },
+  updateUser: async (username: string, payload: any) => {
+    const response = await api.put(`/user/${username}`, payload);
     return response.data;
   }
 };

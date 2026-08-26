@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { stampApi } from "@/service/api";
-import { QrCode, CheckCircle2, User, Sparkles, MapPin, RefreshCw, AlertTriangle, Clock, XCircle, Maximize2 } from "lucide-react";
+import { QrCode, CheckCircle2, User, Sparkles, MapPin, RefreshCw, AlertTriangle, Clock, XCircle, Maximize2, Lock, ArrowLeft } from "lucide-react";
 
 export default function ScanCheckinQRCode() {
+  const router = useRouter();
   const [isScanning, setIsScanning] = useState(true);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
@@ -18,7 +20,22 @@ export default function ScanCheckinQRCode() {
     timestamp: string;
   } | null>(null);
 
+  const [canIssueStamp, setCanIssueStamp] = useState(true);
+
   useEffect(() => {
+    const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
+    if (savedRoles) {
+      try {
+        const parsed = JSON.parse(savedRoles);
+        if (Array.isArray(parsed)) {
+          setCanIssueStamp(parsed.includes("สแกนแสตมป์"));
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!canIssueStamp) return;
     let html5QrCode: any;
     let isActive = true;
 
@@ -132,6 +149,33 @@ export default function ScanCheckinQRCode() {
   };
 
   const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว");
+
+  if (!canIssueStamp) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-rose-100 text-center space-y-5">
+          <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center shadow-inner">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold text-slate-800">ไม่มีสิทธิ์สแกนแสตมป์</h2>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+              บัญชีของคุณไม่มีสิทธิ์ <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">สแกนแสตมป์</span> สำหรับการสแกน QR Code ประทับตราสแตมป์แก่นักท่องเที่ยว
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              onClick={() => router.push("/ranger/view-park-detail")}
+              className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>กลับสู่หน้าหลักอุทยาน</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 font-sans">

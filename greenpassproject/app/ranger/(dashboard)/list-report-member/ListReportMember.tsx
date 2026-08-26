@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { reportApi } from "../../../../service/api";
 import {
   ClipboardList,
   AlertCircle,
@@ -78,44 +79,70 @@ export default function ListReportMember() {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem("greenpass_member_reports");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const mapped = parsed.map((r: any, idx: number) => ({
-          id: String(idx + 1),
-          reportDate: r.reportDate || "10/02/2567",
-          category: r.category || "ทั่วไป",
-          status:
-            r.status === "New"
-              ? "แจ้งรายงาน"
-              : r.status === "InProgress"
-              ? "กำลังดำเนินการ"
-              : r.status === "Completed"
-              ? "ดำเนินการแก้ไขสำเร็จ"
-              : r.status,
-          reportDetails: r.reportDetails || r.reportDetails,
-          ranger:
-            r.ranger && r.ranger !== "-"
-              ? r.ranger
-              : idx === 0
-              ? "ใจดี มากๆ"
-              : idx === 1
-              ? "D3D3D3"
-              : idx === 2
-              ? "ใจดี มากๆ"
-              : "สมชาย อังยอง",
-          startDate: r.startDate || "-",
-          completedDate: r.completedDate || "-"
-        }));
-        setReports(mapped);
-      } catch (e) {
-        console.error("Failed to parse reports", e);
+    async function loadReports() {
+      const username = localStorage.getItem("username") || localStorage.getItem("ranger_username");
+      if (username) {
+        try {
+          const res = await reportApi.getMyReports(username);
+          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+            const mapped: ReportItem[] = res.data.map((r: any, idx: number) => ({
+              id: String(r.reportId || idx + 1),
+              reportDate: r.reportDate || "10/02/2567",
+              category: "ทั่วไป",
+              status: r.status === "Pending" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status || "แจ้งรายงาน",
+              reportDetails: r.description || r.name || "",
+              ranger: r.parkName || "อุทยานแห่งชาติ",
+              startDate: r.reportDate || "-",
+              completedDate: "-"
+            }));
+            setReports(mapped);
+            return;
+          }
+        } catch (err) {
+          console.log("Backend reports fetch info: using local data fallback", err);
+        }
+      }
+
+      const saved = localStorage.getItem("greenpass_member_reports");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const mapped = parsed.map((r: any, idx: number) => ({
+            id: String(idx + 1),
+            reportDate: r.reportDate || "10/02/2567",
+            category: r.category || "ทั่วไป",
+            status:
+              r.status === "New"
+                ? "แจ้งรายงาน"
+                : r.status === "InProgress"
+                ? "กำลังดำเนินการ"
+                : r.status === "Completed"
+                ? "ดำเนินการแก้ไขสำเร็จ"
+                : r.status,
+            reportDetails: r.reportDetails || r.reportDetails,
+            ranger:
+              r.ranger && r.ranger !== "-"
+                ? r.ranger
+                : idx === 0
+                ? "ใจดี มากๆ"
+                : idx === 1
+                ? "D3D3D3"
+                : idx === 2
+                ? "ใจดี มากๆ"
+                : "สมชาย อังยอง",
+            startDate: r.startDate || "-",
+            completedDate: r.completedDate || "-"
+          }));
+          setReports(mapped);
+        } catch (e) {
+          console.error("Failed to parse reports", e);
+          setReports(INITIAL_REPORTS);
+        }
+      } else {
         setReports(INITIAL_REPORTS);
       }
-    } else {
-      setReports(INITIAL_REPORTS);
     }
+    loadReports();
   }, []);
 
   const handleToggle = (id: string) => {

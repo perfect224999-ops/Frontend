@@ -75,7 +75,7 @@ function SetRoleContent() {
     }
   }, [rangerId]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentRanger) return;
 
@@ -89,64 +89,61 @@ function SetRoleContent() {
     if (editDetail) selectedRoles.push("แก้ไขรายละเอียด");
     if (reportIncident) selectedRoles.push("รายงานความคืบหน้าของเหตุการณ์");
 
-    const updatePermissionsAsync = async () => {
-      try {
-        const username = currentRanger.username || currentRanger.id;
-        if (username && username.startsWith("ranger")) {
-          await rangerApi.updateRanger(username, {
-            canIssueStamp: scanStamp,
-            canAnnouncement: announceNews,
-            canEditParkDetails: editDetail,
-            canProgressReport: reportIncident
-          });
-        }
-      } catch (err) {
-        console.warn("Could not sync permissions with Spring Boot backend DB:", err);
-      }
-
-      setIsLoading(false);
-      try {
-        const updatedObj = {
-          ...currentRanger,
-          roles: selectedRoles,
+    try {
+      const username = currentRanger.username || currentRanger.employeeId || currentRanger.id;
+      if (username) {
+        await rangerApi.updateRanger(username, {
           canIssueStamp: scanStamp,
           canAnnouncement: announceNews,
           canEditParkDetails: editDetail,
           canProgressReport: reportIncident
-        };
-
-        const updated = rangers.map((r) => {
-          if (r.id === currentRanger.id || (r.username && r.username === currentRanger.username)) {
-            return updatedObj;
-          }
-          return r;
         });
-
-        localStorage.setItem("greenpass_rangers", JSON.stringify(updated));
-        localStorage.setItem(`greenpass_ranger_detail_${currentRanger.id}`, JSON.stringify(updatedObj));
-        if (currentRanger.username) {
-          localStorage.setItem(`greenpass_ranger_roles_${currentRanger.username}`, JSON.stringify(selectedRoles));
-          localStorage.setItem(`greenpass_ranger_roles_${currentRanger.id}`, JSON.stringify(selectedRoles));
-        }
-
-        // If the logged in ranger is this user, update active session
-        const activeRanger = localStorage.getItem("ranger_username");
-        if (activeRanger && (activeRanger === currentRanger.username || activeRanger === currentRanger.id)) {
-          localStorage.setItem("ranger_roles", JSON.stringify(selectedRoles));
-        }
-
-        setSuccess("ตั้งค่าบทบาทและสิทธิ์ของเจ้าหน้าที่เรียบร้อยแล้ว!");
-
-        setTimeout(() => {
-          router.push(`/admin/view-park-ranger-detail?id=${currentRanger.id}`);
-        }, 1000);
-
-      } catch (err) {
-        setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
       }
-    };
+    } catch (err) {
+      console.warn("Could not sync permissions with Spring Boot backend DB:", err);
+    }
 
-    updatePermissionsAsync();
+    try {
+      const updatedObj = {
+        ...currentRanger,
+        roles: selectedRoles,
+        canIssueStamp: scanStamp,
+        canAnnouncement: announceNews,
+        canEditParkDetails: editDetail,
+        canProgressReport: reportIncident
+      };
+
+      const updated = rangers.map((r) => {
+        if (r.id === currentRanger.id || (r.username && r.username === currentRanger.username)) {
+          return updatedObj;
+        }
+        return r;
+      });
+
+      localStorage.setItem("greenpass_rangers", JSON.stringify(updated));
+      localStorage.setItem(`greenpass_ranger_detail_${currentRanger.id}`, JSON.stringify(updatedObj));
+      if (currentRanger.username) {
+        localStorage.setItem(`greenpass_ranger_roles_${currentRanger.username}`, JSON.stringify(selectedRoles));
+        localStorage.setItem(`greenpass_ranger_roles_${currentRanger.id}`, JSON.stringify(selectedRoles));
+      }
+
+      // If the logged in ranger is this user, update active session
+      const activeRanger = localStorage.getItem("ranger_username");
+      if (activeRanger && (activeRanger === currentRanger.username || activeRanger === currentRanger.id)) {
+        localStorage.setItem("ranger_roles", JSON.stringify(selectedRoles));
+      }
+
+      setSuccess("ตั้งค่าบทบาทและสิทธิ์ของเจ้าหน้าที่เรียบร้อยแล้ว!");
+
+      setTimeout(() => {
+        router.push(`/admin/view-park-ranger-detail?id=${currentRanger.id}`);
+      }, 1000);
+
+    } catch (err) {
+      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!currentRanger) {

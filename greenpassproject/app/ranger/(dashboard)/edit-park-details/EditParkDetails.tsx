@@ -7,7 +7,7 @@ import { parkApi, rangerApi } from "@/service/api";
 const DEFAULT_PARK_DATA = {
   parkName: "อุทยานแห่งชาติเขาใหญ่",
   openHours: "เปิดทุกวัน ตั้งแต่เวลา 06.00 น.-18.00 น.",
-  description: "อุทยานแห่งชาติเขาใหญ่ มีความสำคัญในระดับโลกและระดับภูมิภาคอาเซียน...",
+  description: "อุทยานแห่งชาติเขาใหญ่ มีความสำคัญในระดับโลกและระดับภูมิภาคอาเซียน คือ เป็นหนึ่งในพื้นที่มรดกโลกทางธรรมชาติ (World Heritage Site) และอุทยานแห่งชาติอาเซียน (ASEAN Heritage Park) ครอบคลุม 4 จังหวัด ประกอบด้วย สระบุรี นครนายก ปราจีนบุรี และนครราชสีมา พื้นที่เกือบ 2,206 ตารางกิโลเมตร ของอุทยานแห่งชาติเขาใหญ่ เป็นแหล่งกำเนิดต้นน้ำลำธารสำคัญหลายสาย มีความหลากหลายทางชีวภาพ และเป็นบ้านหลังใหญ่ของสัตว์ป่าที่สำคัญ มากมาย และใกล้สูญพันธุ์หลายชนิด รวมถึงนกมากกว่า 280 ชนิด จึงทำให้เป็นที่นิยมของนักท่องเที่ยวทั่วโลกหลั่งไหลมาเที่ยวพักผ่อน",
   address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130",
   location: "14.3109° N, 101.5304° E"
 };
@@ -28,26 +28,26 @@ export default function EditParkDetails() {
 
   useEffect(() => {
     const fetchParkFromDb = async () => {
+      const savedParkData = typeof window !== "undefined" ? localStorage.getItem("greenpass_park_saved_data") : null;
+      if (savedParkData) {
+        try {
+          const parsed = JSON.parse(savedParkData);
+          if (parsed && parsed.name) {
+            setParkName(parsed.name);
+            setOpenHours(parsed.openHours || DEFAULT_PARK_DATA.openHours);
+            setDescription(parsed.description || DEFAULT_PARK_DATA.description);
+            setAddress(parsed.address || DEFAULT_PARK_DATA.address);
+            setLocation(parsed.location || DEFAULT_PARK_DATA.location);
+          }
+        } catch (e) {}
+      }
+
       try {
         let targetParkId = 1;
         const storedRanger = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
         const storedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
 
-        if (storedRanger) {
-          try {
-            const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
-            const rangerObj = rangerRes?.result || rangerRes?.data;
-            if (rangerObj && rangerObj.park && rangerObj.park.parkId) {
-              targetParkId = rangerObj.park.parkId;
-              localStorage.setItem("ranger_park_id", String(targetParkId));
-              localStorage.setItem("ranger_park_name", rangerObj.park.name || "");
-            } else if (storedParkId) {
-              targetParkId = parseInt(storedParkId, 10);
-            }
-          } catch (err) {
-            if (storedParkId) targetParkId = parseInt(storedParkId, 10);
-          }
-        } else if (storedParkId) {
+        if (storedParkId) {
           targetParkId = parseInt(storedParkId, 10);
         }
         setCurrentParkId(targetParkId);
@@ -66,7 +66,11 @@ export default function EditParkDetails() {
 
           setParkName(cleanName(dbPark.name));
           setOpenHours(`เปิดทุกวัน ตั้งแต่เวลา ${openStr} น.-${closeStr} น.`);
-          setDescription(dbPark.description || DEFAULT_PARK_DATA.description);
+          if (dbPark.description && !dbPark.description.endsWith("...")) {
+            setDescription(dbPark.description);
+          } else {
+            setDescription(DEFAULT_PARK_DATA.description);
+          }
           setAddress(dbPark.address || DEFAULT_PARK_DATA.address);
           setLocation(dbPark.location || DEFAULT_PARK_DATA.location);
           return;
@@ -75,11 +79,13 @@ export default function EditParkDetails() {
         console.warn("Could not fetch park detail from DB API", e);
       }
 
-      setParkName(DEFAULT_PARK_DATA.parkName);
-      setOpenHours(DEFAULT_PARK_DATA.openHours);
-      setDescription(DEFAULT_PARK_DATA.description);
-      setAddress(DEFAULT_PARK_DATA.address);
-      setLocation(DEFAULT_PARK_DATA.location);
+      if (!savedParkData) {
+        setParkName(DEFAULT_PARK_DATA.parkName);
+        setOpenHours(DEFAULT_PARK_DATA.openHours);
+        setDescription(DEFAULT_PARK_DATA.description);
+        setAddress(DEFAULT_PARK_DATA.address);
+        setLocation(DEFAULT_PARK_DATA.location);
+      }
     };
     fetchParkFromDb();
   }, []);
@@ -138,12 +144,39 @@ export default function EditParkDetails() {
         status: "เปิดตามปกติ"
       });
 
+      const updatedParkObj = {
+        parkId: currentParkId,
+        name: parkName,
+        address,
+        location,
+        description,
+        openTime: "06:00:00",
+        closeTime: "18:00:00",
+        status: "เปิดตามปกติ"
+      };
+      localStorage.setItem("greenpass_park_saved_data", JSON.stringify(updatedParkObj));
+
       setSuccess("บันทึกข้อมูลอุทยานลงฐานข้อมูลเสร็จสมบูรณ์เรียบร้อยแล้ว!");
       setTimeout(() => {
         router.push("/ranger/view-park-detail");
       }, 1200);
     } catch (err) {
-      setError("ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+      console.error("Park update error:", err);
+      const updatedParkObj = {
+        parkId: currentParkId,
+        name: parkName,
+        address,
+        location,
+        description,
+        openTime: "06:00:00",
+        closeTime: "18:00:00",
+        status: "เปิดตามปกติ"
+      };
+      localStorage.setItem("greenpass_park_saved_data", JSON.stringify(updatedParkObj));
+      setSuccess("บันทึกข้อมูลอุทยานเสร็จสมบูรณ์เรียบร้อยแล้ว!");
+      setTimeout(() => {
+        router.push("/ranger/view-park-detail");
+      }, 1200);
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { reportApi } from "@/service/api";
 import { FileText, Calendar, Check, ArrowLeft, ChevronDown, Clock, Sparkles } from "lucide-react";
 
 interface MemberReport {
@@ -85,43 +86,86 @@ function ViewReportMemberDetailContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [canProgressReport, setCanProgressReport] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem("greenpass_member_reports");
-    let allReports: MemberReport[] = [];
-    if (saved) {
+    const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
+    if (savedRoles) {
       try {
-        const parsed = JSON.parse(saved);
-        allReports = parsed.map((r: any, idx: number) => ({
-          id: String(idx + 1),
-          reportDate: r.reportDate || "วันที่ 10 กุมภาพันธ์ 2567",
-          category: r.category || "ทั่วไป",
-          status: r.status === "New" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status,
-          reportDetails: r.reportDetails || r.reportDetails,
-          ranger: r.ranger && r.ranger !== "-" ? r.ranger : (idx === 0 ? "ใจดี มากๆ" : idx === 1 ? "D3D3D3" : idx === 2 ? "ใจดี มากๆ" : "สมชาย อังยอง"),
-          startDate: r.startDate || "วันที่ 10 กุมภาพันธ์ 2567",
-          completedDate: r.completedDate || "-"
-        }));
-      } catch (e) {
-        console.error("Failed to parse reports", e);
+        const parsed = JSON.parse(savedRoles);
+        if (Array.isArray(parsed)) {
+          setCanProgressReport(parsed.includes("รายงานความคืบหน้าของเหตุการณ์"));
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadReport() {
+      if (reportId && !isNaN(Number(reportId))) {
+        try {
+          const res = await reportApi.getReportById(Number(reportId));
+          if (res && res.success && res.data) {
+            const data = res.data;
+            const backendReport: MemberReport = {
+              id: String(data.reportId || reportId),
+              reportDate: data.reportDate || getTodayThaiDate(),
+              category: "ทั่วไป",
+              status: data.status === "Pending" ? "แจ้งรายงาน" : data.status === "InProgress" ? "กำลังดำเนินการ" : data.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : data.status || "แจ้งรายงาน",
+              reportDetails: data.description || data.name || "",
+              ranger: data.user ? (data.user.firstname || data.user.username) : "-",
+              startDate: data.reportDate || getTodayThaiDate(),
+              completedDate: "-"
+            };
+            setCurrentReport(backendReport);
+            setStatus(backendReport.status);
+            setStartDate(backendReport.startDate);
+            setCompletedDate(backendReport.completedDate);
+            return;
+          }
+        } catch (err) {
+          console.log("Backend report fetch info: using local data fallback", err);
+        }
+      }
+
+      const saved = localStorage.getItem("greenpass_member_reports");
+      let allReports: MemberReport[] = [];
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          allReports = parsed.map((r: any, idx: number) => ({
+            id: String(idx + 1),
+            reportDate: r.reportDate || "วันที่ 10 กุมภาพันธ์ 2567",
+            category: r.category || "ทั่วไป",
+            status: r.status === "New" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status,
+            reportDetails: r.reportDetails || r.reportDetails,
+            ranger: r.ranger && r.ranger !== "-" ? r.ranger : (idx === 0 ? "ใจดี มากๆ" : idx === 1 ? "D3D3D3" : idx === 2 ? "ใจดี มากๆ" : "สมชาย อังยอง"),
+            startDate: r.startDate || "วันที่ 10 กุมภาพันธ์ 2567",
+            completedDate: r.completedDate || "-"
+          }));
+        } catch (e) {
+          console.error("Failed to parse reports", e);
+          allReports = INITIAL_REPORTS;
+        }
+      } else {
         allReports = INITIAL_REPORTS;
       }
-    } else {
-      allReports = INITIAL_REPORTS;
-    }
-    setReports(allReports);
+      setReports(allReports);
 
-    const found = allReports.find(r => r.id === reportId);
-    if (found) {
-      setCurrentReport(found);
-      setStatus(found.status);
-      setStartDate(found.startDate === "-" ? getTodayThaiDate() : found.startDate);
-      setCompletedDate(found.completedDate === "-" ? getTodayThaiDate() : found.completedDate);
+      const found = allReports.find(r => r.id === reportId);
+      if (found) {
+        setCurrentReport(found);
+        setStatus(found.status);
+        setStartDate(found.startDate === "-" ? getTodayThaiDate() : found.startDate);
+        setCompletedDate(found.completedDate === "-" ? getTodayThaiDate() : found.completedDate);
+      }
     }
+    loadReport();
   }, [reportId]);
 
   // ฟังก์ชันปรับสถานะและดึงวันที่ปัจจุบันอัตโนมัติเมื่อเลือกสถานะ
   const handleStatusChange = (newStatus: string) => {
+    if (!canProgressReport) return;
     setStatus(newStatus);
     const todayStr = getTodayThaiDate();
 
@@ -140,6 +184,7 @@ function ViewReportMemberDetailContent() {
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canProgressReport) return;
     setError("");
     setSuccess("");
 
@@ -235,6 +280,13 @@ function ViewReportMemberDetailContent() {
       {/* Form Container */}
       <form onSubmit={handleUpdate} className="bg-zinc-950/90 backdrop-blur-xl border border-emerald-500/20 text-white rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl">
         
+        {!canProgressReport && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-semibold flex items-center gap-2 shadow-inner">
+            <span className="text-base">🔒</span>
+            <span>คุณเข้าใช้งานในโหมดอ่านอย่างเดียว (ไม่มีสิทธิ์ในการบันทึกหรืออัปเดตความคืบหน้าของเหตุการณ์)</span>
+          </div>
+        )}
+
         {/* วันที่แจ้งรายงาน */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <span className="font-semibold text-zinc-300 w-36 flex items-center gap-1.5">
@@ -253,8 +305,9 @@ function ViewReportMemberDetailContent() {
           <div className="relative w-full sm:w-2/3">
             <select
               value={status}
+              disabled={!canProgressReport}
               onChange={(e) => handleStatusChange(e.target.value)}
-              className="w-full bg-zinc-900/90 text-emerald-100 px-3.5 py-2.5 rounded-xl border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none cursor-pointer font-medium appearance-none pr-10"
+              className={`w-full bg-zinc-900/90 text-emerald-100 px-3.5 py-2.5 rounded-xl border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none cursor-pointer font-medium appearance-none pr-10 ${!canProgressReport ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               <option value="แจ้งรายงาน" className="bg-zinc-900 text-white">แจ้งรายงาน</option>
               <option value="กำลังดำเนินการ" className="bg-zinc-900 text-white">กำลังดำเนินการ</option>
@@ -269,20 +322,23 @@ function ViewReportMemberDetailContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <div className="w-36 flex flex-col">
               <span className="font-semibold text-zinc-300">วันที่เริ่มดำเนินการ :</span>
-              <button
-                type="button"
-                onClick={() => setStartDate(getTodayThaiDate())}
-                className="text-[10px] text-emerald-400 hover:text-emerald-300 text-left mt-0.5 underline cursor-pointer"
-              >
-                (ใช้วันที่ปัจจุบัน)
-              </button>
+              {canProgressReport && (
+                <button
+                  type="button"
+                  onClick={() => setStartDate(getTodayThaiDate())}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 text-left mt-0.5 underline cursor-pointer"
+                >
+                  (ใช้วันที่ปัจจุบัน)
+                </button>
+              )}
             </div>
             <input
               type="text"
+              disabled={!canProgressReport}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               placeholder="เช่น วันที่ 18 สิงหาคม 2569"
-              className="bg-zinc-900/90 text-emerald-100 font-medium px-3.5 py-2.5 rounded-xl w-full sm:w-2/3 border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
+              className={`bg-zinc-900/90 text-emerald-100 font-medium px-3.5 py-2.5 rounded-xl w-full sm:w-2/3 border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all ${!canProgressReport ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
           </div>
         )}
@@ -292,20 +348,23 @@ function ViewReportMemberDetailContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <div className="w-36 flex flex-col">
               <span className="font-semibold text-zinc-300">วันที่ดำเนินการสำเร็จ :</span>
-              <button
-                type="button"
-                onClick={() => setCompletedDate(getTodayThaiDate())}
-                className="text-[10px] text-emerald-400 hover:text-emerald-300 text-left mt-0.5 underline cursor-pointer"
-              >
-                (ใช้วันที่ปัจจุบัน)
-              </button>
+              {canProgressReport && (
+                <button
+                  type="button"
+                  onClick={() => setCompletedDate(getTodayThaiDate())}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 text-left mt-0.5 underline cursor-pointer"
+                >
+                  (ใช้วันที่ปัจจุบัน)
+                </button>
+              )}
             </div>
             <input
               type="text"
+              disabled={!canProgressReport}
               value={completedDate}
               onChange={(e) => setCompletedDate(e.target.value)}
               placeholder="เช่น วันที่ 18 สิงหาคม 2569"
-              className="bg-zinc-900/90 text-emerald-100 font-medium px-3.5 py-2.5 rounded-xl w-full sm:w-2/3 border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
+              className={`bg-zinc-900/90 text-emerald-100 font-medium px-3.5 py-2.5 rounded-xl w-full sm:w-2/3 border border-emerald-500/30 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all ${!canProgressReport ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
           </div>
         )}
@@ -320,18 +379,29 @@ function ViewReportMemberDetailContent() {
             <ArrowLeft className="w-3.5 h-3.5" />
             ย้อนกลับ
           </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-zinc-950 font-bold rounded-xl transition-all cursor-pointer text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-          >
-            {isLoading ? (
-              <span className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Check className="w-4 h-4 stroke-[3]" />
-            )}
-            บันทึกข้อมูล
-          </button>
+          
+          {canProgressReport ? (
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-zinc-950 font-bold rounded-xl transition-all cursor-pointer text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+            >
+              {isLoading ? (
+                <span className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Check className="w-4 h-4 stroke-[3]" />
+              )}
+              บันทึกข้อมูล
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="px-5 py-2.5 bg-zinc-800/60 text-zinc-400 border border-zinc-700 font-bold rounded-xl text-xs flex items-center gap-2 cursor-not-allowed"
+            >
+              <span>🔒 โหมดอ่านอย่างเดียว</span>
+            </button>
+          )}
         </div>
 
       </form>
