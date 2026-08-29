@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { rangerApi } from "../../../../service/api";
+import { rangerApi, parkApi } from "../../../../service/api";
 import { 
   getProvincesList, 
   getDistrictsByProvince, 
@@ -45,6 +45,28 @@ export default function AddParkRangerPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Dynamic Parks from MySQL Database
+  const [dbParks, setDbParks] = useState<Array<{ parkId: number; name: string }>>([]);
+
+  useEffect(() => {
+    async function loadParks() {
+      try {
+        const res = await parkApi.searchParks("");
+        const list = res?.result || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped = list.map((p: any) => ({
+            parkId: p.parkId || p.id,
+            name: p.name
+          }));
+          setDbParks(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch parks from database:", err);
+      }
+    }
+    loadParks();
+  }, []);
 
   // Cascading location lists
   const provincesList = useMemo(() => getProvincesList(), []);
@@ -155,16 +177,17 @@ export default function AddParkRangerPage() {
       return;
     }
 
-    const PARK_NAME_TO_ID_MAP: Record<string, number> = {
+    const fallbackParkMap: Record<string, number> = {
       "อุทยานแห่งชาติเขาใหญ่": 1,
-      "อุทยานแห่งชาติดอยอินทนนท์": 2,
+      "อุทยานแห่งชาติแก่งกระจาน": 2,
       "อุทยานแห่งชาติเอราวัณ": 3,
-      "อุทยานแห่งชาติภูกระดึง": 4,
-      "อุทยานแห่งชาติหมู่เกาะสิมิลัน": 5
+      "อุทยานแห่งชาติสุเทพ-ปุย": 4,
+      "อุทยานแห่งชาติดอยอินทนนท์": 5
     };
 
+    const selectedParkObj = dbParks.find(p => p.name === parkName);
+    const parkIdNum = selectedParkObj ? selectedParkObj.parkId : (fallbackParkMap[parkName] || 1);
     const genderInt = gender === "หญิง" ? 2 : 1;
-    const parkIdNum = PARK_NAME_TO_ID_MAP[parkName] || 1;
     const cleanUsername = employeeId.trim().toLowerCase();
     const cleanPhone = phone.replace(/[^0-9]/g, "").slice(0, 10);
     const cleanEmail = email.trim().slice(0, 50);
@@ -409,11 +432,21 @@ export default function AddParkRangerPage() {
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
                     disabled={isLoading}
                   >
-                    <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
-                    <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
-                    <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
-                    <option value="อุทยานแห่งชาติสุเทพ-ปุย">อุทยานแห่งชาติสุเทพ-ปุย</option>
-                    <option value="อุทยานแห่งชาติดอยอินทนนท์">อุทยานแห่งชาติดอยอินทนนท์</option>
+                    {dbParks.length > 0 ? (
+                      dbParks.map((p) => (
+                        <option key={p.parkId} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
+                        <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
+                        <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
+                        <option value="อุทยานแห่งชาติสุเทพ-ปุย">อุทยานแห่งชาติสุเทพ-ปุย</option>
+                        <option value="อุทยานแห่งชาติดอยอินทนนท์">อุทยานแห่งชาติดอยอินทนนท์</option>
+                      </>
+                    )}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>

@@ -80,27 +80,41 @@ export default function ListReportMember() {
 
   useEffect(() => {
     async function loadReports() {
-      const username = localStorage.getItem("username") || localStorage.getItem("ranger_username");
-      if (username) {
-        try {
-          const res = await reportApi.getMyReports(username);
-          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-            const mapped: ReportItem[] = res.data.map((r: any, idx: number) => ({
+      const username = localStorage.getItem("ranger_username") || localStorage.getItem("username");
+      const parkId = localStorage.getItem("ranger_park_id") || localStorage.getItem("parkId");
+
+      try {
+        let res;
+        if (username) {
+          res = await reportApi.getReportsForRanger(username);
+        } else if (parkId) {
+          res = await reportApi.getReportsByParkId(Number(parkId));
+        }
+
+        const listData = res && res.success ? (res.result || res.data) : null;
+        if (Array.isArray(listData) && listData.length > 0) {
+          const mapped: ReportItem[] = listData.map((r: any, idx: number) => {
+            let dateStr = r.reportDate || "28/08/2569";
+            if (dateStr.includes("-")) {
+              const [y, m, d] = dateStr.split("-");
+              dateStr = `${d}/${m}/${Number(y) + 543}`;
+            }
+            return {
               id: String(r.reportId || idx + 1),
-              reportDate: r.reportDate || "10/02/2567",
+              reportDate: dateStr,
               category: "ทั่วไป",
               status: r.status === "Pending" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status || "แจ้งรายงาน",
-              reportDetails: r.description || r.name || "",
-              ranger: r.parkName || "อุทยานแห่งชาติ",
-              startDate: r.reportDate || "-",
+              reportDetails: r.description ? `${r.name}: ${r.description}` : (r.name || ""),
+              ranger: r.parkRangerName && r.parkRangerName !== "-" ? r.parkRangerName : (r.parkName || "เจ้าหน้าที่อุทยาน"),
+              startDate: dateStr,
               completedDate: "-"
-            }));
-            setReports(mapped);
-            return;
-          }
-        } catch (err) {
-          console.log("Backend reports fetch info: using local data fallback", err);
+            };
+          });
+          setReports(mapped);
+          return;
         }
+      } catch (err) {
+        console.log("Backend reports fetch info: using local data fallback", err);
       }
 
       const saved = localStorage.getItem("greenpass_member_reports");
@@ -119,7 +133,7 @@ export default function ListReportMember() {
                 : r.status === "Completed"
                 ? "ดำเนินการแก้ไขสำเร็จ"
                 : r.status,
-            reportDetails: r.reportDetails || r.reportDetails,
+            reportDetails: r.reportDetails || r.name || "",
             ranger:
               r.ranger && r.ranger !== "-"
                 ? r.ranger

@@ -137,7 +137,7 @@ export default function RangerDashboardLayout({
       
       {/* Modern Executive Header Navbar */}
       <header className="sticky top-0 w-full bg-gradient-to-r from-[#042410] via-[#0b4822] to-[#042410] text-white shadow-xl shadow-emerald-950/40 relative z-50 border-b border-emerald-500/25 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-8 h-16 flex items-center justify-between">
           
           {/* Brand Logo */}
           <Link href="/ranger/view-park-detail" className="flex items-center gap-3 group transition-transform duration-200 active:scale-95">

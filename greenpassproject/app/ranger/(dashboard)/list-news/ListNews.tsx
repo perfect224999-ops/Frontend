@@ -39,6 +39,19 @@ const DEFAULT_NEWS: NewsItem[] = [
   }
 ];
 
+const getImageUrl = (item: NewsItem) => {
+  if (typeof window !== "undefined" && item.id) {
+    const customLocal = localStorage.getItem(`greenpass_announcement_img_${item.id}`);
+    if (customLocal) return customLocal;
+  }
+  const img = item.image;
+  if (!img) return "/src/news1.jpg";
+  if (img.startsWith("data:") || img.startsWith("http://") || img.startsWith("https://") || img.startsWith("/")) {
+    return img;
+  }
+  return `/${img}`;
+};
+
 const formatThaiDateLong = (dateStr: string) => {
   if (!dateStr) return "";
   const parts = dateStr.split("-");
@@ -109,7 +122,7 @@ export default function ListNews() {
             category: item.category || "📢 ประกาศข่าวสาร",
             title: item.announcementTitle || item.title || "ไม่มีหัวข้อ",
             content: item.description || item.content || "",
-            image: item.image || null,
+            image: item.image || "src/news1.jpg",
             parkId: item.parkId ? Number(item.parkId) : (item.parkName?.includes("เอราวัณ") ? 3 : item.parkName?.includes("แก่งกระจาน") ? 2 : 1),
             parkName: item.parkName || activeParkName
           }));
@@ -128,6 +141,7 @@ export default function ListNews() {
       });
 
       const mergedList = Array.from(map.values());
+      mergedList.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
       setNews(mergedList);
       localStorage.setItem("greenpass_news_data", JSON.stringify(mergedList));
     };
@@ -287,8 +301,8 @@ export default function ListNews() {
                 
                 {/* Thumbnail Image */}
                 <div className="w-full sm:w-44 h-28 bg-slate-100 rounded-xl overflow-hidden shrink-0 border border-slate-200 relative group">
-                  {item.image ? (
-                    <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  {getImageUrl(item) ? (
+                    <img src={getImageUrl(item)!} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50">
                       <ImageIcon className="w-6 h-6 mb-1 text-slate-300" />

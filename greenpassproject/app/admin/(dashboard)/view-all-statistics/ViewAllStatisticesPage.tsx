@@ -1,52 +1,124 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart3,
   Trees,
   Users,
   Newspaper,
   ClipboardList,
-  Clock,
   Filter,
-  MapPin,
-  Calendar,
   Building2,
   TrendingUp,
-  CheckCircle2,
   Activity,
-  Sparkles
+  Loader2
 } from "lucide-react";
+import { adminApi } from "@/service/api";
+
+interface ParkStatItem {
+  parkId: number;
+  parkName: string;
+  province: string;
+  announcements: number;
+  totalReports: number;
+  inProgress: number;
+  completed: number;
+}
+
+const MONTH_MAP: Record<string, number> = {
+  "มกราคม": 1,
+  "กุมภาพันธ์": 2,
+  "มีนาคม": 3,
+  "เมษายน": 4,
+  "พฤษภาคม": 5,
+  "มิถุนายน": 6,
+  "กรกฎาคม": 7,
+  "สิงหาคม": 8,
+  "กันยายน": 9,
+  "ตุลาคม": 10,
+  "พฤศจิกายน": 11,
+  "ธันวาคม": 12,
+};
 
 export default function ViewAllStatisticesPage() {
+  const [loading, setLoading] = useState(true);
+
   // Filter states
   const [region, setRegion] = useState("กรุณาเลือก");
-  const [park, setPark] = useState("อุทยานแห่งชาติเขาใหญ่");
+  const [selectedPark, setSelectedPark] = useState("ทุกอุทยาน");
   const [province, setProvince] = useState("กรุณาเลือก");
-  const [month, setMonth] = useState("กุมภาพันธ์");
-  const [year, setYear] = useState("2567");
+  const [month, setMonth] = useState("ทั้งหมด");
+  const [year, setYear] = useState("ทั้งหมด");
 
-  // Mock numbers from Page 171 mockup
-  const metrics = {
-    totalPark: "156",
-    totalRanger: "1,515",
-    totalNews: "85",
-    totalReport: "240",
-    totalProcessingReport: "42"
-  };
+  // Dynamic Metrics from Database
+  const [metrics, setMetrics] = useState({
+    totalPark: 0,
+    totalRanger: 0,
+    totalNews: 0,
+    totalReport: 0,
+    totalProcessingReport: 0,
+  });
 
-  const tableData = {
-    parkName: "อุทยานแห่งชาติเขาใหญ่",
-    announcements: 5,
-    totalReports: 24,
-    inProgress: 4,
-    completed: 20
-  };
+  const [parkStats, setParkStats] = useState<ParkStatItem[]>([]);
 
-  const maxVal = 30; // Max for height calculation
+  useEffect(() => {
+    async function fetchStats() {
+      setLoading(true);
+      try {
+        const monthNum = month !== "ทั้งหมด" ? MONTH_MAP[month] : undefined;
+        const yearNum = year !== "ทั้งหมด" ? Number(year) : undefined;
+        const res = await adminApi.getStatistics(monthNum, yearNum);
+        if (res && res.success && res.result) {
+          const { metrics: m, parkStats: ps } = res.result;
+          if (m) {
+            setMetrics({
+              totalPark: m.totalPark || 0,
+              totalRanger: m.totalRanger || 0,
+              totalNews: m.totalNews || 0,
+              totalReport: m.totalReport || 0,
+              totalProcessingReport: m.totalProcessingReport || 0,
+            });
+          }
+          if (Array.isArray(ps)) {
+            setParkStats(ps);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load DB statistics:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, [month, year]);
+
+  // Filter table data by selectedPark, province, region
+  const filteredParkStats = parkStats.filter(p => {
+    if (selectedPark !== "ทุกอุทยาน" && p.parkName !== selectedPark) return false;
+    if (province !== "กรุณาเลือก" && p.province !== province) return false;
+    return true;
+  });
+
+  // Calculate aggregated stats for chart visualizer
+  const chartAnnouncements = filteredParkStats.reduce((sum, p) => sum + p.announcements, 0);
+  const chartTotalReports = filteredParkStats.reduce((sum, p) => sum + p.totalReports, 0);
+  const chartInProgress = filteredParkStats.reduce((sum, p) => sum + p.inProgress, 0);
+  const chartCompleted = filteredParkStats.reduce((sum, p) => sum + p.completed, 0);
+
+  const highestValue = Math.max(chartAnnouncements, chartTotalReports, chartInProgress, chartCompleted, 1);
+  const maxVal = Math.ceil(highestValue * 1.25);
+
+  const ySteps = [
+    maxVal,
+    Math.round(maxVal * 0.8),
+    Math.round(maxVal * 0.6),
+    Math.round(maxVal * 0.4),
+    Math.round(maxVal * 0.2),
+    0
+  ];
 
   return (
-    <div className="w-full max-w-6xl mx-auto font-sans relative py-4 space-y-6 my-2">
+    <div className="w-full max-w-7xl xl:max-w-[1400px] mx-auto font-sans relative py-4 space-y-6 my-2 px-2 sm:px-4">
       
       {/* Container หลัก */}
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-slate-200/50">
@@ -61,14 +133,20 @@ export default function ViewAllStatisticesPage() {
               <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 รายงานสรุปภาพรวมและสถิติอุทยานแห่งชาติ
                 <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  Admin Dashboard
+                  Admin Dashboard (DB Real-time)
                 </span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                ภาพรวมข้อมูลอุทยาน เจ้าหน้าที่ ข่าวประกาศ และสถานะการจัดการรายงานปัญหา
+                ภาพรวมข้อมูลอุทยาน เจ้าหน้าที่ ข่าวประกาศ และสถานะการจัดการรายงานปัญหาจากฐานข้อมูลจริง
               </p>
             </div>
           </div>
+          {loading && (
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+              <span>กำลังดึงข้อมูลล่าสุดจากฐานข้อมูล...</span>
+            </div>
+          )}
         </div>
 
         {/* 5 Top Summary Stat Cards */}
@@ -84,7 +162,7 @@ export default function ViewAllStatisticesPage() {
             </div>
             <div className="mt-3">
               <h3 className="text-2xl font-extrabold text-emerald-950">{metrics.totalPark}</h3>
-              <p className="text-[10px] text-emerald-700/70 font-medium">แห่งทั่วประเทศ</p>
+              <p className="text-[10px] text-emerald-700/70 font-medium">แห่งในระบบ</p>
             </div>
           </div>
 
@@ -97,7 +175,7 @@ export default function ViewAllStatisticesPage() {
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-2xl font-extrabold text-sky-950">{metrics.totalRanger}</h3>
+              <h3 className="text-2xl font-extrabold text-sky-950">{metrics.totalRanger.toLocaleString()}</h3>
               <p className="text-[10px] text-sky-700/70 font-medium">คนในระบบ</p>
             </div>
           </div>
@@ -150,7 +228,7 @@ export default function ViewAllStatisticesPage() {
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
             <Filter className="w-4 h-4 text-emerald-600" />
-            <span>ตัวกรองการแสดงผลสถิติ:</span>
+            <span>ตัวกรองการแสดงผลสถิติ (ฐานข้อมูล):</span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
@@ -175,14 +253,16 @@ export default function ViewAllStatisticesPage() {
             <div className="space-y-1">
               <label className="block text-[10px] font-medium text-slate-500">เลือกอุทยาน</label>
               <select
-                value={park}
-                onChange={(e) => setPark(e.target.value)}
-                className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm"
+                value={selectedPark}
+                onChange={(e) => setSelectedPark(e.target.value)}
+                className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm font-semibold text-emerald-900"
               >
-                <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
-                <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
-                <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
-                <option value="อุทยานแห่งชาติดอยอินทนนท์">อุทยานแห่งชาติดอยอินทนนท์</option>
+                <option value="ทุกอุทยาน">-- แสดงทุกอุทยาน --</option>
+                {parkStats.map((p) => (
+                  <option key={p.parkId} value={p.parkName}>
+                    {p.parkName}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -197,6 +277,7 @@ export default function ViewAllStatisticesPage() {
                 <option value="กรุณาเลือก">กรุณาเลือก ▼</option>
                 <option value="นครราชสีมา">นครราชสีมา</option>
                 <option value="เพชรบุรี">เพชรบุรี</option>
+                <option value="กาญจนบุรี">กาญจนบุรี</option>
                 <option value="เชียงใหม่">เชียงใหม่</option>
               </select>
             </div>
@@ -209,14 +290,23 @@ export default function ViewAllStatisticesPage() {
                 onChange={(e) => setMonth(e.target.value)}
                 className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm"
               >
+                <option value="ทั้งหมด">-- ทุกเดือน --</option>
                 <option value="มกราคม">มกราคม</option>
                 <option value="กุมภาพันธ์">กุมภาพันธ์</option>
                 <option value="มีนาคม">มีนาคม</option>
                 <option value="เมษายน">เมษายน</option>
+                <option value="พฤษภาคม">พฤษภาคม</option>
+                <option value="มิถุนายน">มิถุนายน</option>
+                <option value="กรกฎาคม">กรกฎาคม</option>
+                <option value="สิงหาคม">สิงหาคม</option>
+                <option value="กันยายน">กันยายน</option>
+                <option value="ตุลาคม">ตุลาคม</option>
+                <option value="พฤศจิกายน">พฤศจิกายน</option>
+                <option value="ธันวาคม">ธันวาคม</option>
               </select>
             </div>
 
-            {/* ปี */}
+            {/* ปี พ.ศ. */}
             <div className="space-y-1">
               <label className="block text-[10px] font-medium text-slate-500">ปี พ.ศ.</label>
               <select
@@ -224,6 +314,9 @@ export default function ViewAllStatisticesPage() {
                 onChange={(e) => setYear(e.target.value)}
                 className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm"
               >
+                <option value="ทั้งหมด">-- ทุกปี พ.ศ. --</option>
+                <option value="2569">2569</option>
+                <option value="2568">2568</option>
                 <option value="2567">2567</option>
                 <option value="2566">2566</option>
               </select>
@@ -237,8 +330,11 @@ export default function ViewAllStatisticesPage() {
           <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-emerald-600" />
-              สรุปผลข้อมูลสถิติรายอุทยาน ({park})
+              สรุปผลข้อมูลสถิติรายอุทยาน ({selectedPark === "ทุกอุทยาน" ? "แสดงทุกอุทยานในฐานข้อมูล" : selectedPark})
             </h3>
+            <span className="text-[11px] text-slate-500 font-semibold">
+              พบ {filteredParkStats.length} อุทยาน
+            </span>
           </div>
 
           <div className="overflow-x-auto">
@@ -253,32 +349,42 @@ export default function ViewAllStatisticesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                <tr className="hover:bg-emerald-50/40 transition-colors">
-                  <td className="py-4 px-5 font-bold text-slate-900 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    {tableData.parkName}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      {tableData.announcements} ข่าว
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                      {tableData.totalReports} รายการ
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-                      {tableData.inProgress} รายการ
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {tableData.completed} รายการ
-                    </span>
-                  </td>
-                </tr>
+                {filteredParkStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                      ไม่พบข้อมูลสถิติอุทยานที่เลือก
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParkStats.map((item) => (
+                    <tr key={item.parkId} className="hover:bg-emerald-50/40 transition-colors">
+                      <td className="py-4 px-5 font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                        {item.parkName}
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {item.announcements} ข่าว
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          {item.totalReports} รายการ
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                          {item.inProgress} รายการ
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {item.completed} รายการ
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -290,10 +396,10 @@ export default function ViewAllStatisticesPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-600" />
-              แผนภูมิเปรียบเทียบสถิติรายงาน (Bar Chart Visualizer)
+              แผนภูมิเปรียบเทียบสถิติรายงาน (Bar Chart Visualizer - {selectedPark === "ทุกอุทยาน" ? "ภาพรวมทุกอุทยาน" : selectedPark})
             </h3>
             <span className="text-[10px] text-slate-500 font-medium">
-              ประจำเดือน {month} พ.ศ. {year}
+              ประจำ{month === "ทั้งหมด" ? "ทุกเดือน" : `เดือน ${month}`} {year === "ทั้งหมด" ? "ทุกปี พ.ศ." : `พ.ศ. ${year}`}
             </span>
           </div>
 
@@ -304,19 +410,14 @@ export default function ViewAllStatisticesPage() {
             <div className="flex h-64 items-end relative border-b border-l border-slate-300 pb-2 pl-4">
               
               {/* Y-axis Gridlines & Numbers */}
-              <div className="absolute left-[-28px] top-0 bottom-6 flex flex-col justify-between text-[10px] font-semibold text-slate-400 text-right w-5">
-                <span>30</span>
-                <span>25</span>
-                <span>20</span>
-                <span>15</span>
-                <span>10</span>
-                <span>5</span>
-                <span>0</span>
+              <div className="absolute left-[-32px] top-0 bottom-6 flex flex-col justify-between text-[10px] font-semibold text-slate-400 text-right w-6">
+                {ySteps.map((step, idx) => (
+                  <span key={idx}>{step}</span>
+                ))}
               </div>
 
               {/* Horizontal Subtle Grid Lines */}
               <div className="absolute inset-0 pl-4 pb-6 flex flex-col justify-between pointer-events-none opacity-40">
-                <div className="border-b border-dashed border-slate-200 w-full" />
                 <div className="border-b border-dashed border-slate-200 w-full" />
                 <div className="border-b border-dashed border-slate-200 w-full" />
                 <div className="border-b border-dashed border-slate-200 w-full" />
@@ -328,57 +429,56 @@ export default function ViewAllStatisticesPage() {
               {/* Bars Grid */}
               <div className="flex-1 flex justify-around items-end h-[90%] px-4 z-10">
                 
-                {/* 1. ข่าวที่ประกาศ (5) */}
+                {/* 1. ข่าวที่ประกาศ */}
                 <div className="flex flex-col items-center justify-end h-full w-20 group cursor-pointer">
-                  {/* Badge count on top */}
                   <span className="text-xs font-black text-indigo-600 mb-1 opacity-90 group-hover:scale-110 transition-transform">
-                    {tableData.announcements}
+                    {chartAnnouncements}
                   </span>
                   <div
-                    className="w-12 bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-xl shadow-md group-hover:from-indigo-500 group-hover:to-indigo-300 transition-all duration-300"
-                    style={{ height: `${(tableData.announcements / maxVal) * 100}%` }}
+                    className="w-12 bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-xl shadow-md group-hover:from-indigo-500 group-hover:to-indigo-300 transition-all duration-300 min-h-[4px]"
+                    style={{ height: `${Math.max((chartAnnouncements / maxVal) * 100, 2)}%` }}
                   />
                   <span className="text-[11px] font-bold text-slate-700 mt-2 whitespace-nowrap">
                     ข่าวที่ประกาศ
                   </span>
                 </div>
 
-                {/* 2. รายงานทั้งหมด (24) */}
+                {/* 2. รายงานทั้งหมด */}
                 <div className="flex flex-col items-center justify-end h-full w-20 group cursor-pointer">
                   <span className="text-xs font-black text-amber-600 mb-1 opacity-90 group-hover:scale-110 transition-transform">
-                    {tableData.totalReports}
+                    {chartTotalReports}
                   </span>
                   <div
-                    className="w-12 bg-gradient-to-t from-amber-500 to-amber-300 rounded-t-xl shadow-md group-hover:from-amber-400 group-hover:to-amber-200 transition-all duration-300"
-                    style={{ height: `${(tableData.totalReports / maxVal) * 100}%` }}
+                    className="w-12 bg-gradient-to-t from-amber-500 to-amber-300 rounded-t-xl shadow-md group-hover:from-amber-400 group-hover:to-amber-200 transition-all duration-300 min-h-[4px]"
+                    style={{ height: `${Math.max((chartTotalReports / maxVal) * 100, 2)}%` }}
                   />
                   <span className="text-[11px] font-bold text-slate-700 mt-2 whitespace-nowrap">
                     รายงานทั้งหมด
                   </span>
                 </div>
 
-                {/* 3. กำลังดำเนินการ (4) */}
+                {/* 3. กำลังดำเนินการ */}
                 <div className="flex flex-col items-center justify-end h-full w-20 group cursor-pointer">
                   <span className="text-xs font-black text-sky-600 mb-1 opacity-90 group-hover:scale-110 transition-transform">
-                    {tableData.inProgress}
+                    {chartInProgress}
                   </span>
                   <div
-                    className="w-12 bg-gradient-to-t from-sky-500 to-sky-300 rounded-t-xl shadow-md group-hover:from-sky-400 group-hover:to-sky-200 transition-all duration-300"
-                    style={{ height: `${(tableData.inProgress / maxVal) * 100}%` }}
+                    className="w-12 bg-gradient-to-t from-sky-500 to-sky-300 rounded-t-xl shadow-md group-hover:from-sky-400 group-hover:to-sky-200 transition-all duration-300 min-h-[4px]"
+                    style={{ height: `${Math.max((chartInProgress / maxVal) * 100, 2)}%` }}
                   />
                   <span className="text-[11px] font-bold text-slate-700 mt-2 whitespace-nowrap">
                     กำลังดำเนินการ
                   </span>
                 </div>
 
-                {/* 4. ดำเนินการสำเร็จ (20) */}
+                {/* 4. ดำเนินการสำเร็จ */}
                 <div className="flex flex-col items-center justify-end h-full w-20 group cursor-pointer">
                   <span className="text-xs font-black text-emerald-600 mb-1 opacity-90 group-hover:scale-110 transition-transform">
-                    {tableData.completed}
+                    {chartCompleted}
                   </span>
                   <div
-                    className="w-12 bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-xl shadow-md group-hover:from-emerald-500 group-hover:to-emerald-300 transition-all duration-300"
-                    style={{ height: `${(tableData.completed / maxVal) * 100}%` }}
+                    className="w-12 bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-xl shadow-md group-hover:from-emerald-500 group-hover:to-emerald-300 transition-all duration-300 min-h-[4px]"
+                    style={{ height: `${Math.max((chartCompleted / maxVal) * 100, 2)}%` }}
                   />
                   <span className="text-[11px] font-bold text-slate-700 mt-2 whitespace-nowrap">
                     ดำเนินการสำเร็จ
@@ -393,19 +493,19 @@ export default function ViewAllStatisticesPage() {
             <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-6 text-[11px] font-semibold text-slate-600">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-md bg-indigo-500 inline-block" />
-                <span>ข่าวที่ประกาศ ({tableData.announcements})</span>
+                <span>ข่าวที่ประกาศ ({chartAnnouncements})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-md bg-amber-500 inline-block" />
-                <span>รายงานทั้งหมด ({tableData.totalReports})</span>
+                <span>รายงานทั้งหมด ({chartTotalReports})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-md bg-sky-500 inline-block" />
-                <span>กำลังดำเนินการ ({tableData.inProgress})</span>
+                <span>กำลังดำเนินการ ({chartInProgress})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-md bg-emerald-500 inline-block" />
-                <span>ดำเนินการสำเร็จ ({tableData.completed})</span>
+                <span>ดำเนินการสำเร็จ ({chartCompleted})</span>
               </div>
             </div>
 
@@ -418,4 +518,3 @@ export default function ViewAllStatisticesPage() {
     </div>
   );
 }
-

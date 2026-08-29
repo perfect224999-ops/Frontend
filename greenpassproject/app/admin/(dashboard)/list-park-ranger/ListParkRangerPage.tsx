@@ -60,33 +60,30 @@ const formatPhone = (phoneStr: string) => {
   return phoneStr;
 };
 
-const INITIAL_RANGERS: Ranger[] = [
-  { id: "01", name: "สมชาย ใจดี", phone: "089-1234567", email: "ranger01@park.go.th", role: "เจ้าหน้าที่อุทยาน", parkName: "ดอยอินทนนท์" },
-  { id: "02", name: "สมหญิง รักษ์ป่า", phone: "089-7654321", email: "ranger02@park.go.th", role: "เจ้าหน้าที่อุทยาน", parkName: "ดอยอินทนนท์" },
-  { id: "03", name: "อนันต์ ศรีสุข", phone: "085-4785236", email: "sdperfasd@gmail.com", role: "เจ้าหน้าที่บริการนักท่องเที่ยว", parkName: "อุทยานแห่งชาติเขาใหญ่" },
-  { id: "04", name: "จอนนี่ จิ้มเอม", phone: "057-1425756", email: "xcperfasd@gmail.com", role: "เจ้าหน้าที่ประชาสัมพันธ์", parkName: "อุทยานแห่งชาติแก่งกระจาน" },
-  { id: "05", name: "วิทยา พรหมมา", phone: "095-7845889", email: "ewperfasd@gmail.com", role: "เจ้าหน้าที่ธุรการ", parkName: "อุทยานแห่งชาติแก่งกระจาน" }
-];
-
 export default function ListParkRangerPage() {
   const router = useRouter();
-  const [rangers, setRangers] = useState<Ranger[]>(INITIAL_RANGERS);
+  const [rangers, setRangers] = useState<Ranger[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPark, setSelectedPark] = useState("ทั้งหมด");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("greenpass_rangers");
+    }
+
     const fetchRangers = async () => {
       try {
         const response = await rangerApi.getAllRangers();
-        if (response.success && response.result) {
-          const mapped: Ranger[] = response.result.map((item: any) => ({
+        const rawList = response?.result || response?.data || (Array.isArray(response) ? response : []);
+        if (Array.isArray(rawList)) {
+          const mapped: Ranger[] = rawList.map((item: any) => ({
             id: item.username,
-            employeeId: item.username.toUpperCase(),
-            name: `${item.firstname} ${item.surname}`,
+            employeeId: item.username ? item.username.toUpperCase() : "",
+            name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username,
             phone: formatPhone(item.mobilephone),
-            email: item.email,
+            email: item.email || "",
             role: item.position || "เจ้าหน้าที่อุทยาน",
-            parkName: item.park?.name || "ดอยอินทนนท์",
+            parkName: item.park?.name || item.parkName || "อุทยานแห่งชาติ",
             // Additional detail fields
             firstName: item.firstname,
             lastName: item.surname,
@@ -105,37 +102,14 @@ export default function ListParkRangerPage() {
             ].filter(Boolean) as string[]
           }));
 
-          // Reverse mapped list so the latest added ranger is at the top
           const reversedMapped = [...mapped].reverse();
-
-          // Merge with localStorage rangers if present (preserving newest at top)
-          const saved = localStorage.getItem("greenpass_rangers");
-          if (saved) {
-            try {
-              const localList: Ranger[] = JSON.parse(saved);
-              const apiUsernames = new Set(mapped.map(r => r.id));
-              const extraLocal = localList.filter(r => !apiUsernames.has(r.id));
-              setRangers([...extraLocal, ...reversedMapped]);
-              return;
-            } catch (e) {
-              console.error(e);
-            }
-          }
-
           setRangers(reversedMapped);
+        } else {
+          setRangers([]);
         }
       } catch (error) {
-        console.error("Failed to load rangers from backend, using localStorage fallback:", error);
-        const saved = localStorage.getItem("greenpass_rangers");
-        if (saved) {
-          try {
-            setRangers(JSON.parse(saved));
-          } catch (e) {
-            setRangers([...INITIAL_RANGERS].reverse());
-          }
-        } else {
-          setRangers([...INITIAL_RANGERS].reverse());
-        }
+        console.error("Failed to load rangers from backend:", error);
+        setRangers([]);
       }
     };
     fetchRangers();

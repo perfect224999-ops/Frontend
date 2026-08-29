@@ -199,6 +199,18 @@ export const reportApi = {
     });
     return response.data;
   },
+  getAllReports: async () => {
+    const response = await api.get('/report/all');
+    return response.data;
+  },
+  getReportsByParkId: async (parkId: number) => {
+    const response = await api.get(`/report/park/${parkId}`);
+    return response.data;
+  },
+  getReportsForRanger: async (username: string) => {
+    const response = await api.get(`/report/ranger/${username}`);
+    return response.data;
+  },
   addReport: async (username: string, payload: {
     name: string;
     description: string;
@@ -213,8 +225,15 @@ export const reportApi = {
   getReportById: async (id: number) => {
     const response = await api.get(`/report/${id}`);
     return response.data;
+  },
+  updateReportStatus: async (id: number, status: string, rangerUsername?: string) => {
+    const response = await api.put(`/report/${id}/status`, { status }, {
+      headers: rangerUsername ? { username: rangerUsername } : {}
+    });
+    return response.data;
   }
 };
+
 
 // userApi สำหรับจัดการบัญชีผู้ใช้งานทั่วไป
 export const userApi = {
@@ -228,6 +247,17 @@ export const userApi = {
   },
   updateUser: async (username: string, payload: any) => {
     const response = await api.put(`/user/${username}`, payload);
+    return response.data;
+  }
+};
+
+// adminApi สำหรับแอดมินและสถิติภาพรวม
+export const adminApi = {
+  getStatistics: async (month?: number, year?: number) => {
+    const params: Record<string, any> = {};
+    if (month) params.month = month;
+    if (year) params.year = year;
+    const response = await api.get('/admin/statistics', { params });
     return response.data;
   }
 };

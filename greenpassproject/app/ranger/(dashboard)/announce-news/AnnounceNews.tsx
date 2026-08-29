@@ -33,6 +33,7 @@ export default function AnnounceNews() {
   const [image, setImage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,12 +53,13 @@ export default function AnnounceNews() {
     if (!title.trim() || !content.trim()) return;
 
     setIsLoading(true);
+    setError("");
     try {
-      const username = localStorage.getItem("ranger_username") || "pr12";
+      const username = localStorage.getItem("ranger_username") || "pr01";
       const isoDate = new Date().toISOString().split("T")[0];
       const apiImage = (image && image.length <= 255) ? image : "src/news1.jpg";
 
-      await announcementApi.addAnnouncement({
+      const res = await announcementApi.addAnnouncement({
         title,
         content: `[${category}] ${content}`,
         publishDate: isoDate,
@@ -65,32 +67,12 @@ export default function AnnounceNews() {
         image: apiImage
       });
 
-      const currentParkId = localStorage.getItem("ranger_park_id") || "1";
-      const currentParkName = localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ";
-
-      const newPost = {
-        id: String(Date.now()),
-        date: publishDate,
-        category: category,
-        title: title,
-        content: content,
-        image: image,
-        parkId: Number(currentParkId),
-        parkName: currentParkName
-      };
-
-      const savedNews = localStorage.getItem("greenpass_news_data");
-      let newsList = [];
-      if (savedNews) {
+      const createdId = res?.result?.announcementId || res?.data?.announcementId;
+      if (createdId && image && image.length > 255 && typeof window !== "undefined") {
         try {
-          newsList = JSON.parse(savedNews);
-        } catch (e) {
-          newsList = [];
-        }
+          localStorage.setItem(`greenpass_announcement_img_${createdId}`, image);
+        } catch (err) {}
       }
-      
-      newsList.unshift(newPost);
-      localStorage.setItem("greenpass_news_data", JSON.stringify(newsList));
 
       setSuccess("บันทึกและประกาศข่าวสารอุทยานสำเร็จเรียบร้อยแล้ว!");
       setTimeout(() => {
@@ -98,27 +80,7 @@ export default function AnnounceNews() {
       }, 1200);
     } catch (err: any) {
       console.error("Failed to save announcement to database:", err);
-      // Local storage fallback for smooth flow
-      const newPost = {
-        id: String(Date.now()),
-        date: publishDate,
-        category: category,
-        title: title,
-        content: content,
-        image: image
-      };
-      const savedNews = localStorage.getItem("greenpass_news_data");
-      let newsList = [];
-      if (savedNews) {
-        try { newsList = JSON.parse(savedNews); } catch (e) { newsList = []; }
-      }
-      newsList.unshift(newPost);
-      localStorage.setItem("greenpass_news_data", JSON.stringify(newsList));
-
-      setSuccess("บันทึกประกาศข่าวสารเรียบร้อยแล้ว (โหมดออฟไลน์)");
-      setTimeout(() => {
-        router.push("/ranger/list-news");
-      }, 1200);
+      setError("เกิดข้อผิดพลาดในการบันทึกประกาศข่าวสารลงฐานข้อมูล");
     } finally {
       setIsLoading(false);
     }

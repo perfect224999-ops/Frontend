@@ -105,8 +105,8 @@ function ViewReportMemberDetailContent() {
       if (reportId && !isNaN(Number(reportId))) {
         try {
           const res = await reportApi.getReportById(Number(reportId));
-          if (res && res.success && res.data) {
-            const data = res.data;
+          const data = res && res.success ? (res.result || res.data) : null;
+          if (data) {
             const backendReport: MemberReport = {
               id: String(data.reportId || reportId),
               reportDate: data.reportDate || getTodayThaiDate(),
@@ -182,7 +182,7 @@ function ViewReportMemberDetailContent() {
     }
   };
 
-  const handleUpdate = (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canProgressReport) return;
     setError("");
@@ -195,45 +195,50 @@ function ViewReportMemberDetailContent() {
 
     const finalStartDate = status === "แจ้งรายงาน" ? "-" : (startDate || getTodayThaiDate());
     const finalCompletedDate = status === "ดำเนินการแก้ไขสำเร็จ" ? (completedDate || getTodayThaiDate()) : "-";
+    const backendStatus = status === "แจ้งรายงาน" ? "Pending" : status === "กำลังดำเนินการ" ? "InProgress" : "Completed";
+    const rangerUsername = localStorage.getItem("ranger_username") || localStorage.getItem("username") || "";
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      try {
-        const updated = reports.map((r) => {
-          if (r.id === reportId) {
-            return {
-              ...r,
-              status,
-              startDate: finalStartDate,
-              completedDate: finalCompletedDate,
-              ranger: status === "แจ้งรายงาน" ? "-" : (r.ranger && r.ranger !== "-" ? r.ranger : "ใจดี มากๆ")
-            };
-          }
-          return r;
-        });
-
-        const toSave = updated.map(r => ({
-          id: r.id,
-          reportDate: r.reportDate,
-          category: r.category,
-          status: r.status === "แจ้งรายงาน" ? "New" : r.status === "กำลังดำเนินการ" ? "InProgress" : "Completed",
-          reportDetails: r.reportDetails,
-          ranger: r.ranger,
-          startDate: r.startDate,
-          completedDate: r.completedDate
-        }));
-
-        localStorage.setItem("greenpass_member_reports", JSON.stringify(toSave));
-        setSuccess("ระบบแสดงผลการบันทึกข้อมูลที่สมบูรณ์");
-
-        setTimeout(() => {
-          router.push("/ranger/list-report-member");
-        }, 1200);
-      } catch (err) {
-        setError("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+    try {
+      if (reportId && !isNaN(Number(reportId))) {
+        await reportApi.updateReportStatus(Number(reportId), backendStatus, rangerUsername);
       }
-    }, 800);
+
+      const updated = reports.map((r) => {
+        if (r.id === reportId) {
+          return {
+            ...r,
+            status,
+            startDate: finalStartDate,
+            completedDate: finalCompletedDate,
+            ranger: status === "แจ้งรายงาน" ? "-" : (r.ranger && r.ranger !== "-" ? r.ranger : "ใจดี มากๆ")
+          };
+        }
+        return r;
+      });
+
+      const toSave = updated.map(r => ({
+        id: r.id,
+        reportDate: r.reportDate,
+        category: r.category,
+        status: r.status === "แจ้งรายงาน" ? "New" : r.status === "กำลังดำเนินการ" ? "InProgress" : "Completed",
+        reportDetails: r.reportDetails,
+        ranger: r.ranger,
+        startDate: r.startDate,
+        completedDate: r.completedDate
+      }));
+
+      localStorage.setItem("greenpass_member_reports", JSON.stringify(toSave));
+      setIsLoading(false);
+      setSuccess("ระบบแสดงผลการบันทึกข้อมูลที่สมบูรณ์");
+
+      setTimeout(() => {
+        router.push("/ranger/list-report-member");
+      }, 1200);
+    } catch (err) {
+      setIsLoading(false);
+      setError("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+    }
   };
 
   if (!currentReport) {
