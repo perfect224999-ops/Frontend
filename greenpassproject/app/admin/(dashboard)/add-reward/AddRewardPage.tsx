@@ -58,41 +58,22 @@ export default function AddRewardPage() {
 
     setIsLoading(true);
     try {
-      // 1. บันทึกลงฐานข้อมูล MySQL ผ่าน Spring Boot API
+      const shortImageName = image.startsWith("http") || image.startsWith("/") 
+        ? image 
+        : `reward_${Date.now()}.png`;
+
+      // 1. บันทึกลงฐานข้อมูล MySQL ผ่าน Spring Boot API (ส่งชื่อรูปสั้นๆ ไปเก็บใน DB)
       const result = await rewardApi.addReward({
-        rewardTitle,
-        rewardDetails,
-        image
+        rewardTitle: rewardTitle.trim(),
+        rewardDetails: rewardDetails.trim(),
+        image: shortImageName
       });
 
-      const newRewardId = result?.result?.rewardId || String(Date.now());
-
-      // 2. อัปเดต localStorage เพื่อความรวดเร็วในการแสดงผลฝั่ง Frontend
-      const saved = localStorage.getItem("greenpass_rewards");
-      let list = [];
-      if (saved) {
-        try {
-          list = JSON.parse(saved);
-        } catch (e) {
-          list = [];
-        }
+      const newRewardId = result?.result?.rewardId || result?.data?.rewardId;
+      if (newRewardId) {
+        localStorage.setItem(`greenpass_reward_img_${newRewardId}`, image);
       }
 
-      const newReward = {
-        id: String(newRewardId),
-        rewardTitle,
-        rewardDetails,
-        parkCount,
-        rewardAnnounmentDate: new Date().toLocaleDateString("th-TH", {
-          day: "numeric",
-          month: "long",
-          year: "numeric"
-        }),
-        image
-      };
-
-      list.unshift(newReward);
-      localStorage.setItem("greenpass_rewards", JSON.stringify(list));
       setSuccess("เพิ่มข้อมูลของรางวัลลงฐานข้อมูลสำเร็จเรียบร้อยแล้ว!");
 
       setTimeout(() => {
@@ -125,9 +106,6 @@ export default function AddRewardPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               เพิ่มของรางวัลใหม่
-              <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Reward Catalog
-              </span>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               สร้างรายการของรางวัลสะสมแต้มสำหรับนักท่องเที่ยวอุทยานแห่งชาติ

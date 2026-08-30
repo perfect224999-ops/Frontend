@@ -58,29 +58,28 @@ function EditRewardContent() {
 
   useEffect(() => {
     const loadRewardData = async () => {
-      let list: Reward[] = [];
-      const saved = localStorage.getItem("greenpass_rewards");
-      if (saved) {
-        try {
-          list = JSON.parse(saved);
-        } catch {
-          list = DEFAULT_REWARDS;
+      if (!rewardId) return;
+      try {
+        const response = await rewardApi.getRewardById(Number(rewardId));
+        const item = response?.result || response?.data;
+        if (item) {
+          const rObj: Reward = {
+            id: String(item.rewardId || item.id),
+            rewardTitle: item.rewardTitle || "",
+            rewardDetails: item.rewardDetails || "",
+            rewardAnnounmentDate: item.rewardAnnouncementDate || "",
+            parkCount: "156 แห่ง",
+            image: item.image || ""
+          };
+          setCurrentReward(rObj);
+          setRewardTitle(rObj.rewardTitle);
+          setRewardDetails(rObj.rewardDetails);
+
+          const cachedImg = localStorage.getItem(`greenpass_reward_img_${rObj.id}`);
+          setImageUrl(cachedImg || rObj.image || "");
         }
-      } else {
-        list = DEFAULT_REWARDS;
-      }
-
-      setRewards(list);
-
-      // Find by id (compare as string or numeric)
-      const found = list.find((r) => String(r.id) === String(rewardId)) || list[0];
-      if (found) {
-        setCurrentReward(found);
-        setParkCount(found.parkCount || "156 แห่ง");
-        setRewardTitle(found.rewardTitle || "");
-        setRewardDetails(found.rewardDetails || "");
-        setImageUrl(found.image || "");
-        setAnnouncementDate(found.rewardAnnounmentDate || "25 ตุลาคม 2567");
+      } catch (e) {
+        console.error("Failed to load reward details from DB:", e);
       }
     };
 
@@ -103,74 +102,28 @@ function EditRewardContent() {
 
     try {
       const targetId = currentReward.id || rewardId || "1";
+      const shortImageName = imageUrl.startsWith("http") || imageUrl.startsWith("/")
+        ? imageUrl
+        : `reward_${targetId}.png`;
 
-      // 1. เรียก API ของ Spring Boot เพื่อแก้ไขข้อมูลในฐานข้อมูล MySQL (ถ้ามี backend)
-      try {
-        await rewardApi.updateReward(targetId, {
-          rewardTitle: rewardTitle.trim(),
-          rewardDetails: rewardDetails.trim(),
-          image: imageUrl
-        });
-      } catch (apiErr) {
-        console.warn("Backend API update error:", apiErr);
-      }
-
-      // 2. อัปเดตข้อมูลใน localStorage เพื่อแสดงผลใน Frontend ทันที
-      const saved = localStorage.getItem("greenpass_rewards");
-      let list: Reward[] = saved ? JSON.parse(saved) : (rewards.length > 0 ? rewards : DEFAULT_REWARDS);
-      
-      let isUpdated = false;
-      const updatedList = list.map((r) => {
-        if (String(r.id) === String(targetId) || String(r.id) === String(rewardId)) {
-          isUpdated = true;
-          return {
-            ...r,
-            rewardTitle: rewardTitle.trim(),
-            rewardDetails: rewardDetails.trim(),
-            parkCount: parkCount.trim() || "156 แห่ง",
-            image: imageUrl || r.image
-          };
-        }
-        return r;
+      await rewardApi.updateReward(Number(targetId), {
+        rewardTitle: rewardTitle.trim(),
+        rewardDetails: rewardDetails.trim(),
+        image: shortImageName
       });
 
-      // หากไม่พบไอดีเดิมในรายการ ให้เปลี่ยนไอเทมแรก หรือเพิ่มใหม่
-      if (!isUpdated) {
-        if (updatedList.length > 0) {
-          updatedList[0] = {
-            ...updatedList[0],
-            rewardTitle: rewardTitle.trim(),
-            rewardDetails: rewardDetails.trim(),
-            parkCount: parkCount.trim() || "156 แห่ง",
-            image: imageUrl || updatedList[0].image
-          };
-        } else {
-          updatedList.push({
-            id: String(targetId),
-            rewardTitle: rewardTitle.trim(),
-            rewardDetails: rewardDetails.trim(),
-            rewardAnnounmentDate: new Date().toLocaleDateString("th-TH", {
-              day: "numeric",
-              month: "long",
-              year: "numeric"
-            }),
-            parkCount: parkCount.trim() || "156 แห่ง",
-            image: imageUrl
-          });
-        }
+      if (imageUrl) {
+        localStorage.setItem(`greenpass_reward_img_${targetId}`, imageUrl);
       }
 
-      localStorage.setItem("greenpass_rewards", JSON.stringify(updatedList));
-      setSuccess("บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว! กำลังกลับสู่หน้าแสดงของรางวัล...");
-
-      // บังคับเปลี่ยนหน้าพร้อมโหลดข้อมูลใหม่ทันที
+      setSuccess("บันทึกการแก้ไขของรางวัลลงฐานข้อมูลเรียบร้อยแล้ว!");
       setTimeout(() => {
-        window.location.href = "/admin/view-reward-admin";
-      }, 500);
-
+        router.push("/admin/view-reward-admin");
+      }, 600);
     } catch (err: any) {
-      console.error(err);
-      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง");
+      console.error("Failed to update reward in database:", err);
+      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -200,9 +153,6 @@ function EditRewardContent() {
             <div>
               <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 แก้ไขของรางวัล #{currentReward.id}
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  Edit Reward
-                </span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 ปรับปรุงข้อมูล ชื่อรางวัล สิทธิประโยชน์ และรูปภาพประกอบ

@@ -172,6 +172,10 @@ export const rewardApi = {
   }) => {
     const response = await api.post(`/reward/update?id=${id}`, payload);
     return response.data;
+  },
+  deleteReward: async (id: number | string) => {
+    const response = await api.delete(`/reward/delete?id=${id}`);
+    return response.data;
   }
 };
 

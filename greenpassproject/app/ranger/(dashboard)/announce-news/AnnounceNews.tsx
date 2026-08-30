@@ -110,7 +110,7 @@ export default function AnnounceNews() {
           </div>
           <h1 className="text-xl sm:text-2xl font-bold">สร้างประกาศข่าวสารอุทยาน</h1>
           <p className="text-emerald-100 text-xs sm:text-sm max-w-xl">
-            เผยแพร่ข้อมูลข่าวสาร การแจ้งเตือน และกิจกรรมสำคัญให้แก่นักท่องเที่ยวและเจ้าหน้าที่
+            เผยแพร่ข้อมูลข่าวสาร การแจ้งเตือน และกิจกรรมสำคัญให้แก่นักท่องเที่ยว
           </p>
         </div>
 

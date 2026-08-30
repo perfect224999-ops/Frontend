@@ -304,9 +304,9 @@ export default function ListReportMember() {
               <thead>
                 <tr className="bg-slate-800 text-slate-100 font-semibold border-b border-slate-700">
                   <th className="py-3.5 px-4 w-16 text-center">ลำดับ</th>
-                  <th className="py-3.5 px-4 w-36">วันที่แจ้งรายงาน</th>
-                  <th className="py-3.5 px-4 w-44">สถานะ</th>
-                  <th className="py-3.5 px-4 w-48">เจ้าหน้าที่ผู้รับผิดชอบ</th>
+                  <th className="py-3.5 px-4 w-36 text-center">วันที่แจ้งรายงาน</th>
+                  <th className="py-3.5 px-4 w-44 text-center">สถานะ</th>
+                  <th className="py-3.5 px-4 w-48 text-center">เจ้าหน้าที่ผู้รับผิดชอบ</th>
                   <th className="py-3.5 px-4 min-w-[260px] text-center">รายละเอียดเหตุการณ์</th>
                 </tr>
               </thead>
@@ -335,17 +335,17 @@ export default function ListReportMember() {
                         </td>
 
                         {/* วันที่แจ้งรายงาน */}
-                        <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
+                        <td className="py-3.5 px-4 font-medium text-slate-700 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-1.5">
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
                             <span>วันที่ {report.reportDate}</span>
                           </div>
                         </td>
 
                         {/* สถานะ */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 text-center">
                           {report.status === "แจ้งรายงาน" ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                               {report.status}
                             </span>

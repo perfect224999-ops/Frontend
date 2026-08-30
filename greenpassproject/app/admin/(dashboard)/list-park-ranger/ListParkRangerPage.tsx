@@ -190,15 +190,15 @@ export default function ListParkRangerPage() {
         {/* Data Table */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-center text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-800 text-white font-semibold">
-                  <th className="px-4 py-3.5">ลำดับ</th>
-                  <th className="px-4 py-3.5">ชื่อ-นามสกุล</th>
-                  <th className="px-4 py-3.5">เบอร์มือถือ</th>
-                  <th className="px-4 py-3.5">อีเมล</th>
-                  <th className="px-4 py-3.5">ตำแหน่ง</th>
-                  <th className="px-4 py-3.5">อุทยานแห่งชาติ</th>
+                  <th className="px-4 py-3.5 text-center">ลำดับ</th>
+                  <th className="px-4 py-3.5 text-center">ชื่อ-นามสกุล</th>
+                  <th className="px-4 py-3.5 text-center">เบอร์มือถือ</th>
+                  <th className="px-4 py-3.5 text-center">อีเมล</th>
+                  <th className="px-4 py-3.5 text-center">ตำแหน่ง</th>
+                  <th className="px-4 py-3.5 text-center">อุทยานแห่งชาติ</th>
                   <th className="px-4 py-3.5 text-center">รายละเอียด</th>
                 </tr>
               </thead>
@@ -206,18 +206,18 @@ export default function ListParkRangerPage() {
                 {filteredRangers.length > 0 ? (
                   filteredRangers.map((ranger, idx) => (
                     <tr key={ranger.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-3.5 font-bold text-slate-400 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-bold text-slate-400 whitespace-nowrap text-center">
                         {String(idx + 1).padStart(2, "0")}
                       </td>
-                      <td className="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap">{ranger.name}</td>
-                      <td className="px-4 py-3.5 text-slate-600 font-medium whitespace-nowrap">{ranger.phone}</td>
-                      <td className="px-4 py-3.5 text-emerald-700 underline font-normal whitespace-nowrap">{ranger.email}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                      <td className="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap text-center">{ranger.name}</td>
+                      <td className="px-4 py-3.5 text-slate-600 font-medium whitespace-nowrap text-center">{ranger.phone}</td>
+                      <td className="px-4 py-3.5 text-emerald-700 underline font-normal whitespace-nowrap text-center">{ranger.email}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-center">
+                        <span className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                           {ranger.role}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-slate-700 font-medium whitespace-nowrap">{ranger.parkName}</td>
+                      <td className="px-4 py-3.5 text-slate-700 font-medium whitespace-nowrap text-center">{ranger.parkName}</td>
                       <td className="px-4 py-3.5 text-center whitespace-nowrap">
                         <button
                           onClick={() => router.push(`/admin/view-park-ranger-detail?id=${ranger.id}`)}

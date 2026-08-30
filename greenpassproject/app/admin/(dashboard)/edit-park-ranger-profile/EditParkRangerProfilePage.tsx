@@ -465,9 +465,6 @@ function EditProfileContent() {
           <div>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               แก้ไขประวัติเจ้าหน้าที่อุทยาน #{currentRanger.id}
-              <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Edit Profile
-              </span>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               แก้ไขและอัปเดตข้อมูลรายละเอียดเจ้าหน้าที่ให้เป็นปัจจุบัน

@@ -62,26 +62,44 @@ export default function ViewAllStatisticesPage() {
   const [parkStats, setParkStats] = useState<ParkStatItem[]>([]);
 
   useEffect(() => {
-    async function fetchStats() {
+    // 1. Instant render from sessionStorage cache (0ms delay)
+    const cacheKey = `greenpass_stats_cache_${month}_${year}`;
+    const cached = typeof window !== "undefined" ? sessionStorage.getItem(cacheKey) : null;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.metrics) setMetrics(parsed.metrics);
+        if (parsed.parkStats) setParkStats(parsed.parkStats);
+        setLoading(false);
+      } catch (e) {}
+    } else {
       setLoading(true);
+    }
+
+    // 2. Fetch fresh data from DB in background
+    async function fetchStats() {
       try {
         const monthNum = month !== "ทั้งหมด" ? MONTH_MAP[month] : undefined;
         const yearNum = year !== "ทั้งหมด" ? Number(year) : undefined;
         const res = await adminApi.getStatistics(monthNum, yearNum);
         if (res && res.success && res.result) {
           const { metrics: m, parkStats: ps } = res.result;
-          if (m) {
-            setMetrics({
-              totalPark: m.totalPark || 0,
-              totalRanger: m.totalRanger || 0,
-              totalNews: m.totalNews || 0,
-              totalReport: m.totalReport || 0,
-              totalProcessingReport: m.totalProcessingReport || 0,
-            });
-          }
-          if (Array.isArray(ps)) {
-            setParkStats(ps);
-          }
+          const newMetrics = {
+            totalPark: m?.totalPark || 0,
+            totalRanger: m?.totalRanger || 0,
+            totalNews: m?.totalNews || 0,
+            totalReport: m?.totalReport || 0,
+            totalProcessingReport: m?.totalProcessingReport || 0,
+          };
+          const newParkStats = Array.isArray(ps) ? ps : [];
+
+          setMetrics(newMetrics);
+          setParkStats(newParkStats);
+
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            metrics: newMetrics,
+            parkStats: newParkStats
+          }));
         }
       } catch (err) {
         console.error("Failed to load DB statistics:", err);
@@ -89,6 +107,7 @@ export default function ViewAllStatisticesPage() {
         setLoading(false);
       }
     }
+
     fetchStats();
   }, [month, year]);
 
@@ -132,9 +151,6 @@ export default function ViewAllStatisticesPage() {
             <div>
               <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 รายงานสรุปภาพรวมและสถิติอุทยานแห่งชาติ
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  Admin Dashboard (DB Real-time)
-                </span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 ภาพรวมข้อมูลอุทยาน เจ้าหน้าที่ ข่าวประกาศ และสถานะการจัดการรายงานปัญหาจากฐานข้อมูลจริง
@@ -330,7 +346,7 @@ export default function ViewAllStatisticesPage() {
           <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-emerald-600" />
-              สรุปผลข้อมูลสถิติรายอุทยาน ({selectedPark === "ทุกอุทยาน" ? "แสดงทุกอุทยานในฐานข้อมูล" : selectedPark})
+              สรุปผลข้อมูลสถิติรายอุทยาน
             </h3>
             <span className="text-[11px] text-slate-500 font-semibold">
               พบ {filteredParkStats.length} อุทยาน
@@ -338,10 +354,10 @@ export default function ViewAllStatisticesPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-center text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-800 text-slate-100 font-semibold">
-                  <th className="py-3.5 px-5">อุทยานแห่งชาติ</th>
+                  <th className="py-3.5 px-5 text-center">อุทยานแห่งชาติ</th>
                   <th className="py-3.5 px-4 text-center">ข่าวที่ประกาศ</th>
                   <th className="py-3.5 px-4 text-center">รายงานทั้งหมด</th>
                   <th className="py-3.5 px-4 text-center">กำลังดำเนินการ</th>
@@ -358,7 +374,7 @@ export default function ViewAllStatisticesPage() {
                 ) : (
                   filteredParkStats.map((item) => (
                     <tr key={item.parkId} className="hover:bg-emerald-50/40 transition-colors">
-                      <td className="py-4 px-5 font-bold text-slate-900 flex items-center gap-2">
+                      <td className="py-4 px-5 font-bold text-slate-900 flex items-center justify-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                         {item.parkName}
                       </td>
@@ -396,7 +412,7 @@ export default function ViewAllStatisticesPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-600" />
-              แผนภูมิเปรียบเทียบสถิติรายงาน (Bar Chart Visualizer - {selectedPark === "ทุกอุทยาน" ? "ภาพรวมทุกอุทยาน" : selectedPark})
+              แผนภูมิเปรียบเทียบสถิติรายงาน
             </h3>
             <span className="text-[10px] text-slate-500 font-medium">
               ประจำ{month === "ทั้งหมด" ? "ทุกเดือน" : `เดือน ${month}`} {year === "ทั้งหมด" ? "ทุกปี พ.ศ." : `พ.ศ. ${year}`}

@@ -280,9 +280,6 @@ export default function AddParkRangerPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               เพิ่มเจ้าหน้าที่อุทยาน
-              <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Register Ranger
-              </span>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               กรอกข้อมูลแบบฟอร์มเพื่อลงทะเบียนเจ้าหน้าที่ปฏิบัติงานใหม่เข้าสู่ระบบ
