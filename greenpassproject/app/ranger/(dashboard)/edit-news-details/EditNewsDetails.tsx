@@ -46,6 +46,7 @@ function EditNewsDetailsContent() {
   const [image, setImage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("greenpass_news_data");
@@ -72,27 +73,38 @@ function EditNewsDetailsContent() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim() || !currentNews) return;
+    setError("");
+    setSuccess("");
+
+    const cleanTitle = title.trim();
+    const cleanContent = content.trim();
+
+    if (!cleanTitle || cleanTitle.length < 4 || cleanTitle.length > 50 ||
+        !cleanContent || cleanContent.length < 4 || cleanContent.length > 255 ||
+        !currentNews) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
+      return;
+    }
 
     setIsLoading(true);
     try {
       const username = localStorage.getItem("ranger_username") || "ranger01";
       await announcementApi.updateAnnouncement(currentNews.id, {
-        title,
-        content,
+        title: cleanTitle,
+        content: cleanContent,
         publishDate: currentNews.date,
         username,
         image
       });
-    } catch (error) {
-      console.error("Failed to update announcement in database:", error);
+    } catch (err) {
+      console.error("Failed to update announcement in database:", err);
     } finally {
       const updated = newsList.map((item) => {
         if (item.id === currentNews.id) {
           return {
             ...item,
-            title: title,
-            content: content,
+            title: cleanTitle,
+            content: cleanContent,
             image: image
           };
         }
@@ -127,6 +139,17 @@ function EditNewsDetailsContent() {
     <div className="max-w-4xl mx-auto space-y-6 font-sans">
       
       {/* Toast Notification */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-300 text-red-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-2">
+            <X className="w-4 h-4 text-red-600" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError("")} className="text-red-600 hover:text-red-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {success && (
         <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">
           <div className="flex items-center space-x-2">

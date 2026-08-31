@@ -11,7 +11,8 @@ import {
   Building2,
   TrendingUp,
   Activity,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from "lucide-react";
 import { adminApi } from "@/service/api";
 
@@ -57,6 +58,7 @@ export default function ViewAllStatisticesPage() {
     totalNews: 0,
     totalReport: 0,
     totalProcessingReport: 0,
+    totalCompletedReport: 0,
   });
 
   const [parkStats, setParkStats] = useState<ParkStatItem[]>([]);
@@ -90,6 +92,7 @@ export default function ViewAllStatisticesPage() {
             totalNews: m?.totalNews || 0,
             totalReport: m?.totalReport || 0,
             totalProcessingReport: m?.totalProcessingReport || 0,
+            totalCompletedReport: m?.totalCompletedReport || 0,
           };
           const newParkStats = Array.isArray(ps) ? ps : [];
 
@@ -153,7 +156,7 @@ export default function ViewAllStatisticesPage() {
                 รายงานสรุปภาพรวมและสถิติอุทยานแห่งชาติ
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                ภาพรวมข้อมูลอุทยาน เจ้าหน้าที่ ข่าวประกาศ และสถานะการจัดการรายงานปัญหาจากฐานข้อมูลจริง
+                ภาพรวมข้อมูลอุทยาน เจ้าหน้าที่ ข่าวประกาศ
               </p>
             </div>
           </div>
@@ -165,8 +168,8 @@ export default function ViewAllStatisticesPage() {
           )}
         </div>
 
-        {/* 5 Top Summary Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        {/* 6 Top Summary Stat Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
           
           {/* Total Park */}
           <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
@@ -225,7 +228,7 @@ export default function ViewAllStatisticesPage() {
           </div>
 
           {/* TotalProcessing Report */}
-          <div className="bg-gradient-to-br from-rose-50 to-pink-50/50 border border-rose-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group col-span-2 sm:col-span-1">
+          <div className="bg-gradient-to-br from-rose-50 to-pink-50/50 border border-rose-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-rose-800">Processing</span>
               <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-700 flex items-center justify-center">
@@ -238,13 +241,27 @@ export default function ViewAllStatisticesPage() {
             </div>
           </div>
 
+          {/* Completed Report */}
+          <div className="bg-gradient-to-br from-emerald-50 to-green-50/50 border border-emerald-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-emerald-800">Completed</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <h3 className="text-2xl font-extrabold text-emerald-950">{metrics.totalCompletedReport}</h3>
+              <p className="text-[10px] text-emerald-700/70 font-medium">ดำเนินการสำเร็จ</p>
+            </div>
+          </div>
+
         </div>
 
         {/* Filter Controls Bar */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
             <Filter className="w-4 h-4 text-emerald-600" />
-            <span>ตัวกรองการแสดงผลสถิติ (ฐานข้อมูล):</span>
+            <span>ตัวกรองการแสดงผลสถิติ:</span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">

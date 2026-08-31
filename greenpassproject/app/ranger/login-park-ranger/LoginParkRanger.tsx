@@ -29,12 +29,12 @@ export default function LoginParkRanger() {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
-    if (!cleanUsername) {
-      setError("กรุณากรอกชื่อผู้ใช้งาน");
-      return;
-    }
-    if (!cleanPassword) {
-      setError("กรุณากรอกรหัสผ่าน");
+    // Validate script according to SRS Page 32 (Username 4-50 alpha-num, Password 8-32 alpha-num-special)
+    const isUsernameValid = /^[a-zA-Z0-9]{4,50}$/.test(cleanUsername);
+    const isPasswordValid = /^[a-zA-Z0-9!#_.]{8,32}$/.test(cleanPassword);
+
+    if (!cleanUsername || !cleanPassword || !isUsernameValid || !isPasswordValid) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 
@@ -105,21 +105,12 @@ export default function LoginParkRanger() {
         localStorage.setItem("ranger_roles", JSON.stringify(userRoles));
         router.push("/ranger/view-park-detail");
       } else {
-        setError(response?.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+        setError("ไม่พบข้อมูลผู้ใช้");
         setIsLoading(false);
       }
     } catch (err: any) {
       console.error("Ranger Login Error:", err);
-      const serverMsg = err?.response?.data?.message;
-      if (serverMsg === "Password incorrect") {
-        setError("รหัสผ่านไม่ถูกต้อง (กรุณากรอก pass1234)");
-      } else if (serverMsg === "Park Ranger not found") {
-        setError("ไม่พบชื่อผู้ใช้งานเจ้าหน้าที่คนนี้ในระบบ");
-      } else if (serverMsg) {
-        setError(serverMsg);
-      } else {
-        setError("ชื่อผู้ใช้งานหรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง");
-      }
+      setError("ไม่พบข้อมูลผู้ใช้");
       setIsLoading(false);
     }
   };

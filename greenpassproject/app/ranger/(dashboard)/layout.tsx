@@ -160,7 +160,7 @@ export default function RangerDashboardLayout({
           </Link>
 
           {/* เมนูบาร์นำทางหลัก */}
-          <nav className="hidden lg:flex items-center gap-1 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
+          <nav className="hidden lg:flex items-center gap-2.5 sm:gap-3 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
             {navItems.map((item) => {
               const isParkActive = 
                 item.dropdownType === "park" && (
@@ -196,7 +196,7 @@ export default function RangerDashboardLayout({
                         setShowParkDropdown(!showParkDropdown);
                         router.push(item.href);
                       }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer ${
+                      className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                         isActive 
                           ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                           : "text-emerald-100/90 hover:text-white hover:bg-white/10"
@@ -253,7 +253,7 @@ export default function RangerDashboardLayout({
                         setShowReportDropdown(!showReportDropdown);
                         router.push(item.href);
                       }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer ${
+                      className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                         isActive 
                           ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                           : "text-emerald-100/90 hover:text-white hover:bg-white/10"
@@ -285,7 +285,7 @@ export default function RangerDashboardLayout({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive 
                       ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                       : "text-emerald-100/90 hover:text-white hover:bg-white/10"

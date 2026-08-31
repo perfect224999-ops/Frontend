@@ -50,18 +50,27 @@ export default function AnnounceNews() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    setError("");
+    setSuccess("");
+
+    const cleanTitle = title.trim();
+    const cleanContent = content.trim();
+
+    if (!cleanTitle || cleanTitle.length < 4 || cleanTitle.length > 50 ||
+        !cleanContent || cleanContent.length < 4 || cleanContent.length > 255) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน");
+      return;
+    }
 
     setIsLoading(true);
-    setError("");
     try {
       const username = localStorage.getItem("ranger_username") || "pr01";
       const isoDate = new Date().toISOString().split("T")[0];
       const apiImage = (image && image.length <= 255) ? image : "src/news1.jpg";
 
       const res = await announcementApi.addAnnouncement({
-        title,
-        content: `[${category}] ${content}`,
+        title: cleanTitle,
+        content: `[${category}] ${cleanContent}`,
         publishDate: isoDate,
         username,
         image: apiImage
@@ -80,7 +89,7 @@ export default function AnnounceNews() {
       }, 1200);
     } catch (err: any) {
       console.error("Failed to save announcement to database:", err);
-      setError("เกิดข้อผิดพลาดในการบันทึกประกาศข่าวสารลงฐานข้อมูล");
+      setError("ไม่สามารถบันทึกข่าวสารได้");
     } finally {
       setIsLoading(false);
     }
@@ -90,6 +99,17 @@ export default function AnnounceNews() {
     <div className="max-w-4xl mx-auto space-y-6 font-sans">
       
       {/* Toast Notification */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-300 text-red-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-2">
+            <X className="w-4 h-4 text-red-600" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError("")} className="text-red-600 hover:text-red-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {success && (
         <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">
           <div className="flex items-center space-x-2">

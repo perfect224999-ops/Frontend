@@ -76,7 +76,7 @@ export default function AdminDashboardLayout({
           </Link>
 
           {/* Navigation Items */}
-          <nav className="hidden md:flex items-center gap-1 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
+          <nav className="hidden md:flex items-center gap-2.5 sm:gap-3.5 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href ||
@@ -90,7 +90,7 @@ export default function AdminDashboardLayout({
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 relative ${
+                  className={`flex items-center gap-2 px-4 sm:px-5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 relative ${
                     isActive 
                       ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                       : "text-emerald-100/90 hover:text-white hover:bg-white/10"

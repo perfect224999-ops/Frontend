@@ -95,31 +95,16 @@ export default function EditParkDetails() {
     setError("");
     setSuccess("");
 
-    if (!parkName.trim()) {
-      setError("ชื่ออุทยานต้องไม่เป็นค่าว่าง");
-      return;
-    }
-    if (parkName.length < 4 || parkName.length > 50) {
-      setError("ชื่ออุทยานต้องมีความยาว 4 - 50 ตัวอักษร");
-      return;
-    }
+    const cleanName = parkName.trim();
+    const cleanOpenHours = openHours.trim();
+    const cleanDesc = description.trim();
+    const cleanAddress = address.trim();
 
-    if (!openHours.trim()) {
-      setError("เวลาเปิด-ปิด ต้องไม่เป็นค่าว่าง");
-      return;
-    }
-
-    if (!description.trim()) {
-      setError("คำอธิบายต้องไม่เป็นค่าว่าง");
-      return;
-    }
-    if (description.length < 4 || description.length > 1000) {
-      setError("คำอธิบายต้องมีความยาว 4 - 1000 ตัวอักษร");
-      return;
-    }
-
-    if (!address.trim()) {
-      setError("ที่อยู่ต้องไม่เป็นค่าว่าง");
+    if (!cleanName || cleanName.length < 4 || cleanName.length > 50 ||
+        !cleanOpenHours ||
+        !cleanDesc || cleanDesc.length < 4 || cleanDesc.length > 1000 ||
+        !cleanAddress) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 

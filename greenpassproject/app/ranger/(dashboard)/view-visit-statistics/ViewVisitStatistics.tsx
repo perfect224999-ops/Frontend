@@ -19,11 +19,11 @@ interface PeriodStats {
 
 export default function ViewVisitStatistics() {
   const [filter, setFilter] = useState<"monthly" | "yearly">("monthly");
-  const [selectedYear, setSelectedYear] = useState<string>("ปี 2026 (ปัจจุบัน)");
+  const [selectedYear, setSelectedYear] = useState<string>("ปี 2026");
 
   // ข้อมูลสถิติรายเดือนแยกตามปี (ปี 2026, 2025, 2024, 2023)
   const [monthlyStatsByYear, setMonthlyStatsByYear] = useState<Record<string, PeriodStats>>({
-    "ปี 2026 (ปัจจุบัน)": {
+    "ปี 2026": {
       thai: 101,
       foreigner: 200,
       total: 301,
@@ -110,7 +110,7 @@ export default function ViewVisitStatistics() {
       { label: "ปี 2023", thai: 60, foreigner: 120 },
       { label: "ปี 2024", thai: 70, foreigner: 140 },
       { label: "ปี 2025", thai: 85, foreigner: 170 },
-      { label: "ปี 2026 (ปัจจุบัน)", thai: 101, foreigner: 200 },
+      { label: "ปี 2026", thai: 101, foreigner: 200 },
     ]
   });
 
@@ -125,11 +125,11 @@ export default function ViewVisitStatistics() {
               thai: res.monthlyStats.thai || 101,
               foreigner: res.monthlyStats.foreigner || 200,
               total: res.monthlyStats.total || 301,
-              history: res.monthlyStats.history && res.monthlyStats.history.length > 0 ? res.monthlyStats.history : monthlyStatsByYear["ปี 2026 (ปัจจุบัน)"].history
+              history: res.monthlyStats.history && res.monthlyStats.history.length > 0 ? res.monthlyStats.history : monthlyStatsByYear["ปี 2026"].history
             };
             setMonthlyStatsByYear(prev => ({
               ...prev,
-              "ปี 2026 (ปัจจุบัน)": current2026
+              "ปี 2026": current2026
             }));
           }
 
@@ -149,14 +149,14 @@ export default function ViewVisitStatistics() {
     fetchStats();
   }, []);
 
-  const yearsList = ["ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026 (ปัจจุบัน)"];
+  const yearsList = ["ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"];
 
   // หา Index ของปีที่ถูกเลือกในปัจจุบัน
   const activeYearIdx = yearsList.indexOf(selectedYear) !== -1 ? yearsList.indexOf(selectedYear) : 3;
   const currentSelectedYearLabel = yearsList[activeYearIdx];
 
   // สถิติรายเดือนประจำปีที่เลือก
-  const currentMonthlyStats = monthlyStatsByYear[currentSelectedYearLabel] || monthlyStatsByYear["ปี 2026 (ปัจจุบัน)"];
+  const currentMonthlyStats = monthlyStatsByYear[currentSelectedYearLabel] || monthlyStatsByYear["ปี 2026"];
 
   // ฟังก์ชันเลื่อนเลือกปีถัดไป / ย้อนหลัง
   const handlePrevYear = () => {
@@ -195,7 +195,7 @@ export default function ViewVisitStatistics() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white shadow-sm rounded-lg p-6 font-sans border-t-4 border-[#2ebb5e] space-y-6">
+    <div className="w-[98%] max-w-6xl mx-auto bg-white shadow-sm rounded-2xl p-6 sm:p-8 font-sans border-t-4 border-[#2ebb5e] space-y-6">
       
       {/* Title Bar & Mode Switcher */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-zinc-150 pb-4">

@@ -89,6 +89,8 @@ export default function ListReportMember() {
           res = await reportApi.getReportsForRanger(username);
         } else if (parkId) {
           res = await reportApi.getReportsByParkId(Number(parkId));
+        } else {
+          res = await reportApi.getReportsByParkId(4);
         }
 
         const listData = res && res.success ? (res.result || res.data) : null;
@@ -115,6 +117,7 @@ export default function ListReportMember() {
         }
       } catch (err) {
         console.log("Backend reports fetch info: using local data fallback", err);
+        setError("ไม่สามารถดึงรายงานเหตุการจากฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
       }
 
       const saved = localStorage.getItem("greenpass_member_reports");
@@ -320,7 +323,8 @@ export default function ListReportMember() {
                     </td>
                   </tr>
                 ) : (
-                  filteredReports.map((report) => {
+                  filteredReports.map((report, index) => {
+                    const displayIndex = String(index + 1).padStart(2, "0");
                     return (
                       <tr
                         key={report.id}
@@ -330,7 +334,7 @@ export default function ListReportMember() {
                         {/* ลำดับ */}
                         <td className="py-3.5 px-4 text-center font-bold text-slate-500">
                           <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 inline-flex items-center justify-center text-xs group-hover:bg-emerald-100 group-hover:text-emerald-800 transition-colors">
-                            {report.id}
+                            {displayIndex}
                           </span>
                         </td>
 

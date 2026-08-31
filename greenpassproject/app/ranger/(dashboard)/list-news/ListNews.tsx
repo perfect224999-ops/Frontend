@@ -245,7 +245,7 @@ export default function ListNews() {
         {filteredNews.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3 shadow-sm">
             <AlertCircle className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-xs font-bold text-slate-600">ไม่พบรายการข่าวสารประกาศ</p>
+            <p className="text-xs font-bold text-slate-600">ไม่มีข้อมูลข่าวสาร</p>
             {canAnnouncement && (
               <button
                 onClick={() => router.push("/ranger/announce-news")}
