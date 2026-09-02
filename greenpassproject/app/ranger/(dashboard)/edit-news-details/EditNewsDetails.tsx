@@ -79,10 +79,10 @@ function EditNewsDetailsContent() {
     const cleanTitle = title.trim();
     const cleanContent = content.trim();
 
-    if (!cleanTitle || cleanTitle.length < 4 || cleanTitle.length > 50 ||
-        !cleanContent || cleanContent.length < 4 || cleanContent.length > 255 ||
+    if (!cleanTitle || cleanTitle.length < 2 || cleanTitle.length > 250 ||
+        !cleanContent || cleanContent.length < 4 || cleanContent.length > 2000 ||
         !currentNews) {
-      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
+      setError("กรุณากรอกหัวข้อประกาศ (2-250 ตัวอักษร) และเนื้อหาประกาศ (4-2000 ตัวอักษร) ให้ถูกต้อง");
       return;
     }
 

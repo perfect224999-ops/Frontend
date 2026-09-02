@@ -33,8 +33,17 @@ export const authApi = {
 // stampApi สำหรับหน้าแสตมป์
 export const stampApi = {
   scanCheckinQrCode: async (payload: { token: string; parkRangerId?: number; parkRangerUsername?: string }) => {
-    const response = await api.post('/stamp', payload);
-    return response.data;
+    try {
+      const response = await api.post('/stamp', payload, {
+        validateStatus: (status) => status < 500
+      });
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.data) {
+        return err.response.data;
+      }
+      throw err;
+    }
   },
   getStatistics: async () => {
     const response = await api.get('/stamp/statistics');
@@ -84,7 +93,10 @@ export const announcementApi = {
     const response = await api.post(`/announcement/update?id=${id}`, payload);
     return response.data;
   },
-  deleteAnnouncement: async (id: string) => {
+  deleteAnnouncement: async (id: string | number) => {
+    if (!id || id === "undefined" || id === "null") {
+      return { success: true, message: "Local item deleted" };
+    }
     const response = await api.delete(`/announcement/delete?id=${id}`);
     return response.data;
   }

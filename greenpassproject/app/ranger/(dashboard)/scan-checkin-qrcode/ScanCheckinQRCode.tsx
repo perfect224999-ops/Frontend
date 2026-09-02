@@ -130,7 +130,7 @@ export default function ScanCheckinQRCode() {
       }
     } catch (err: any) {
       console.error("Error scan checkin:", err);
-      const msg = err?.response?.data?.message || "ไม่พบข้อมูลนักท่องเที่ยวในฐานข้อมูล หรือสแกนซ้ำภายใน 1 วัน";
+      const msg = err?.response?.data?.message || "ไม่พบข้อมูลนักท่องเที่ยวในฐานข้อมูล หรือสแกนซ้ำภายใน 2 ชั่วโมง";
       setErrorMessage(msg);
       setShowErrorPopup(true);
     }
@@ -148,7 +148,7 @@ export default function ScanCheckinQRCode() {
     setIsScanning(true);
   };
 
-  const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว");
+  const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว") || errorMessage.includes("2 ชั่วโมง");
 
   if (!canIssueStamp) {
     return (
@@ -332,10 +332,10 @@ export default function ScanCheckinQRCode() {
                 isDuplicateError ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-rose-50 text-rose-800 border-rose-200"
               }`}>
                 <AlertTriangle className="w-4 h-4" /> 
-                {isDuplicateError ? "ไม่อนุญาตให้สแกนซ้ำภายใน 1 วัน" : "สแกนไม่สำเร็จ"}
+                {isDuplicateError ? "ไม่อนุญาตให้สแกนซ้ำภายใน 2 ชั่วโมง" : "สแกนไม่สำเร็จ"}
               </span>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">
-                {isDuplicateError ? "พบการสแกนสแตมป์ซ้ำในวันนี้" : "ไม่สามารถมอบสแตมป์ได้"}
+                {isDuplicateError ? "พบการสแกนสแตมป์ซ้ำภายใน 2 ชั่วโมง" : "ไม่สามารถมอบสแตมป์ได้"}
               </h3>
             </div>
 
@@ -349,7 +349,7 @@ export default function ScanCheckinQRCode() {
               </div>
               <p className="text-xs opacity-80 pt-2 border-t border-amber-200/60">
                 {isDuplicateError 
-                  ? "ระบบเปิดใช้งานเงื่อนไขความปลอดภัย: นักท่องเที่ยว 1 คน สามารถสแกนรับสแตมป์ได้ 1 ครั้ง ต่อ 1 อุทยานในแต่ละวันเท่านั้น" 
+                  ? "ระบบเปิดใช้งานเงื่อนไขความปลอดภัย: นักท่องเที่ยว 1 คน สามารถสแกนรับสแตมป์ได้ 1 ครั้ง ต่อ 1 อุทยานในระยะเวลา 2 ชั่วโมงเท่านั้น" 
                   : "กรุณาตรวจสอบ QR Code หรือข้อมูลนักท่องเที่ยวในระบบใหม่อีกครั้ง"}
               </p>
             </div>

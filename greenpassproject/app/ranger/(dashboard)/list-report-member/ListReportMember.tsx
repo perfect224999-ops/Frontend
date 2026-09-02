@@ -176,19 +176,85 @@ export default function ListReportMember() {
     (r) => r.status === "ดำเนินการแก้ไขสำเร็จ" || r.status === "ดำเนินการสำเร็จ"
   ).length;
 
+  const handleTriggerEmergencyReport = () => {
+    const timeStr = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    const dateStr = new Date().toLocaleDateString("th-TH");
+    const newReport: ReportItem = {
+      id: String(Date.now()),
+      reportDate: dateStr,
+      category: "🚨 เหตุฉุกเฉินด่วน",
+      status: "แจ้งรายงาน",
+      reportDetails: "🚨 พบนกท่องเที่ยวหกล้มบาดเจ็บ / ต้องการความช่วยเหลือปฐมพยาบาลด่วน บริเวณน้ำตกชั้น 3!",
+      ranger: "เจ้าหน้าที่อุทยาน",
+      startDate: dateStr,
+      completedDate: "-",
+      isEmergency: true
+    };
+
+    setReports(prev => [newReport, ...prev]);
+
+    const saved = typeof window !== "undefined" ? localStorage.getItem("greenpass_member_reports") : null;
+    let currentList = [];
+    if (saved) {
+      try { currentList = JSON.parse(saved); } catch (e) {}
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("greenpass_member_reports", JSON.stringify([newReport, ...currentList]));
+    }
+
+    const emergencyPayload = {
+      id: newReport.id,
+      details: newReport.reportDetails,
+      location: "บริเวณน้ำตกชั้น 3 (จุดชมวิว)",
+      time: `${timeStr} น.`,
+      reporter: "นักท่องเที่ยวในพื้นที่"
+    };
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("greenpass_emergency_alert", JSON.stringify(emergencyPayload));
+      window.dispatchEvent(new CustomEvent("greenpass_emergency_trigger", { detail: emergencyPayload }));
+    }
+  };
+
+  const handleTriggerNormalReport = () => {
+    const dateStr = new Date().toLocaleDateString("th-TH");
+    const newReport: ReportItem = {
+      id: String(Date.now()),
+      reportDate: dateStr,
+      category: "ทั่วไป",
+      status: "แจ้งรายงาน",
+      reportDetails: "พบถังขยะบริเวณจุดพักผ่อนเต็ม มีขยะล้นออกมาข้างนอกเล็กน้อย",
+      ranger: "เจ้าหน้าที่อุทยาน",
+      startDate: dateStr,
+      completedDate: "-",
+      isEmergency: false
+    };
+
+    setReports(prev => [newReport, ...prev]);
+
+    const saved = typeof window !== "undefined" ? localStorage.getItem("greenpass_member_reports") : null;
+    let currentList = [];
+    if (saved) {
+      try { currentList = JSON.parse(saved); } catch (e) {}
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("greenpass_member_reports", JSON.stringify([newReport, ...currentList]));
+    }
+  };
+
   const filteredReports =
     selectedDate === "All"
       ? reports
-      : reports.filter((r) => r.reportDate.startsWith(selectedDate));
+      : reports.filter((r) => r.reportDate.includes(selectedDate) || r.reportDate.startsWith(selectedDate));
 
   return (
-    <div className="w-[98%] max-w-6xl mx-auto font-sans relative py-4 space-y-6">
+    <div className="w-full max-w-7xl mx-auto font-sans relative py-4 space-y-6 px-2 sm:px-4">
       
       {/* Container หลัก */}
       <div className="bg-emerald-950/5 backdrop-blur-md border border-emerald-800/10 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-emerald-950/5">
         
-        {/* Header Title Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-900/10 pb-5">
+        {/* Header Title Section with Emergency Action Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-emerald-900/10 pb-5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20">
               <ClipboardList className="w-6 h-6" />
@@ -204,6 +270,22 @@ export default function ListReportMember() {
                 ติดตามและจัดการสถานะรายงานเหตุฉุกเฉินความชำรุดในเขตอุทยาน
               </p>
             </div>
+          </div>
+
+          {/* Simulation Action Buttons for Testing Emergency Siren */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleTriggerNormalReport}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-300 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <span>📋 ทดลองรายงานปกติ (ไม่ส่งเสียงร้อง)</span>
+            </button>
+            <button
+              onClick={handleTriggerEmergencyReport}
+              className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded-xl text-xs font-bold transition-all border border-rose-400/30 flex items-center gap-1.5 cursor-pointer shadow-md shadow-rose-950/20 animate-pulse"
+            >
+              <span>🚨 จำลองส่งเหตุฉุกเฉิน (เปิดไซเรนเตือนภัย)</span>
+            </button>
           </div>
         </div>
 
@@ -348,7 +430,12 @@ export default function ListReportMember() {
 
                         {/* สถานะ */}
                         <td className="py-3.5 px-4 text-center">
-                          {report.status === "แจ้งรายงาน" ? (
+                          {report.isEmergency ? (
+                            <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white shadow-md shadow-rose-950/20 animate-pulse border border-rose-400">
+                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                              🚨 เหตุฉุกเฉินด่วนที่สุด
+                            </span>
+                          ) : report.status === "แจ้งรายงาน" ? (
                             <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                               {report.status}

@@ -117,7 +117,7 @@ export default function ListNews() {
         const apiData = result?.result || result?.data;
         if (result && (result.success || result.status) && Array.isArray(apiData) && apiData.length > 0) {
           apiList = apiData.map((item: any) => ({
-            id: String(item.announcementId || item.id || Math.random()),
+            id: String(item.announcementId || item.id || Date.now()),
             date: formatThaiDateLong(item.postDate) || item.createdAt || item.date || "ไม่ระบุวันที่",
             category: item.category || "📢 ประกาศข่าวสาร",
             title: item.announcementTitle || item.title || "ไม่มีหัวข้อ",
@@ -159,11 +159,13 @@ export default function ListNews() {
   const handleConfirmDelete = async () => {
     if (!selectedDeleteId) return;
     try {
-      await announcementApi.deleteAnnouncement(selectedDeleteId);
+      if (!isNaN(Number(selectedDeleteId))) {
+        await announcementApi.deleteAnnouncement(selectedDeleteId);
+      }
     } catch (error) {
-      console.error("Failed to delete announcement from database:", error);
+      console.warn("API delete announcement notice:", error);
     } finally {
-      const updated = news.filter((item) => item.id !== selectedDeleteId);
+      const updated = news.filter((item) => String(item.id) !== String(selectedDeleteId));
       setNews(updated);
       localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
       setShowDeleteModal(false);
@@ -256,14 +258,17 @@ export default function ListNews() {
             )}
           </div>
         ) : (
-          filteredNews.map((item) => (
+          filteredNews.map((item, index) => (
             <div
               key={item.id}
               className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition-all duration-200 space-y-4 border-l-4 border-l-[#0a5829]"
             >
-              {/* Top Row: Date, Category & Actions */}
+              {/* Top Row: Index Badge, Date, Category & Actions */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div className="flex items-center space-x-2 text-xs">
+                  <span className="px-2.5 py-0.5 bg-[#0a5829] text-white font-extrabold text-[11px] rounded-lg shadow-xs">
+                    ข่าวสารที่ {index + 1}
+                  </span>
                   <span className="inline-flex items-center text-slate-500 font-bold">
                     <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                     {item.date}

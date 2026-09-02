@@ -4,7 +4,24 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { rangerApi, parkApi } from "@/service/api";
-import { ShieldAlert, Lock, ArrowLeft } from "lucide-react";
+import { 
+  ShieldAlert, 
+  Lock, 
+  ArrowLeft,
+  QrCode,
+  Trees,
+  ClipboardList,
+  BarChart3,
+  LogOut,
+  Info,
+  Newspaper,
+  Megaphone,
+  Siren,
+  AlertTriangle,
+  CheckCircle,
+  Volume2,
+  BellRing
+} from "lucide-react";
 
 export default function RangerDashboardLayout({
   children,
@@ -22,6 +39,138 @@ export default function RangerDashboardLayout({
   const [rangerRoles, setRangerRoles] = useState<string[]>([
     "สแกนแสตมป์", "ประกาศข่าวสาร", "แก้ไขรายละเอียด", "รายงานความคืบหน้าของเหตุการณ์"
   ]);
+
+  // สถานะรายงานเหตุฉุกเฉินและการร้องเตือนภัย
+  const [activeEmergencyAlert, setActiveEmergencyAlert] = useState<{
+    id: string;
+    details: string;
+    location: string;
+    time: string;
+    reporter: string;
+  } | null>(null);
+
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const sirenTimerRef = React.useRef<any>(null);
+
+  // สังเคราะห์เสียงไซเรนฉุกเฉิน (Loud Dual-Tone Oscillator Alarm)
+  const startEmergencySirenSound = () => {
+    try {
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        audioContextRef.current = new AudioCtx();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      if (sirenTimerRef.current) clearInterval(sirenTimerRef.current);
+
+      let toggle = false;
+      const playSirenPulse = () => {
+        if (!audioContextRef.current) return;
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          const freq = toggle ? 1150 : 750;
+          toggle = !toggle;
+
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(toggle ? 1350 : 650, ctx.currentTime + 0.35);
+
+          gain.gain.setValueAtTime(0.5, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.38);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start();
+          osc.stop(ctx.currentTime + 0.4);
+        } catch (e) {}
+      };
+
+      playSirenPulse();
+      sirenTimerRef.current = setInterval(playSirenPulse, 420);
+    } catch (e) {
+      console.warn("Could not play synthesized audio alarm", e);
+    }
+  };
+
+  const stopEmergencySirenSound = () => {
+    if (sirenTimerRef.current) {
+      clearInterval(sirenTimerRef.current);
+      sirenTimerRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+  };
+
+  // ตรวจจับเหตุฉุกเฉินผ่าน LocalStorage / Custom Event
+  useEffect(() => {
+    const checkEmergencyState = () => {
+      const savedEmergency = typeof window !== "undefined" ? localStorage.getItem("greenpass_emergency_alert") : null;
+      if (savedEmergency) {
+        try {
+          const parsed = JSON.parse(savedEmergency);
+          if (parsed && parsed.id) {
+            setActiveEmergencyAlert(parsed);
+            startEmergencySirenSound();
+          }
+        } catch (e) {}
+      }
+    };
+
+    checkEmergencyState();
+    const interval = setInterval(checkEmergencyState, 2000);
+
+    const handleCustomTrigger = (e: any) => {
+      if (e.detail) {
+        setActiveEmergencyAlert(e.detail);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("greenpass_emergency_alert", JSON.stringify(e.detail));
+        }
+        startEmergencySirenSound();
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("greenpass_emergency_trigger", handleCustomTrigger);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("greenpass_emergency_trigger", handleCustomTrigger);
+      }
+    };
+  }, []);
+
+  const handleAcknowledgeEmergency = () => {
+    stopEmergencySirenSound();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("greenpass_emergency_alert");
+      
+      // อัปเดตสถานะในรายการรายงาน local data
+      const savedReports = localStorage.getItem("greenpass_member_reports");
+      if (savedReports && activeEmergencyAlert) {
+        try {
+          const parsed = JSON.parse(savedReports);
+          const updated = parsed.map((r: any) => {
+            if (String(r.id) === String(activeEmergencyAlert.id) || r.isEmergency) {
+              return { ...r, status: "กำลังดำเนินการ", acknowledged: true };
+            }
+            return r;
+          });
+          localStorage.setItem("greenpass_member_reports", JSON.stringify(updated));
+        } catch (e) {}
+      }
+    }
+    setActiveEmergencyAlert(null);
+  };
 
   useEffect(() => {
     const loadRangerInfo = async () => {
@@ -83,10 +232,11 @@ export default function RangerDashboardLayout({
             if (rangerObj.canAnnouncement) apiRoles.push("ประกาศข่าวสาร");
             if (rangerObj.canEditParkDetails) apiRoles.push("แก้ไขรายละเอียด");
             if (rangerObj.canProgressReport) apiRoles.push("รายงานความคืบหน้าของเหตุการณ์");
-
-            setRangerRoles(apiRoles);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("ranger_roles", JSON.stringify(apiRoles));
+            if (apiRoles.length > 0) {
+              setRangerRoles(apiRoles);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("ranger_roles", JSON.stringify(apiRoles));
+              }
             }
           }
         } catch (e) {}
@@ -94,27 +244,17 @@ export default function RangerDashboardLayout({
     };
     loadRangerInfo();
   }, []);
-
-  // รายการเมนูนำทางหลัก
   const navItems = [
-    { name: "กล้องสแกน", href: "/ranger/scan-checkin-qrcode" },
+    { name: "กล้องสแกน", href: "/ranger/scan-checkin-qrcode", icon: QrCode },
     { 
-      name: "เที่ยวกับอุทยาน", 
+      name: "เกี่ยวกับอุทยาน", 
       href: "/ranger/view-park-detail",
       hasDropdown: true,
-      dropdownType: "park"
+      dropdownType: "park",
+      icon: Trees
     },
-    { name: "สำรวจอุทยาน", href: "/ranger/explore-khaoyai" },
-    { name: "วางแผนการเดินทาง", href: "/ranger/travel-plan" },
-    { name: "จุดเดินป่าและเส้นทางการเดิน", href: "/ranger/hiking-trails" },
-    { name: "ติดต่อเรา", href: "#" },
-    { 
-      name: "รายงาน", 
-      href: "/ranger/list-report-member",
-      hasDropdown: true,
-      dropdownType: "report"
-    },
-    { name: "สถิติ", href: "/ranger/view-visit-statistics" }
+    { name: "รายงาน", href: "/ranger/list-report-member", icon: ClipboardList },
+    { name: "สถิติ", href: "/ranger/view-visit-statistics", icon: BarChart3 }
   ];
 
   // Role Permission Guard Logic for current pathname
@@ -142,7 +282,7 @@ export default function RangerDashboardLayout({
           {/* Brand Logo */}
           <Link href="/ranger/view-park-detail" className="flex items-center gap-3 group transition-transform duration-200 active:scale-95">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-900/50 ring-1 ring-emerald-300/40 group-hover:shadow-emerald-400/30 transition-all duration-300">
-              <span className="text-lg">🌲</span>
+              <Trees className="w-5 h-5 text-white transform group-hover:scale-110 transition-transform duration-300" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
@@ -162,6 +302,7 @@ export default function RangerDashboardLayout({
           {/* เมนูบาร์นำทางหลัก */}
           <nav className="hidden lg:flex items-center gap-2.5 sm:gap-3 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
             {navItems.map((item) => {
+              const Icon = item.icon;
               const isParkActive = 
                 item.dropdownType === "park" && (
                   pathname === "/ranger/view-park-detail" || 
@@ -172,7 +313,7 @@ export default function RangerDashboardLayout({
                 );
 
               const isReportActive = 
-                item.dropdownType === "report" && (
+                item.href === "/ranger/list-report-member" && (
                   pathname === "/ranger/list-report-member" || 
                   pathname.startsWith("/ranger/view-report-member-detail")
                 );
@@ -180,7 +321,7 @@ export default function RangerDashboardLayout({
               const isActive = 
                 pathname === item.href || isParkActive || isReportActive;
 
-              // 1. จัดการเมนูดรอปดาวน์สำหรับ "เกี่ยวกับอุทยาน"
+              // 1. จัดการเมนูดรอปดาวน์สำหรับ "เกี่ยวกับอุทยาน" (คลิกเปิด-ปิด dropdown เท่านั้น ยังไม่เข้าหน้าไหน)
               if (item.dropdownType === "park") {
                 const isVisible = showParkDropdown;
 
@@ -192,43 +333,45 @@ export default function RangerDashboardLayout({
                     onMouseLeave={() => setShowParkDropdown(false)}
                   >
                     <button
-                      onClick={() => {
-                        setShowParkDropdown(!showParkDropdown);
-                        router.push(item.href);
-                      }}
-                      className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer ${
+                      type="button"
+                      onClick={() => setShowParkDropdown((prev) => !prev)}
+                      className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                         isActive 
                           ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                           : "text-emerald-100/90 hover:text-white hover:bg-white/10"
                       }`}
                     >
+                      {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-emerald-300/80"}`} />}
                       <span>{item.name}</span>
                       <span className="text-[9px] opacity-70">▼</span>
                     </button>
 
                     {isVisible && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-48 pt-2 z-50 transition-all select-none">
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-52 pt-2 z-50 transition-all select-none">
                         <div className="bg-[#052b13]/95 backdrop-blur-md rounded-xl shadow-2xl border border-emerald-500/30 text-xs overflow-hidden p-1.5 space-y-1 relative">
                           <Link 
                             href="/ranger/view-park-detail"
-                            className="block px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all"
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all"
                             onClick={() => setShowParkDropdown(false)}
                           >
-                            ข้อมูลอุทยานหลัก
+                            <Info className="w-3.5 h-3.5 text-emerald-300" />
+                            <span>ข้อมูลอุทยานหลัก</span>
                           </Link>
                           <Link 
                             href="/ranger/announce-news"
-                            className="block px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all border-t border-emerald-500/20"
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all border-t border-emerald-500/20"
                             onClick={() => setShowParkDropdown(false)}
                           >
-                            ประกาศข่าวสาร
+                            <Megaphone className="w-3.5 h-3.5 text-emerald-300" />
+                            <span>ประกาศข่าวสาร</span>
                           </Link>
                           <Link 
                             href="/ranger/list-news"
-                            className="block px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all border-t border-emerald-500/20"
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all border-t border-emerald-500/20"
                             onClick={() => setShowParkDropdown(false)}
                           >
-                            ประกาศข่าวสารจากอุทยาน
+                            <Newspaper className="w-3.5 h-3.5 text-emerald-300" />
+                            <span>ประกาศข่าวสารจากอุทยาน</span>
                           </Link>
                         </div>
                       </div>
@@ -237,61 +380,19 @@ export default function RangerDashboardLayout({
                 );
               }
 
-              // 2. จัดการเมนูดรอปดาวน์สำหรับ "รายงาน"
-              if (item.dropdownType === "report") {
-                const isVisible = showReportDropdown;
-
-                return (
-                  <div 
-                    key={item.name}
-                    className="relative h-full flex items-center"
-                    onMouseEnter={() => setShowReportDropdown(true)}
-                    onMouseLeave={() => setShowReportDropdown(false)}
-                  >
-                    <button
-                      onClick={() => {
-                        setShowReportDropdown(!showReportDropdown);
-                        router.push(item.href);
-                      }}
-                      className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                        isActive 
-                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
-                          : "text-emerald-100/90 hover:text-white hover:bg-white/10"
-                      }`}
-                    >
-                      <span>{item.name}</span>
-                      <span className="text-[9px] opacity-70">▼</span>
-                    </button>
-
-                    {isVisible && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-48 pt-2 z-50 transition-all select-none">
-                        <div className="bg-[#052b13]/95 backdrop-blur-md rounded-xl shadow-2xl border border-emerald-500/30 text-xs overflow-hidden p-1.5 relative text-center">
-                          <Link 
-                            href="/ranger/list-report-member"
-                            className="block px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all"
-                            onClick={() => setShowReportDropdown(false)}
-                          >
-                            ดูประวัติรายงาน
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              // เมนูอื่นๆ ทั่วไป
+              // เมนูอื่นๆ ทั่วไป (รวมถึง "รายงาน")
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive 
                       ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                       : "text-emerald-100/90 hover:text-white hover:bg-white/10"
                   }`}
                 >
-                  {item.name}
+                  {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-emerald-300/80"}`} />}
+                  <span>{item.name}</span>
                 </Link>
               );
             })}
@@ -318,7 +419,8 @@ export default function RangerDashboardLayout({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white rounded-xl text-xs font-bold shadow-md shadow-red-950/40 border border-red-400/30 hover:border-red-300 transition-all duration-200 cursor-pointer active:scale-95"
               title="ออกจากระบบ"
             >
-              <span>ออกจากระบบ</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">ออกจากระบบ</span>
             </button>
           </div>
 
@@ -354,6 +456,80 @@ export default function RangerDashboardLayout({
           children
         )}
       </main>
+
+      {/* 🚨 HIGH-VISIBILITY EMERGENCY ALARM MODAL OVERLAY WITH SIREN SOUND */}
+      {activeEmergencyAlert && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in font-sans">
+          <div className="relative w-full max-w-lg bg-gradient-to-b from-rose-950 via-slate-900 to-rose-950 text-white rounded-3xl p-6 sm:p-8 border-2 border-rose-500 shadow-[0_0_80px_rgba(225,29,72,0.6)] space-y-6 text-center overflow-hidden animate-bounce-subtle">
+            
+            {/* Pulsing Red Warning Light Accent */}
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-rose-600/30 rounded-full blur-3xl animate-ping" />
+            <div className="absolute top-0 right-0 p-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/40 text-[10px] font-black uppercase tracking-widest animate-pulse">
+                <Volume2 className="w-3.5 h-3.5 text-rose-400 animate-bounce" />
+                SIREN ALARM ACTIVE
+              </span>
+            </div>
+
+            {/* Siren Icon Header */}
+            <div className="relative z-10 space-y-3">
+              <div className="w-20 h-20 rounded-full bg-rose-600/30 border-2 border-rose-500/80 mx-auto flex items-center justify-center text-rose-400 shadow-xl shadow-rose-600/40 ring-8 ring-rose-600/20 animate-pulse">
+                <Siren className="w-10 h-10 text-rose-400 animate-spin-slow" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
+                  <AlertTriangle className="w-6 h-6 text-rose-400" />
+                  แจ้งเตือนเหตุฉุกเฉินด่วนที่สุด!
+                </h2>
+                <p className="text-xs text-rose-200/90 font-medium mt-1">
+                  มีผู้ใช้งานส่งรายงานเหตุการณ์ฉุกเฉินเข้ามาในพื้นที่อุทยาน
+                </p>
+              </div>
+            </div>
+
+            {/* Incident Details Card */}
+            <div className="relative z-10 bg-slate-900/90 rounded-2xl p-4 border border-rose-500/40 text-left space-y-2.5 shadow-inner backdrop-blur-sm text-xs">
+              <div className="flex justify-between items-center border-b border-rose-900/50 pb-2">
+                <span className="text-[11px] font-bold text-rose-400">ประเภทเหตุการณ์:</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] tracking-wider uppercase shadow-xs">
+                  🚨 เหตุฉุกเฉินเร่งด่วน
+                </span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-400 block">รายละเอียดเหตุการณ์:</span>
+                <p className="text-sm font-extrabold text-white leading-snug">
+                  {activeEmergencyAlert.details || "พบผู้ได้รับบาดเจ็บ / ต้องการความช่วยเหลือด่วนในพื้นที่อุทยาน"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px]">
+                <div>
+                  <span className="text-slate-400 block font-semibold">สถานที่ / พิกัด:</span>
+                  <span className="font-bold text-emerald-300">{activeEmergencyAlert.location || "พื้นที่อุทยานแห่งชาติ"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-semibold">เวลาแจ้งเหตุ:</span>
+                  <span className="font-bold text-amber-300">{activeEmergencyAlert.time || "เมื่อสักครู่"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Acknowledge & Stop Alarm Button */}
+            <div className="relative z-10 pt-2">
+              <button
+                onClick={handleAcknowledgeEmergency}
+                className="w-full py-4 px-6 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 text-white rounded-2xl font-black text-sm sm:text-base tracking-wide shadow-xl shadow-rose-900/60 border border-rose-400/50 transition-all duration-200 hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5 text-emerald-300" />
+                <span>รับทราบและยืนยันการรับรู้เหตุฉุกเฉิน</span>
+              </button>
+              <p className="text-[10px] text-slate-400 mt-2">
+                * เสียงร้องสัญญาณเตือนภัยจะหยุดทำงานเมื่อเจ้าหน้าที่กดปุ่มยืนยันรับรู้
+              </p>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

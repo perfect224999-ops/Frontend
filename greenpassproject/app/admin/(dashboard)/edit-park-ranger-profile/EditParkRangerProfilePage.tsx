@@ -21,12 +21,17 @@ import {
   ArrowLeft, 
   Check, 
   ChevronDown,
-  Users
+  Users,
+  Lock,
+  Hash,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 interface Ranger {
   id: string;
   employeeId: string;
+  password?: string;
   name: string;
   firstName: string;
   lastName: string;
@@ -37,6 +42,7 @@ interface Ranger {
   district: string;
   subDistrict: string;
   province: string;
+  zipcode?: string;
   gender: string;
   phone: string;
   email: string;
@@ -47,6 +53,7 @@ const DEFAULT_RANGERS: Ranger[] = [
   { 
     id: "01", 
     employeeId: "PR01", 
+    password: "pass1234",
     name: "สมชาย ใจดี", 
     firstName: "สมชาย", 
     lastName: "ใจดี", 
@@ -57,6 +64,7 @@ const DEFAULT_RANGERS: Ranger[] = [
     district: "ปากช่อง",
     subDistrict: "ปากช่อง",
     province: "นครราชสีมา",
+    zipcode: "30130",
     gender: "ชาย",
     phone: "065-5249531",
     email: "perfasd@gmail.com"
@@ -64,6 +72,7 @@ const DEFAULT_RANGERS: Ranger[] = [
   { 
     id: "04", 
     employeeId: "PR04", 
+    password: "pass1234",
     name: "จอนนี่ จิ้มเอม", 
     firstName: "จอนนี่", 
     lastName: "จิ้มเอม", 
@@ -74,6 +83,7 @@ const DEFAULT_RANGERS: Ranger[] = [
     district: "หนองสองตอน",
     subDistrict: "หนองสองตอน",
     province: "ฉะเชิงเทรา",
+    zipcode: "24000",
     gender: "ชาย",
     phone: "057-1425756",
     email: "xcperfasd@gmail.com"
@@ -115,6 +125,8 @@ function EditProfileContent() {
 
   // Form states based on Page 163
   const [employeeId, setEmployeeId] = useState("");
+  const [password, setPassword] = useState("pass1234");
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -124,6 +136,7 @@ function EditProfileContent() {
   const [district, setDistrict] = useState("");
   const [subDistrict, setSubDistrict] = useState("");
   const [province, setProvince] = useState("");
+  const [zipcode, setZipcode] = useState("10000");
   const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -182,6 +195,7 @@ function EditProfileContent() {
             foundRanger = {
               id: item.username,
               employeeId: item.username.toUpperCase(),
+              password: item.password || "pass1234",
               name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username,
               phone: item.mobilephone || "",
               email: item.email || "",
@@ -194,6 +208,7 @@ function EditProfileContent() {
               district: item.district || "-",
               subDistrict: item.subDistrict || "-",
               province: item.province || "-",
+              zipcode: item.zipcode || "10000",
               gender: item.gender === 2 ? "หญิง" : "ชาย"
             };
           }
@@ -210,6 +225,7 @@ function EditProfileContent() {
             const list = response.result.map((item: any) => ({
               id: item.username,
               employeeId: item.username.toUpperCase(),
+              password: item.password || "pass1234",
               name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username,
               phone: item.mobilephone || "",
               email: item.email || "",
@@ -222,6 +238,7 @@ function EditProfileContent() {
               district: item.district || "-",
               subDistrict: item.subDistrict || "-",
               province: item.province || "-",
+              zipcode: item.zipcode || "10000",
               gender: item.gender === 2 ? "หญิง" : "ชาย"
             }));
             const found = list.find((r: any) => 
@@ -248,6 +265,7 @@ function EditProfileContent() {
         foundRanger = {
           id: rangerId,
           employeeId: rangerId.length <= 4 ? `PR${rangerId}` : rangerId.toUpperCase(),
+          password: "pass1234",
           name: "สมชาย ใจดี",
           firstName: "สมชาย",
           lastName: "ใจดี",
@@ -258,6 +276,7 @@ function EditProfileContent() {
           district: "ปากช่อง",
           subDistrict: "ปากช่อง",
           province: "นครราชสีมา",
+          zipcode: "30130",
           gender: "ชาย",
           phone: "089-1234567",
           email: "ranger01@park.go.th"
@@ -267,6 +286,7 @@ function EditProfileContent() {
       // Populate form fields
       setCurrentRanger(foundRanger);
       setEmployeeId(foundRanger.employeeId || `PR${foundRanger.id}`);
+      setPassword(foundRanger.password || "pass1234");
       setFirstName(foundRanger.firstName || foundRanger.name.split(" ")[0] || "");
       setLastName(foundRanger.lastName || foundRanger.name.split(" ")[1] || "");
       setBirthDate(foundRanger.birthDate || "");
@@ -276,6 +296,7 @@ function EditProfileContent() {
       setDistrict(foundRanger.district || "");
       setSubDistrict(foundRanger.subDistrict || "");
       setProvince(foundRanger.province || "");
+      setZipcode(foundRanger.zipcode || "10000");
       setGender(foundRanger.gender || "ชาย");
       setPhone(foundRanger.phone || "");
       setEmail(foundRanger.email || "");
@@ -294,6 +315,14 @@ function EditProfileContent() {
     }
     if (!/^[a-zA-Z0-9_-]+$/.test(cleanEmpId)) {
       return "รหัสพนักงานต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรืออักขระ _ - เท่านั้น (ห้ามมีภาษาไทย)";
+    }
+
+    const cleanPassword = password.trim();
+    if (!cleanPassword) {
+      return "กรุณากรอกรหัสผ่าน (Password)";
+    }
+    if (cleanPassword.length < 4 || cleanPassword.length > 16) {
+      return "รหัสผ่านต้องมีความยาว 4 ถึง 16 ตัวอักษร";
     }
 
     const cleanFirstName = firstName.trim();
@@ -322,6 +351,14 @@ function EditProfileContent() {
     }
     if (!/^[a-zA-Zก-๙\s]+$/.test(cleanLastName)) {
       return "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรือภาษาอังกฤษเท่านั้น (ห้ามมีอักขระพิเศษ)";
+    }
+
+    const cleanZipcode = zipcode.trim();
+    if (!cleanZipcode) {
+      return "กรุณากรอกรหัสไปรษณีย์";
+    }
+    if (!/^\d{5}$/.test(cleanZipcode)) {
+      return "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก (เช่น 10000)";
     }
 
     const cleanPhone = phone.replace(/[-\s]/g, "");
@@ -381,6 +418,7 @@ function EditProfileContent() {
       try {
         await rangerApi.updateRanger(targetUsername, {
           employeeId,
+          password: password.trim().slice(0, 16),
           firstName,
           lastName,
           birthDate,
@@ -390,7 +428,8 @@ function EditProfileContent() {
           district,
           subDistrict,
           province,
-          gender,
+          zipcode: zipcode.trim().slice(0, 5),
+          gender: gender === "หญิง" ? 2 : 1,
           phone,
           email
         });
@@ -401,6 +440,7 @@ function EditProfileContent() {
       const updatedObj = {
         ...currentRanger,
         employeeId,
+        password,
         name: `${firstName} ${lastName}`,
         firstName,
         lastName,
@@ -411,6 +451,7 @@ function EditProfileContent() {
         district,
         subDistrict,
         province,
+        zipcode,
         gender,
         phone,
         email
@@ -513,6 +554,36 @@ function EditProfileContent() {
                 />
               </div>
 
+              {/* รหัสผ่าน ข้างๆ รหัสพนักงาน */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>รหัสผ่าน</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all pr-10"
+                    disabled={isLoading}
+                    placeholder="ระบุรหัสผ่านเข้าสู่ระบบ"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                    title={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
               {/* เพศ */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
@@ -531,6 +602,21 @@ function EditProfileContent() {
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
+              </div>
+
+              {/* วัน/เดือน/ปีเกิด (Date Picker) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>วัน/เดือน/ปีเกิด</span>
+                </label>
+                <input 
+                  type="date" 
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
+                  disabled={isLoading}
+                />
               </div>
 
               {/* ชื่อ */}
@@ -559,21 +645,6 @@ function EditProfileContent() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* วัน/เดือน/ปีเกิด (Date Picker) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>วัน/เดือน/ปีเกิด</span>
-                </label>
-                <input 
-                  type="date" 
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
                   disabled={isLoading}
                 />
               </div>
@@ -625,7 +696,7 @@ function EditProfileContent() {
               </div>
 
               {/* วันที่เริ่มปฏิบัติงาน (Date Picker) */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                   <span>วันที่เริ่มปฏิบัติงาน</span>
@@ -642,14 +713,14 @@ function EditProfileContent() {
             </div>
           </div>
 
-          {/* Section 2: ที่อยู่ปฏิบัติงาน (77 จังหวัด -> อำเภอ -> ตำบล) */}
+          {/* Section 2: ที่อยู่ปฏิบัติงาน (77 จังหวัด -> อำเภอ -> ตำบล -> รหัสไปรษณีย์) */}
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
               <MapPin className="w-4 h-4 text-emerald-600" />
-              <span>ที่อยู่และพื้นที่ปฏิบัติงาน (เลือกจังหวัด / อำเภอ / ตำบล)</span>
+              <span>ที่อยู่และพื้นที่ปฏิบัติงาน (เลือกจังหวัด / อำเภอ / ตำบล / รหัสไปรษณีย์)</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               
               {/* จังหวัด (77 จังหวัดทั่วไทย) */}
               <div className="space-y-1.5">
@@ -719,6 +790,20 @@ function EditProfileContent() {
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
+              </div>
+
+              {/* รหัสไปรษณีย์ */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">รหัสไปรษณีย์</label>
+                <input 
+                  type="text" 
+                  maxLength={5}
+                  value={zipcode}
+                  onChange={(e) => setZipcode(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all font-mono"
+                  disabled={isLoading}
+                  placeholder="เช่น 10000"
+                />
               </div>
 
             </div>

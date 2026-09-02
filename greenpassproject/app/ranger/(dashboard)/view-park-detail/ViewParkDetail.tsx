@@ -125,15 +125,22 @@ export default function ViewParkDetail() {
           const openStr = dbPark.openTime ? formatTime(dbPark.openTime) : "06.00";
           const closeStr = dbPark.closeTime ? formatTime(dbPark.closeTime) : "18.00";
 
-          const FULL_DEFAULT_DESC = "อุทยานแห่งชาติเขาใหญ่ มีความสำคัญในระดับโลกและระดับภูมิภาคอาเซียน คือ เป็นหนึ่งในพื้นที่มรดกโลกทางธรรมชาติ (World Heritage Site) และอุทยานแห่งชาติอาเซียน (ASEAN Heritage Park) ครอบคลุม 4 จังหวัด ประกอบด้วย สระบุรี นครนายก ปราจีนบุรี และนครราชสีมา พื้นที่เกือบ 2,206 ตารางกิโลเมตร ของอุทยานแห่งชาติเขาใหญ่ เป็นแหล่งกำเนิดต้นน้ำลำธารสำคัญหลายสาย มีความหลากหลายทางชีวภาพ และเป็นบ้านหลังใหญ่ของสัตว์ป่าที่สำคัญ มากมาย และใกล้สูญพันธุ์หลายชนิด รวมถึงนกมากกว่า 280 ชนิด จึงทำให้เป็นที่นิยมของนักท่องเที่ยวทั่วโลกหลั่งไหลมาเที่ยวพักผ่อน";
+          const DEFAULT_PARK_INFO: Record<number, { location: string; address: string }> = {
+            1: { location: "14.3109229, 101.5304415", address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130" },
+            2: { location: "12.8850041, 99.6317361", address: "ต.แก่งกระจาน อ.แก่งกระจาน จ.เพชรบุรี 76170" },
+            3: { location: "14.3755029, 99.1426559", address: "ต.ท่ากระดาน อ.ศรีสวัสดิ์ จ.กาญจนบุรี 71250" },
+            4: { location: "18.8070052, 98.9160906", address: "ถนน ศรีวิชัย ตำบลสุเทพ อำเภอเมืองเชียงใหม่ เชียงใหม่ 50200" },
+            5: { location: "18.5356313, 98.519549", address: "119 ตำบลบ้านหลวง อำเภอจอมทอง เชียงใหม่ 50160" }
+          };
+          const defaultPark = DEFAULT_PARK_INFO[targetParkId] || DEFAULT_PARK_INFO[1];
 
           setParkData({
             parkId: dbPark.parkId || targetParkId,
             parkName: cleanName(dbPark.name),
             openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openStr} น. - ${closeStr} น.`,
             description: (dbPark.description && !dbPark.description.endsWith("...")) ? dbPark.description : FULL_DEFAULT_DESC,
-            address: dbPark.address || "",
-            location: dbPark.location || "",
+            address: (dbPark.address && dbPark.address.trim() !== "") ? dbPark.address : defaultPark.address,
+            location: (dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location,
             eventNote: dbPark.eventNote || "เปิดให้บริการตามปกติ",
             status: dbPark.status || "เปิดตามปกติ",
             image: dbPark.image || "https://images.unsplash.com/photo-1511497584788-8767611136f6"
@@ -148,12 +155,36 @@ export default function ViewParkDetail() {
     fetchParkFromDb();
   }, []);
 
+  const getCoordinates = (locStr: string) => {
+    if (!locStr) return null;
+    const matches = locStr.match(/(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
+    if (matches && matches[1] && matches[2]) {
+      return { lat: matches[1], lng: matches[2] };
+    }
+    return null;
+  };
+
+  const getMapEmbedUrl = (locStr: string, nameStr: string) => {
+    if (nameStr) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(nameStr)}&hl=th&z=15&ie=UTF8&iwloc=&output=embed`;
+    }
+    const coords = getCoordinates(locStr);
+    if (coords) {
+      return `https://maps.google.com/maps?q=${coords.lat},${coords.lng}&hl=th&z=15&ie=UTF8&iwloc=&output=embed`;
+    }
+    return `https://maps.google.com/maps?q=${encodeURIComponent(nameStr)}&hl=th&z=15&ie=UTF8&iwloc=&output=embed`;
+  };
+
   const openGoogleMaps = () => {
     if (!parkData) return;
-    const query = parkData.location 
-      ? `${parkData.parkName} ${parkData.location}` 
-      : parkData.parkName;
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, "_blank");
+    if (parkData.parkName) {
+      window.open(`https://www.google.com/maps/place/${encodeURIComponent(parkData.parkName)}`, "_blank");
+    } else {
+      const coords = getCoordinates(parkData.location);
+      if (coords) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`, "_blank");
+      }
+    }
   };
 
   if (isLoading || !parkData) {
@@ -373,7 +404,7 @@ export default function ViewParkDetail() {
                 className="w-full h-full border-0"
                 loading="lazy"
                 allowFullScreen
-                src={`https://maps.google.com/maps?q=${encodeURIComponent(parkData.location ? `${parkData.parkName} ${parkData.location}` : parkData.parkName)}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
+                src={getMapEmbedUrl(parkData.location, parkData.parkName)}
               ></iframe>
               <button
                 onClick={openGoogleMaps} 
@@ -394,14 +425,6 @@ export default function ViewParkDetail() {
                 <p className="font-medium text-slate-700 font-mono text-[11px]">{parkData.location}</p>
               </div>
             </div>
-
-            <button
-              onClick={openGoogleMaps}
-              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 shadow-sm cursor-pointer"
-            >
-              <span>เปิดนำทางใน Google Maps</span>
-              <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-            </button>
           </div>
 
         </div>

@@ -9,7 +9,7 @@ const DEFAULT_PARK_DATA = {
   openHours: "เปิดทุกวัน ตั้งแต่เวลา 06.00 น.-18.00 น.",
   description: "อุทยานแห่งชาติเขาใหญ่ มีความสำคัญในระดับโลกและระดับภูมิภาคอาเซียน คือ เป็นหนึ่งในพื้นที่มรดกโลกทางธรรมชาติ (World Heritage Site) และอุทยานแห่งชาติอาเซียน (ASEAN Heritage Park) ครอบคลุม 4 จังหวัด ประกอบด้วย สระบุรี นครนายก ปราจีนบุรี และนครราชสีมา พื้นที่เกือบ 2,206 ตารางกิโลเมตร ของอุทยานแห่งชาติเขาใหญ่ เป็นแหล่งกำเนิดต้นน้ำลำธารสำคัญหลายสาย มีความหลากหลายทางชีวภาพ และเป็นบ้านหลังใหญ่ของสัตว์ป่าที่สำคัญ มากมาย และใกล้สูญพันธุ์หลายชนิด รวมถึงนกมากกว่า 280 ชนิด จึงทำให้เป็นที่นิยมของนักท่องเที่ยวทั่วโลกหลั่งไหลมาเที่ยวพักผ่อน",
   address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130",
-  location: "14.3109° N, 101.5304° E"
+  location: "14.3109, 101.5304"
 };
 
 export default function EditParkDetails() {
@@ -71,8 +71,17 @@ export default function EditParkDetails() {
           } else {
             setDescription(DEFAULT_PARK_DATA.description);
           }
-          setAddress(dbPark.address || DEFAULT_PARK_DATA.address);
-          setLocation(dbPark.location || DEFAULT_PARK_DATA.location);
+          const DEFAULT_PARK_INFO: Record<number, { location: string; address: string }> = {
+            1: { location: "14.3109229, 101.5304415", address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130" },
+            2: { location: "12.8850041, 99.6317361", address: "ต.แก่งกระจาน อ.แก่งกระจาน จ.เพชรบุรี 76170" },
+            3: { location: "14.3755029, 99.1426559", address: "ต.ท่ากระดาน อ.ศรีสวัสดิ์ จ.กาญจนบุรี 71250" },
+            4: { location: "18.8070052, 98.9160906", address: "ถนน ศรีวิชัย ตำบลสุเทพ อำเภอเมืองเชียงใหม่ เชียงใหม่ 50200" },
+            5: { location: "18.5356313, 98.519549", address: "119 ตำบลบ้านหลวง อำเภอจอมทอง เชียงใหม่ 50160" }
+          };
+          const defaultPark = DEFAULT_PARK_INFO[targetParkId] || DEFAULT_PARK_INFO[1];
+
+          setAddress((dbPark.address && dbPark.address.trim() !== "") ? dbPark.address : defaultPark.address);
+          setLocation((dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location);
           return;
         }
       } catch (e) {

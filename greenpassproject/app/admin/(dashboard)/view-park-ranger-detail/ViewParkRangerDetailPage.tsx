@@ -33,6 +33,7 @@ interface Ranger {
   district: string;
   subDistrict: string;
   province: string;
+  zipcode?: string;
   gender: string;
   phone: string;
   email: string;
@@ -54,6 +55,7 @@ const DEFAULT_RANGERS: Ranger[] = [
     district: "ปากช่อง",
     subDistrict: "ปากช่อง",
     province: "นครราชสีมา",
+    zipcode: "30130",
     gender: "ชาย",
     phone: "065-5249531",
     email: "perfasd@gmail.com",
@@ -72,6 +74,7 @@ const DEFAULT_RANGERS: Ranger[] = [
     district: "หนองสองตอน",
     subDistrict: "หนองสองตอน",
     province: "ฉะเชิงเทรา",
+    zipcode: "24000",
     gender: "ชาย",
     phone: "057-1425756",
     email: "xcperfasd@gmail.com",
@@ -410,17 +413,17 @@ function RangerDetailContent() {
               <span>ที่อยู่และพื้นที่ปฏิบัติงาน</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
               
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500 mb-1 block">ตำบล</span>
+                <span className="text-xs font-semibold text-slate-500 mb-1 block">ตำบล / แขวง</span>
                 <div className="text-sm font-bold text-slate-900">
                   {ranger.subDistrict || "หนองสองตอน"}
                 </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                <span className="text-xs font-semibold text-slate-500 mb-1 block">อำเภอ</span>
+                <span className="text-xs font-semibold text-slate-500 mb-1 block">อำเภอ / เขต</span>
                 <div className="text-sm font-bold text-slate-900">
                   {ranger.district || "หนองสองตอน"}
                 </div>
@@ -430,6 +433,13 @@ function RangerDetailContent() {
                 <span className="text-xs font-semibold text-slate-500 mb-1 block">จังหวัด</span>
                 <div className="text-sm font-bold text-slate-900">
                   {ranger.province || "ฉะเชิงเทรา"}
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-xs font-semibold text-slate-500 mb-1 block">รหัสไปรษณีย์</span>
+                <div className="text-sm font-bold text-slate-900 font-mono">
+                  {ranger.zipcode || "24000"}
                 </div>
               </div>
 

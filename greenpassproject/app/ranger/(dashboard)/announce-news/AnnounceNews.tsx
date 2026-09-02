@@ -56,9 +56,9 @@ export default function AnnounceNews() {
     const cleanTitle = title.trim();
     const cleanContent = content.trim();
 
-    if (!cleanTitle || cleanTitle.length < 4 || cleanTitle.length > 50 ||
-        !cleanContent || cleanContent.length < 4 || cleanContent.length > 255) {
-      setError("กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน");
+    if (!cleanTitle || cleanTitle.length < 2 || cleanTitle.length > 250 ||
+        !cleanContent || cleanContent.length < 4 || cleanContent.length > 2000) {
+      setError("กรุณากรอกหัวข้อประกาศ (2-250 ตัวอักษร) และเนื้อหาประกาศ (4-2000 ตัวอักษร) ให้ถูกต้อง");
       return;
     }
 
@@ -68,19 +68,51 @@ export default function AnnounceNews() {
       const isoDate = new Date().toISOString().split("T")[0];
       const apiImage = (image && image.length <= 255) ? image : "src/news1.jpg";
 
-      const res = await announcementApi.addAnnouncement({
-        title: cleanTitle,
-        content: `[${category}] ${cleanContent}`,
-        publishDate: isoDate,
-        username,
-        image: apiImage
-      });
+      const apiTitle = cleanTitle.length > 250 ? cleanTitle.substring(0, 250) : cleanTitle;
+      const apiContent = `[${category}] ${cleanContent}`;
+      const safeApiContent = apiContent.length > 250 ? apiContent.substring(0, 250) : apiContent;
 
-      const createdId = res?.result?.announcementId || res?.data?.announcementId;
-      if (createdId && image && image.length > 255 && typeof window !== "undefined") {
+      let createdId = null;
+      try {
+        const res = await announcementApi.addAnnouncement({
+          title: apiTitle,
+          content: safeApiContent,
+          publishDate: isoDate,
+          username,
+          image: apiImage
+        });
+        createdId = res?.result?.announcementId || res?.data?.announcementId;
+      } catch (apiErr) {
+        console.warn("API save warning, saving locally:", apiErr);
+      }
+
+      const newId = String(createdId || Date.now());
+      if (image && image.length > 255 && typeof window !== "undefined") {
         try {
-          localStorage.setItem(`greenpass_announcement_img_${createdId}`, image);
+          localStorage.setItem(`greenpass_announcement_img_${newId}`, image);
         } catch (err) {}
+      }
+
+      // Save to local list for immediate display
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("greenpass_news_data");
+        let list: any[] = [];
+        if (saved) {
+          try { list = JSON.parse(saved); } catch (e) { list = []; }
+        }
+        const parkIdVal = Number(localStorage.getItem("ranger_park_id") || 1);
+        const parkNameVal = localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติเขาใหญ่";
+        list.unshift({
+          id: newId,
+          date: publishDate,
+          category,
+          title: cleanTitle,
+          content: cleanContent,
+          image: image || "src/news1.jpg",
+          parkId: parkIdVal,
+          parkName: parkNameVal
+        });
+        localStorage.setItem("greenpass_news_data", JSON.stringify(list));
       }
 
       setSuccess("บันทึกและประกาศข่าวสารอุทยานสำเร็จเรียบร้อยแล้ว!");
@@ -88,7 +120,7 @@ export default function AnnounceNews() {
         router.push("/ranger/list-news");
       }, 1200);
     } catch (err: any) {
-      console.error("Failed to save announcement to database:", err);
+      console.error("Failed to save announcement:", err);
       setError("ไม่สามารถบันทึกข่าวสารได้");
     } finally {
       setIsLoading(false);

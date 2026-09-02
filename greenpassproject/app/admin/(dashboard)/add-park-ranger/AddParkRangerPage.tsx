@@ -21,7 +21,11 @@ import {
   ArrowLeft, 
   Check, 
   ChevronDown,
-  Users
+  Users,
+  Lock,
+  Hash,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 export default function AddParkRangerPage() {
@@ -29,6 +33,8 @@ export default function AddParkRangerPage() {
   
   // Form states
   const [employeeId, setEmployeeId] = useState("PR01");
+  const [password, setPassword] = useState("pass1234");
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("สมพร");
   const [lastName, setLastName] = useState("ดงศักดิ์");
   const [birthDate, setBirthDate] = useState("2004-10-15");
@@ -38,6 +44,7 @@ export default function AddParkRangerPage() {
   const [province, setProvince] = useState("ฉะเชิงเทรา");
   const [district, setDistrict] = useState("เมืองฉะเชิงเทรา");
   const [subDistrict, setSubDistrict] = useState("หน้าเมือง");
+  const [zipcode, setZipcode] = useState("24000");
   const [gender, setGender] = useState("ชาย");
   const [phone, setPhone] = useState("097-1425756");
   const [email, setEmail] = useState("xcperfasd@gmail.com");
@@ -101,6 +108,14 @@ export default function AddParkRangerPage() {
       return "รหัสพนักงานต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรืออักขระ _ - เท่านั้น (ห้ามมีภาษาไทย)";
     }
 
+    const cleanPassword = password.trim();
+    if (!cleanPassword) {
+      return "กรุณากรอกรหัสผ่าน (Password)";
+    }
+    if (cleanPassword.length < 4 || cleanPassword.length > 16) {
+      return "รหัสผ่านต้องมีความยาว 4 ถึง 16 ตัวอักษร";
+    }
+
     const cleanFirstName = firstName.trim();
     if (!cleanFirstName) {
       return "กรุณากรอกชื่อเจ้าหน้าที่";
@@ -127,6 +142,14 @@ export default function AddParkRangerPage() {
     }
     if (!/^[a-zA-Zก-๙\s]+$/.test(cleanLastName)) {
       return "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรือภาษาอังกฤษเท่านั้น (ห้ามมีอักขระพิเศษ)";
+    }
+
+    const cleanZipcode = zipcode.trim();
+    if (!cleanZipcode) {
+      return "กรุณากรอกรหัสไปรษณีย์";
+    }
+    if (!/^\d{5}$/.test(cleanZipcode)) {
+      return "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก (เช่น 24000)";
     }
 
     const cleanPhone = phone.replace(/[-\s]/g, "");
@@ -197,7 +220,7 @@ export default function AddParkRangerPage() {
       // 1. บันทึกลงฐานข้อมูล Spring Boot ผ่าน API
       await rangerApi.addRanger({
         username: cleanUsername,
-        password: "pass1234",
+        password: password.trim().slice(0, 16),
         employeeId: cleanUsername,
         firstName: firstName.trim().slice(0, 50),
         lastName: lastName.trim().slice(0, 50),
@@ -209,7 +232,7 @@ export default function AddParkRangerPage() {
         district: district.trim().slice(0, 20),
         subDistrict: subDistrict.trim().slice(0, 20),
         province: province.trim().slice(0, 20),
-        zipcode: "10000",
+        zipcode: zipcode.trim().slice(0, 5),
         gender: genderInt,
         phone: cleanPhone,
         email: cleanEmail
@@ -230,6 +253,7 @@ export default function AddParkRangerPage() {
         id: String(Date.now()),
         employeeId,
         username: employeeId.toLowerCase(),
+        password: password.trim(),
         name: `${firstName} ${lastName}`,
         firstName,
         lastName,
@@ -240,6 +264,7 @@ export default function AddParkRangerPage() {
         district,
         subDistrict,
         province,
+        zipcode,
         gender,
         phone,
         email,
@@ -325,7 +350,38 @@ export default function AddParkRangerPage() {
                   onChange={(e) => setEmployeeId(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
                   disabled={isLoading}
+                  placeholder="เช่น PR01 หรือ ranger01"
                 />
+              </div>
+
+              {/* รหัสผ่าน ข้างๆ รหัสพนักงาน */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>รหัสผ่าน</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all pr-10"
+                    disabled={isLoading}
+                    placeholder="ระบุรหัสผ่านเข้าสู่ระบบ (4-16 ตัวอักษร)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                    title={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* เพศ */}
@@ -346,6 +402,21 @@ export default function AddParkRangerPage() {
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
+              </div>
+
+              {/* วัน/เดือน/ปีเกิด (Date Picker) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>วัน/เดือน/ปีเกิด</span>
+                </label>
+                <input 
+                  type="date" 
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
+                  disabled={isLoading}
+                />
               </div>
 
               {/* ชื่อ */}
@@ -374,21 +445,6 @@ export default function AddParkRangerPage() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* วัน/เดือน/ปีเกิด (Date Picker) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>วัน/เดือน/ปีเกิด</span>
-                </label>
-                <input 
-                  type="date" 
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
                   disabled={isLoading}
                 />
               </div>
@@ -450,7 +506,7 @@ export default function AddParkRangerPage() {
               </div>
 
               {/* วันที่เริ่มปฏิบัติงาน (Date Picker) */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                   <span>วันที่เริ่มปฏิบัติงาน</span>
@@ -467,14 +523,14 @@ export default function AddParkRangerPage() {
             </div>
           </div>
 
-          {/* Section 2: ที่อยู่ปฏิบัติงาน (77 จังหวัด -> อำเภอ -> ตำบล) */}
+          {/* Section 2: ที่อยู่ปฏิบัติงาน (77 จังหวัด -> อำเภอ -> ตำบล -> รหัสไปรษณีย์) */}
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
               <MapPin className="w-4 h-4 text-emerald-600" />
-              <span>ที่อยู่และพื้นที่ปฏิบัติงาน (เลือกจังหวัด / อำเภอ / ตำบล)</span>
+              <span>ที่อยู่และพื้นที่ปฏิบัติงาน (เลือกจังหวัด / อำเภอ / ตำบล / รหัสไปรษณีย์)</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               
               {/* จังหวัด (77 จังหวัดทั่วไทย) */}
               <div className="space-y-1.5">
@@ -531,6 +587,20 @@ export default function AddParkRangerPage() {
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
+              </div>
+
+              {/* รหัสไปรษณีย์ */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">รหัสไปรษณีย์</label>
+                <input 
+                  type="text" 
+                  maxLength={5}
+                  value={zipcode}
+                  onChange={(e) => setZipcode(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all font-mono"
+                  disabled={isLoading}
+                  placeholder="เช่น 24000"
+                />
               </div>
 
             </div>
