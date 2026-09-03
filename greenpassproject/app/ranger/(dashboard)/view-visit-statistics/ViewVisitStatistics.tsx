@@ -184,7 +184,7 @@ export default function ViewVisitStatistics() {
   const currentTotalCard = filter === "monthly" ? currentMonthlyStats.total : yearlyStats.total;
 
   const getTitle = () => {
-    if (filter === "monthly") return `สถิติจำนวนผู้เข้าชมอุทยาน (รายเดือนประจำ${currentSelectedYearLabel})`;
+    if (filter === "monthly") return `สถิติจำนวนผู้เข้าชมอุทยาน`;
     return `สถิติจำนวนผู้เข้าชมอุทยาน (เปรียบเทียบสะสมทุกปี)`;
   };
 

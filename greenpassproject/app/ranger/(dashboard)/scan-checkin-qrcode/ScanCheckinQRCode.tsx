@@ -202,7 +202,7 @@ export default function ScanCheckinQRCode() {
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold">สแกน QR Code มอบสแตมป์อุทยาน</h1>
           <p className="text-emerald-100 text-xs sm:text-sm max-w-2xl">
-            นำกล้องส่องไปยัง QR Code บนมือถือนักท่องเที่ยวเพื่อตรวจสอบรายชื่อและมอบสแตมป์สะสมจากฐานข้อมูล
+            นำกล้องส่องไปยัง QR Code บนมือถือนักท่องเที่ยวเพื่อตรวจสอบรายชื่อและมอบสแตมป์สะสม
           </p>
         </div>
 
