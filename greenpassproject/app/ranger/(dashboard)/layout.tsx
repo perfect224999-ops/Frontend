@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { rangerApi, parkApi } from "@/service/api";
@@ -25,6 +25,18 @@ import {
   BellRing
 } from "lucide-react";
 
+interface NotificationPayload {
+  notificationId?: number;
+  title: string;
+  message: string;
+  report?: {
+    reportId: number;
+    name: string;
+    description: string;
+    image?: string;
+  };
+}
+
 export default function RangerDashboardLayout({
   children,
 }: {
@@ -33,14 +45,31 @@ export default function RangerDashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   
-  // สถานะ hover ของแต่ละเมนู
+  // สถานะเปิด-ปิด dropdown ของแต่ละเมนู
   const [showParkDropdown, setShowParkDropdown] = useState(false);
   const [showReportDropdown, setShowReportDropdown] = useState(false);
+  const parkDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // ปิด Dropdown เมื่อคลิกข้างนอก
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (parkDropdownRef.current && !parkDropdownRef.current.contains(event.target as Node)) {
+        setShowParkDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
   const [rangerUser, setRangerUser] = useState<string>("");
   const [parkName, setParkName] = useState<string>("");
   const [rangerRoles, setRangerRoles] = useState<string[]>([
     "สแกนแสตมป์", "ประกาศข่าวสาร", "แก้ไขรายละเอียด", "รายงานความคืบหน้าของเหตุการณ์"
   ]);
+
+  // สถานะ Pop-up Notification จาก Mobile / WebSocket
+  const [popupNotification, setPopupNotification] = useState<NotificationPayload | null>(null);
 
   // สถานะรายงานเหตุฉุกเฉินและการร้องเตือนภัย
   const [activeEmergencyAlert, setActiveEmergencyAlert] = useState<{
@@ -164,51 +193,75 @@ export default function RangerDashboardLayout({
     let stompClient: Client | null = null;
 
     try {
+      const getWsUrl = () => {
+        if (typeof window !== "undefined") {
+          return `http://${window.location.hostname}:8081/api/v1/ws-greenpass`;
+        }
+        return "http://localhost:8081/api/v1/ws-greenpass";
+      };
+
       stompClient = new Client({
-        webSocketFactory: () => new SockJS("http://localhost:8080/ws-greenpass"),
+        webSocketFactory: () => new SockJS(getWsUrl()),
         debug: () => {}, // ปิด log debug ใน console
         reconnectDelay: 5000,
         onConnect: () => {
           console.log(`📡 WebSocket Connected for Park ID: ${parkId}`);
 
-          stompClient?.subscribe(`/topic/park/${parkId}/notifications`, (message: any) => {
-            if (message.body) {
-              try {
-                const notification = JSON.parse(message.body);
-                const report = notification.report || {};
-                const title = notification.title || "";
-                const messageText = notification.message || report.description || "";
-                
-                // 🔍 ตรวจสอบว่าเป็นรายงานฉุกเฉินหรือไม่
-                const isEmergency = 
-                  notification.isEmergency ||
-                  title.includes("ฉุกเฉิน") ||
-                  messageText.includes("ฉุกเฉิน") ||
-                  report.type?.typeName?.includes("ฉุกเฉิน");
+          const targetIds = Array.from(new Set([String(parkId), "1", "2", "3", "4", "5"]));
+          targetIds.forEach((id) => {
+            stompClient?.subscribe(`/topic/park/${id}/notifications`, (message: any) => {
+              if (message.body) {
+                try {
+                  const notification = JSON.parse(message.body);
+                  const report = notification.report || {};
+                  const title = notification.title || "";
+                  const messageText = notification.message || report.description || "";
+                  const typeName = report.typeName || report.type?.typeName || notification.typeName || notification.reportType || "";
+                  const typeId = report.typeId || report.type?.typeId || notification.typeId || report.type_id;
 
-                if (isEmergency) {
-                  // 🚨 กรณีฉุกเฉิน: เด้ง Pop-up ด่วนที่สุดกลางจอ + เปิดเสียงไซเรน
-                  setActiveEmergencyAlert({
-                    id: String(report.reportId || notification.id || Date.now()),
-                    details: messageText || "พบเหตุการณ์ฉุกเฉินในพื้นที่อุทยาน",
-                    location: parkName || "พื้นที่อุทยานแห่งชาติ",
-                    time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-                    reporter: report.user?.username || notification.username || "ผู้ใช้งาน GreenPass"
-                  });
-                  startEmergencySirenSound(); // เปิดเสียงไซเรน
-                } else {
-                  // ℹ️ กรณีไม่ฉุกเฉิน: ไม่เปิด Pop-up ใหญ่ และ ไม่เปิดเสียงไซเรน
-                  console.log("ℹ️ ได้รับรายงานปกติ:", notification);
-                }
+                  console.log("📡 [WebSocket] Received Notification:", notification);
 
-                // 🔄 สั่งให้ตารางรายงาน (ListReportMember) อัปเดตโหลดข้อมูลใหม่ทันที
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: notification }));
+                  // 🔍 ตรวจสอบว่าเป็นรายงานร้ายแรง / ฉุกเฉินหรือไม่
+                  const isEmergency = 
+                    typeId === 2 ||
+                    String(typeId) === "2" ||
+                    notification.isEmergency === true ||
+                    typeName.includes("ร้ายแรง") ||
+                    typeName.includes("ฉุกเฉิน") ||
+                    title.includes("ร้ายแรง") ||
+                    title.includes("ฉุกเฉิน") ||
+                    title.includes("แจ้งเตือนเหตุฉุกเฉิน") ||
+                    messageText.includes("ร้ายแรง") ||
+                    messageText.includes("ฉุกเฉิน");
+
+                  if (isEmergency) {
+                    console.log("🚨 [WebSocket] Emergency alert triggered!");
+                    const alertData = {
+                      id: String(report.reportId || notification.notificationId || Date.now()),
+                      details: messageText || report.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน",
+                      location: parkName || "พื้นที่อุทยานแห่งชาติ",
+                      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+                      reporter: report.user?.username || notification.username || "ผู้ใช้งาน GreenPass"
+                    };
+
+                    setActiveEmergencyAlert(alertData);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("greenpass_emergency_alert", JSON.stringify(alertData));
+                    }
+                    startEmergencySirenSound(); // เปิดเสียงไซเรนวนลูป
+                  } else {
+                    console.log("ℹ️ [WebSocket] Received normal report (no modal alarm needed):", notification);
+                  }
+
+                  // 🔄 สั่งให้ตารางรายงาน (ListReportMember) อัปเดตโหลดข้อมูลใหม่ในพื้นหลังทันที
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: notification }));
+                  }
+                } catch (e) {
+                  console.error("Error parsing WebSocket message:", e);
                 }
-              } catch (e) {
-                console.error("Error parsing WebSocket message:", e);
               }
-            }
+            });
           });
         },
         onStompError: (frame) => {
@@ -230,6 +283,15 @@ export default function RangerDashboardLayout({
 
   const handleAcknowledgeEmergency = () => {
     stopEmergencySirenSound();
+    if (activeEmergencyAlert?.id && typeof window !== "undefined") {
+      try {
+        const ackList = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
+        if (!ackList.includes(activeEmergencyAlert.id)) {
+          ackList.push(activeEmergencyAlert.id);
+          localStorage.setItem("greenpass_ack_reports", JSON.stringify(ackList));
+        }
+      } catch (e) {}
+    }
     if (typeof window !== "undefined") {
       localStorage.removeItem("greenpass_emergency_alert");
       localStorage.removeItem("greenpass_member_reports");
@@ -386,16 +448,15 @@ export default function RangerDashboardLayout({
               const isActive = 
                 pathname === item.href || isParkActive || isReportActive;
 
-              // 1. จัดการเมนูดรอปดาวน์สำหรับ "เกี่ยวกับอุทยาน" (คลิกเปิด-ปิด dropdown เท่านั้น ยังไม่เข้าหน้าไหน)
+              // 1. จัดการเมนูดรอปดาวน์สำหรับ "เกี่ยวกับอุทยาน" (คลิกเปิด-ปิด dropdown เท่านั้น)
               if (item.dropdownType === "park") {
                 const isVisible = showParkDropdown;
 
                 return (
                   <div 
                     key={item.name}
+                    ref={parkDropdownRef}
                     className="relative h-full flex items-center"
-                    onMouseEnter={() => setShowParkDropdown(true)}
-                    onMouseLeave={() => setShowParkDropdown(false)}
                   >
                     <button
                       type="button"

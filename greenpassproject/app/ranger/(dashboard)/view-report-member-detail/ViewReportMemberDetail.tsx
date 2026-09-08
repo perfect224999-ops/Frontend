@@ -213,6 +213,15 @@ function ViewReportMemberDetailContent() {
 
   const handleStatusChange = (newStatus: string) => {
     if (!canProgressReport) return;
+
+    // 🛑 ตรวจสอบการข้ามขั้นตอน: หากสถานะเดิมคือ "แจ้งรายงาน" จะไม่อนุญาตให้เลือก "ดำเนินการแก้ไขสำเร็จ" โดยตรง
+    const isOriginalPending = currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending";
+    if (isOriginalPending && newStatus === "ดำเนินการแก้ไขสำเร็จ") {
+      setError("ต้องเปลี่ยนสถานะเป็น 'กำลังดำเนินการ' ก่อนเท่านั้น จึงจะสามารถเลือก 'ดำเนินการแก้ไขสำเร็จ' ได้");
+      return;
+    }
+
+    setError("");
     setStatus(newStatus);
     const todayStr = getTodayThaiDate();
 
@@ -240,6 +249,12 @@ function ViewReportMemberDetailContent() {
 
     if (!status) {
       setError("กรุณาเลือกสถานะ");
+      return;
+    }
+
+    const isOriginalPending = currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending";
+    if (isOriginalPending && status === "ดำเนินการแก้ไขสำเร็จ") {
+      setError("ไม่สามารถข้ามขั้นตอนได้! ต้องเปลี่ยนสถานะเป็น 'กำลังดำเนินการ' ก่อนเท่านั้น");
       return;
     }
 
@@ -377,9 +392,19 @@ function ViewReportMemberDetailContent() {
                   onChange={(e) => handleStatusChange(e.target.value)}
                   className={`w-full bg-slate-900/90 text-emerald-100 text-xs font-semibold px-4 py-3 rounded-2xl border border-emerald-500/40 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none cursor-pointer appearance-none pr-10 transition-all shadow-md ${!canProgressReport ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  <option value="แจ้งรายงาน" className="bg-slate-900 text-white">แจ้งรายงาน (Pending)</option>
-                  <option value="กำลังดำเนินการ" className="bg-slate-900 text-white">กำลังดำเนินการ (InProgress)</option>
-                  <option value="ดำเนินการแก้ไขสำเร็จ" className="bg-slate-900 text-white">ดำเนินการแก้ไขสำเร็จ (Completed)</option>
+                  <option value="แจ้งรายงาน" className="bg-slate-900 text-white">
+                    แจ้งรายงาน (Pending)
+                  </option>
+                  <option value="กำลังดำเนินการ" className="bg-slate-900 text-white">
+                    กำลังดำเนินการ (InProgress)
+                  </option>
+                  <option 
+                    value="ดำเนินการแก้ไขสำเร็จ" 
+                    disabled={currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending"} 
+                    className={(currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending") ? "bg-slate-900 text-slate-500 font-normal" : "bg-slate-900 text-white"}
+                  >
+                    ดำเนินการแก้ไขสำเร็จ (Completed) {(currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending") ? "🔒 (ต้องเปลี่ยนเป็นกำลังดำเนินการก่อน)" : ""}
+                  </option>
                 </select>
                 <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>

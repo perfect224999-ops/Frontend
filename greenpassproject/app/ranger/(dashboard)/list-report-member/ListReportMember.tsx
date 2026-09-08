@@ -123,6 +123,38 @@ export default function ListReportMember() {
           : null;
 
         if (Array.isArray(listData)) {
+          // 🚨 ตรวจหาป๊อปอัปแจ้งเตือนเหตุฉุกเฉินร้ายแรงที่ยังไม่ได้ยืนยันรับทราบ
+          if (typeof window !== "undefined") {
+            try {
+              const ackList: string[] = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
+              const unackEmergency = listData.find((r: any) => {
+                const rId = String(r.reportId || "");
+                const tName = String(r.typeName || r.type?.typeName || r.category || "");
+                const tId = r.typeId || r.type?.typeId;
+                const isSevere = tId === 2 || String(tId) === "2" || tName.includes("ร้ายแรง") || tName.includes("ฉุกเฉิน");
+                const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน";
+                return isSevere && isPending && rId && !ackList.includes(rId);
+              });
+
+              if (unackEmergency) {
+                const emergencyEventData = {
+                  id: String(unackEmergency.reportId),
+                  details: unackEmergency.description 
+                    ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}` 
+                    : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
+                  location: unackEmergency.parkName || unackEmergency.park?.name || "พื้นที่อุทยานแห่งชาติ",
+                  time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+                  reporter: unackEmergency.username || unackEmergency.user?.username || "ผู้ใช้งาน GreenPass"
+                };
+
+                localStorage.setItem("greenpass_emergency_alert", JSON.stringify(emergencyEventData));
+                window.dispatchEvent(new CustomEvent("greenpass_emergency_trigger", { detail: emergencyEventData }));
+              }
+            } catch (e) {
+              console.error("Error checking unacknowledged emergency reports:", e);
+            }
+          }
+
           const mapped: ReportItem[] = listData.map((r: any, idx: number) => {
             let dateStr = r.reportDate || "";
             if (dateStr.includes("-")) {
@@ -138,7 +170,7 @@ export default function ListReportMember() {
             return {
               id: reportIdStr,
               reportDate: dateStr || "วันนี้",
-              category: r.type?.typeName || r.category || "ทั่วไป",
+              category: r.typeName || r.type?.typeName || r.category || "ปกติ",
               status: r.status === "Pending" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status || "แจ้งรายงาน",
               reportDetails: r.description ? `${r.name ? r.name + ": " : ""}${r.description}` : (r.name || ""),
               ranger: r.parkRangerName && r.parkRangerName !== "-" ? r.parkRangerName : (r.park?.name || r.parkName || "เจ้าหน้าที่อุทยาน"),
@@ -165,6 +197,11 @@ export default function ListReportMember() {
     }
     loadReports();
 
+    // 🔄 Auto-polling ทุก 3.5 วินาที ดึงข้อมูลรายงานล่าสุดให้อัตโนมัติในพื้นหลังโดยไม่ต้องกด F5
+    const pollInterval = setInterval(() => {
+      loadReports();
+    }, 3500);
+
     const handleReportUpdate = () => {
       loadReports();
     };
@@ -174,6 +211,7 @@ export default function ListReportMember() {
     }
 
     return () => {
+      clearInterval(pollInterval);
       if (typeof window !== "undefined") {
         window.removeEventListener("greenpass_report_updated", handleReportUpdate);
       }
@@ -326,6 +364,7 @@ export default function ListReportMember() {
                 <tr className="bg-slate-800 text-slate-100 font-semibold border-b border-slate-700">
                   <th className="py-3.5 px-4 w-16 text-center">ลำดับ</th>
                   <th className="py-3.5 px-4 w-36 text-center">วันที่แจ้งรายงาน</th>
+                  <th className="py-3.5 px-3 w-32 text-center">ระดับเหตุการณ์</th>
                   <th className="py-3.5 px-4 w-28 text-center">รูปภาพ</th>
                   <th className="py-3.5 px-4 w-44 text-center">สถานะ</th>
                   <th className="py-3.5 px-4 w-48 text-center">เจ้าหน้าที่ผู้รับผิดชอบ</th>
@@ -337,13 +376,14 @@ export default function ListReportMember() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredReports.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
                       ไม่พบข้อมูลรายงานตามวันที่เลือก
                     </td>
                   </tr>
                 ) : (
                   filteredReports.map((report, index) => {
                     const displayIndex = String(index + 1).padStart(2, "0");
+                    const isSevere = report.category === "ร้ายแรง" || report.isEmergency;
                     return (
                       <tr
                         key={report.id}
@@ -363,6 +403,21 @@ export default function ListReportMember() {
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
                             <span>วันที่ {report.reportDate}</span>
                           </div>
+                        </td>
+
+                        {/* ระดับเหตุการณ์ (ปกติ / ร้ายแรง) */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          {isSevere ? (
+                            <span className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                              ร้ายแรง
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              ปกติ
+                            </span>
+                          )}
                         </td>
 
                         {/* รูปภาพ */}
