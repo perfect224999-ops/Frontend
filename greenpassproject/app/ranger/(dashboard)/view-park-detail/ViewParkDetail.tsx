@@ -138,7 +138,7 @@ export default function ViewParkDetail() {
             parkId: dbPark.parkId || targetParkId,
             parkName: cleanName(dbPark.name),
             openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openStr} น. - ${closeStr} น.`,
-            description: (dbPark.description && !dbPark.description.endsWith("...")) ? dbPark.description : FULL_DEFAULT_DESC,
+            description: (dbPark.description && !dbPark.description.endsWith("...")) ? dbPark.description : DEFAULT_PARK_DATA.description,
             address: (dbPark.address && dbPark.address.trim() !== "") ? dbPark.address : defaultPark.address,
             location: (dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location,
             eventNote: dbPark.eventNote || "เปิดให้บริการตามปกติ",
@@ -197,7 +197,7 @@ export default function ViewParkDetail() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 pb-12 font-sans">
       
       {/* 1. HERO BANNER CARD */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-900 via-green-800 to-teal-900 text-white shadow-xl">

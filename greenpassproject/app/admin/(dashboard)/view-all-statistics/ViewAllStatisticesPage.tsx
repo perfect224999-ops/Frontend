@@ -41,6 +41,123 @@ const MONTH_MAP: Record<string, number> = {
   "ธันวาคม": 12,
 };
 
+const PROVINCE_REGION_MAP: Record<string, string> = {
+  // ภาคเหนือ
+  "เชียงใหม่": "ภาคเหนือ",
+  "เชียงราย": "ภาคเหนือ",
+  "ลำปาง": "ภาคเหนือ",
+  "ลำพูน": "ภาคเหนือ",
+  "แม่ฮ่องสอน": "ภาคเหนือ",
+  "น่าน": "ภาคเหนือ",
+  "พะเยา": "ภาคเหนือ",
+  "แพร่": "ภาคเหนือ",
+  "อุตรดิตถ์": "ภาคเหนือ",
+  "ตาก": "ภาคเหนือ",
+  "สุโขทัย": "ภาคเหนือ",
+  "พิษณุโลก": "ภาคเหนือ",
+  "พิจิตร": "ภาคเหนือ",
+  "กำแพงเพชร": "ภาคเหนือ",
+  "เพชรบูรณ์": "ภาคเหนือ",
+  "นครสวรรค์": "ภาคเหนือ",
+  "อุทัยธานี": "ภาคเหนือ",
+
+  // ภาคตะวันออกเฉียงเหนือ
+  "นครราชสีมา": "ภาคตะวันออกเฉียงเหนือ",
+  "ขอนแก่น": "ภาคตะวันออกเฉียงเหนือ",
+  "อุดรธานี": "ภาคตะวันออกเฉียงเหนือ",
+  "อุบลราชธานี": "ภาคตะวันออกเฉียงเหนือ",
+  "บุรีรัมย์": "ภาคตะวันออกเฉียงเหนือ",
+  "สุรินทร์": "ภาคตะวันออกเฉียงเหนือ",
+  "ศรีสะเกษ": "ภาคตะวันออกเฉียงเหนือ",
+  "ร้อยเอ็ด": "ภาคตะวันออกเฉียงเหนือ",
+  "ชัยภูมิ": "ภาคตะวันออกเฉียงเหนือ",
+  "สกลนคร": "ภาคตะวันออกเฉียงเหนือ",
+  "กาฬสินธุ์": "ภาคตะวันออกเฉียงเหนือ",
+  "มหาสารคาม": "ภาคตะวันออกเฉียงเหนือ",
+  "นครพนม": "ภาคตะวันออกเฉียงเหนือ",
+  "เลย": "ภาคตะวันออกเฉียงเหนือ",
+  "ยโสธร": "ภาคตะวันออกเฉียงเหนือ",
+  "หนองคาย": "ภาคตะวันออกเฉียงเหนือ",
+  "หนองบัวลำภู": "ภาคตะวันออกเฉียงเหนือ",
+  "บึงกาฬ": "ภาคตะวันออกเฉียงเหนือ",
+  "อำนาจเจริญ": "ภาคตะวันออกเฉียงเหนือ",
+  "มุกดาหาร": "ภาคตะวันออกเฉียงเหนือ",
+
+  // ภาคกลาง
+  "กรุงเทพมหานคร": "ภาคกลาง",
+  "กรุงเทพฯ": "ภาคกลาง",
+  "นนทบุรี": "ภาคกลาง",
+  "ปทุมธานี": "ภาคกลาง",
+  "สมุทรปราการ": "ภาคกลาง",
+  "สมุทรสาคร": "ภาคกลาง",
+  "สมุทรสงคราม": "ภาคกลาง",
+  "พระนครศรีอยุธยา": "ภาคกลาง",
+  "อยุธยา": "ภาคกลาง",
+  "อ่างทอง": "ภาคกลาง",
+  "ลพบุรี": "ภาคกลาง",
+  "สิงห์บุรี": "ภาคกลาง",
+  "ชัยนาท": "ภาคกลาง",
+  "สระบุรี": "ภาคกลาง",
+  "นครนายก": "ภาคกลาง",
+  "สุพรรณบุรี": "ภาคกลาง",
+  "นครปฐม": "ภาคกลาง",
+
+  // ภาคตะวันตก
+  "กาญจนบุรี": "ภาคตะวันตก",
+  "เพชรบุรี": "ภาคตะวันตก",
+  "ประจวบคีรีขันธ์": "ภาคตะวันตก",
+  "ราชบุรี": "ภาคตะวันตก",
+
+  // ภาคตะวันออก
+  "ชลบุรี": "ภาคตะวันออก",
+  "ระยอง": "ภาคตะวันออก",
+  "จันทบุรี": "ภาคตะวันออก",
+  "ตราด": "ภาคตะวันออก",
+  "ฉะเชิงเทรา": "ภาคตะวันออก",
+  "ปราจีนบุรี": "ภาคตะวันออก",
+  "สระแก้ว": "ภาคตะวันออก",
+
+  // ภาคใต้
+  "ภูเก็ต": "ภาคใต้",
+  "สุราษฎร์ธานี": "ภาคใต้",
+  "กระบี่": "ภาคใต้",
+  "พังงา": "ภาคใต้",
+  "สงขลา": "ภาคใต้",
+  "นครศรีธรรมราช": "ภาคใต้",
+  "ชุมพร": "ภาคใต้",
+  "ระนอง": "ภาคใต้",
+  "ตรัง": "ภาคใต้",
+  "พัทลุง": "ภาคใต้",
+  "สตูล": "ภาคใต้",
+  "ปัตตานี": "ภาคใต้",
+  "ยะลา": "ภาคใต้",
+  "นราธิวาส": "ภาคใต้",
+};
+
+const PARK_PROVINCE_MAP: Record<string, string> = {
+  "เขาใหญ่": "นครราชสีมา",
+  "แก่งกระจาน": "เพชรบุรี",
+  "เอราวัณ": "กาญจนบุรี",
+  "ดอยสุเทพ-ปุย": "เชียงใหม่",
+  "ดอยอินทนนท์": "เชียงใหม่",
+};
+
+function resolveProvince(p: ParkStatItem): string {
+  if (p.province && p.province !== "ทั่วไป") return p.province;
+  for (const [key, prov] of Object.entries(PARK_PROVINCE_MAP)) {
+    if (p.parkName && p.parkName.includes(key)) return prov;
+  }
+  return p.province || "ทั่วไป";
+}
+
+function getRegionForProvince(province: string): string {
+  if (!province) return "อื่นๆ";
+  const clean = province.replace(/^จ\.\s*/, "").replace(/^จังหวัด\s*/, "").trim();
+  return PROVINCE_REGION_MAP[clean] || PROVINCE_REGION_MAP[province] || "อื่นๆ";
+}
+
+
+
 export default function ViewAllStatisticesPage() {
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +188,12 @@ export default function ViewAllStatisticesPage() {
       try {
         const parsed = JSON.parse(cached);
         if (parsed.metrics) setMetrics(parsed.metrics);
-        if (parsed.parkStats) setParkStats(parsed.parkStats);
+        if (parsed.parkStats) {
+          setParkStats(parsed.parkStats.map((p: ParkStatItem) => ({
+            ...p,
+            province: resolveProvince(p)
+          })));
+        }
         setLoading(false);
       } catch (e) {}
     } else {
@@ -94,7 +216,10 @@ export default function ViewAllStatisticesPage() {
             totalProcessingReport: m?.totalProcessingReport || 0,
             totalCompletedReport: m?.totalCompletedReport || 0,
           };
-          const newParkStats = Array.isArray(ps) ? ps : [];
+          const newParkStats = (Array.isArray(ps) ? ps : []).map((p: ParkStatItem) => ({
+            ...p,
+            province: resolveProvince(p)
+          }));
 
           setMetrics(newMetrics);
           setParkStats(newParkStats);
@@ -114,12 +239,84 @@ export default function ViewAllStatisticesPage() {
     fetchStats();
   }, [month, year]);
 
-  // Filter table data by selectedPark, province, region
-  const filteredParkStats = parkStats.filter(p => {
-    if (selectedPark !== "ทุกอุทยาน" && p.parkName !== selectedPark) return false;
-    if (province !== "กรุณาเลือก" && p.province !== province) return false;
+  // Dynamically filter provinces based on selected region & available parkStats
+  const availableProvinces = Array.from(
+    new Set(
+      parkStats
+        .filter((p) => {
+          if (region !== "กรุณาเลือก" && region !== "ทั้งหมด") {
+            return getRegionForProvince(p.province) === region;
+          }
+          return true;
+        })
+        .map((p) => p.province)
+        .filter((prov) => prov && prov !== "ทั่วไป")
+    )
+  ).sort();
+
+  // Dynamically filter parks based on selected region & selected province
+  const availableParks = parkStats.filter((p) => {
+    if (region !== "กรุณาเลือก" && region !== "ทั้งหมด") {
+      if (getRegionForProvince(p.province) !== region) return false;
+    }
+    if (province !== "กรุณาเลือก" && province !== "ทั้งหมด") {
+      if (p.province !== province) return false;
+    }
     return true;
   });
+
+  const handleRegionChange = (newRegion: string) => {
+    setRegion(newRegion);
+
+    if (newRegion === "กรุณาเลือก" || newRegion === "ทั้งหมด") {
+      setProvince("กรุณาเลือก");
+      setSelectedPark("ทุกอุทยาน");
+    } else {
+      if (province !== "กรุณาเลือก" && province !== "ทั้งหมด") {
+        const provRegion = getRegionForProvince(province);
+        if (provRegion !== newRegion) {
+          setProvince("กรุณาเลือก");
+        }
+      }
+
+      if (selectedPark !== "ทุกอุทยาน" && selectedPark !== "ทั้งหมด") {
+        const parkItem = parkStats.find((p) => p.parkName === selectedPark);
+        if (parkItem && getRegionForProvince(parkItem.province) !== newRegion) {
+          setSelectedPark("ทุกอุทยาน");
+        }
+      }
+    }
+  };
+
+  const handleProvinceChange = (newProvince: string) => {
+    setProvince(newProvince);
+
+    if (newProvince === "กรุณาเลือก" || newProvince === "ทั้งหมด") {
+      setSelectedPark("ทุกอุทยาน");
+    } else {
+      if (selectedPark !== "ทุกอุทยาน" && selectedPark !== "ทั้งหมด") {
+        const parkItem = parkStats.find((p) => p.parkName === selectedPark);
+        if (parkItem && parkItem.province !== newProvince) {
+          setSelectedPark("ทุกอุทยาน");
+        }
+      }
+    }
+  };
+
+  // Filter table data by selectedPark, province, region
+  const filteredParkStats = parkStats.filter((p) => {
+    if (region !== "กรุณาเลือก" && region !== "ทั้งหมด") {
+      if (getRegionForProvince(p.province) !== region) return false;
+    }
+    if (province !== "กรุณาเลือก" && province !== "ทั้งหมด") {
+      if (p.province !== province) return false;
+    }
+    if (selectedPark !== "ทุกอุทยาน" && selectedPark !== "ทั้งหมด") {
+      if (p.parkName !== selectedPark) return false;
+    }
+    return true;
+  });
+
 
   // Calculate aggregated stats for chart visualizer
   const chartAnnouncements = filteredParkStats.reduce((sum, p) => sum + p.announcements, 0);
@@ -139,8 +336,11 @@ export default function ViewAllStatisticesPage() {
     0
   ];
 
+  const isRegionSelected = region !== "กรุณาเลือก" && region !== "ทั้งหมด";
+  const isProvinceSelected = isRegionSelected && province !== "กรุณาเลือก" && province !== "ทั้งหมด";
+
   return (
-    <div className="w-full max-w-7xl xl:max-w-[1400px] mx-auto font-sans relative py-4 space-y-6 my-2 px-2 sm:px-4">
+    <div className="w-full max-w-[1600px] mx-auto font-sans relative py-4 space-y-6 my-2 px-2 sm:px-4">
       
       {/* Container หลัก */}
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-slate-200/50">
@@ -271,14 +471,40 @@ export default function ViewAllStatisticesPage() {
               <label className="block text-[10px] font-medium text-slate-500">ภูมิภาค</label>
               <select
                 value={region}
-                onChange={(e) => setRegion(e.target.value)}
+                onChange={(e) => handleRegionChange(e.target.value)}
                 className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm"
               >
-                <option value="กรุณาเลือก">กรุณาเลือก ▼</option>
-                <option value="กลาง">ภาคกลาง</option>
-                <option value="เหนือ">ภาคเหนือ</option>
-                <option value="ใต้">ภาคใต้</option>
-                <option value="ตะวันออกเฉียงเหนือ">ภาคอีสาน</option>
+                <option value="กรุณาเลือก">-- แสดงทุกภูมิภาค --</option>
+                <option value="ภาคเหนือ">ภาคเหนือ</option>
+                <option value="ภาคกลาง">ภาคกลาง</option>
+                <option value="ภาคตะวันออกเฉียงเหนือ">ภาคตะวันออกเฉียงเหนือ (อีสาน)</option>
+                <option value="ภาคตะวันตก">ภาคตะวันตก</option>
+                <option value="ภาคตะวันออก">ภาคตะวันออก</option>
+                <option value="ภาคใต้">ภาคใต้</option>
+              </select>
+            </div>
+
+            {/* จังหวัด */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-medium text-slate-500">จังหวัด</label>
+              <select
+                value={province}
+                onChange={(e) => handleProvinceChange(e.target.value)}
+                disabled={!isRegionSelected}
+                className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
+              >
+                {!isRegionSelected ? (
+                  <option value="กรุณาเลือก">-- กรุณาเลือกภูมิภาคก่อน --</option>
+                ) : (
+                  <>
+                    <option value="กรุณาเลือก">-- แสดงทุกจังหวัด --</option>
+                    {availableProvinces.map((prov) => (
+                      <option key={prov} value={prov}>
+                        {prov}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
 
@@ -288,30 +514,23 @@ export default function ViewAllStatisticesPage() {
               <select
                 value={selectedPark}
                 onChange={(e) => setSelectedPark(e.target.value)}
-                className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm font-semibold text-emerald-900"
+                disabled={!isProvinceSelected}
+                className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm font-semibold text-emerald-900 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed disabled:font-normal"
               >
-                <option value="ทุกอุทยาน">-- แสดงทุกอุทยาน --</option>
-                {parkStats.map((p) => (
-                  <option key={p.parkId} value={p.parkName}>
-                    {p.parkName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* จังหวัด */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-medium text-slate-500">จังหวัด</label>
-              <select
-                value={province}
-                onChange={(e) => setProvince(e.target.value)}
-                className="w-full bg-white text-slate-800 text-xs font-medium rounded-xl px-3 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-sm"
-              >
-                <option value="กรุณาเลือก">กรุณาเลือก ▼</option>
-                <option value="นครราชสีมา">นครราชสีมา</option>
-                <option value="เพชรบุรี">เพชรบุรี</option>
-                <option value="กาญจนบุรี">กาญจนบุรี</option>
-                <option value="เชียงใหม่">เชียงใหม่</option>
+                {!isRegionSelected ? (
+                  <option value="ทุกอุทยาน">-- กรุณาเลือกภูมิภาคก่อน --</option>
+                ) : !isProvinceSelected ? (
+                  <option value="ทุกอุทยาน">-- กรุณาเลือกจังหวัดก่อน --</option>
+                ) : (
+                  <>
+                    <option value="ทุกอุทยาน">-- แสดงทุกอุทยาน --</option>
+                    {availableParks.map((p) => (
+                      <option key={p.parkId} value={p.parkName}>
+                        {p.parkName}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
 
@@ -393,7 +612,7 @@ export default function ViewAllStatisticesPage() {
                     <tr key={item.parkId} className="hover:bg-emerald-50/40 transition-colors">
                       <td className="py-4 px-5 font-bold text-slate-900 flex items-center justify-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        {item.parkName}
+                        <span>{item.parkName}</span>
                       </td>
                       <td className="py-4 px-4 text-center">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">

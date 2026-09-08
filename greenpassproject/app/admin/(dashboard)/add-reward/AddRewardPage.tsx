@@ -93,7 +93,7 @@ export default function AddRewardPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl xl:max-w-6xl mx-auto font-sans relative py-4 my-2 px-2 sm:px-4">
+    <div className="w-full max-w-[1600px] mx-auto font-sans relative py-4 my-2 px-2 sm:px-4">
       
       {/* Container หลัก */}
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl shadow-slate-200/50">

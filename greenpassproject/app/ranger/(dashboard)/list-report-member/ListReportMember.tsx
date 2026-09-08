@@ -13,7 +13,10 @@ import {
   UserCheck,
   Eye,
   Check,
-  Sparkles
+  Sparkles,
+  ImageIcon,
+  X,
+  ZoomIn
 } from "lucide-react";
 
 interface ReportItem {
@@ -25,6 +28,8 @@ interface ReportItem {
   ranger: string;
   startDate: string;
   completedDate: string;
+  image?: string | null;
+  isEmergency?: boolean;
 }
 
 const INITIAL_REPORTS: ReportItem[] = [
@@ -36,7 +41,8 @@ const INITIAL_REPORTS: ReportItem[] = [
     reportDetails: "พบเจอช้างป่าหลุดบริเวณทางเข้าอุทยาน",
     ranger: "ใจดี มากๆ",
     startDate: "10/02/2567",
-    completedDate: "-"
+    completedDate: "-",
+    image: "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "2",
@@ -46,7 +52,8 @@ const INITIAL_REPORTS: ReportItem[] = [
     reportDetails: "พบกิ่งไม้ขนาดใหญ่ล้มขวางเส้นทางศึกษาธรรมชาติกิโลเมตรที่ 4",
     ranger: "D3D3D3",
     startDate: "15/02/2567",
-    completedDate: "-"
+    completedDate: "-",
+    image: "https://images.unsplash.com/photo-1511497584788-876761c139ab?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "3",
@@ -56,7 +63,8 @@ const INITIAL_REPORTS: ReportItem[] = [
     reportDetails: "ท่อน้ำรั่วซึมบริเวณใกล้ห้องน้ำสาธารณะจุดกางเต็นท์ลำตะคอง",
     ranger: "ใจดี มากๆ",
     startDate: "25/02/2567",
-    completedDate: "-"
+    completedDate: "-",
+    image: null
   },
   {
     id: "4",
@@ -66,13 +74,30 @@ const INITIAL_REPORTS: ReportItem[] = [
     reportDetails: "ป้ายเตือนระวังช้างป่าล้มชำรุดเสียหายบริเวณกิโลเมตรที่ 12",
     ranger: "สมชาย อังยอง",
     startDate: "27/02/2567",
-    completedDate: "27/02/2567"
+    completedDate: "27/02/2567",
+    image: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=600&q=80"
   }
 ];
+
+const getReportImageUrl = (item: ReportItem) => {
+  if (typeof window !== "undefined" && item.id) {
+    const customLocal = localStorage.getItem(`greenpass_report_img_${item.id}`);
+    if (customLocal) return customLocal;
+  }
+  const img = item.image;
+  if (!img || img === "-" || img === "null" || img === "undefined" || img.trim() === "") {
+    return null;
+  }
+  if (img.startsWith("data:") || img.startsWith("http://") || img.startsWith("https://") || img.startsWith("/")) {
+    return img;
+  }
+  return `/${img}`;
+};
 
 export default function ListReportMember() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [selectedDate, setSelectedDate] = useState("All");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [activeToggles, setActiveToggles] = useState<Record<string, boolean>>({
     "1": true,
     "2": true
@@ -93,73 +118,66 @@ export default function ListReportMember() {
           res = await reportApi.getReportsByParkId(4);
         }
 
-        const listData = res && res.success ? (res.result || res.data) : null;
-        if (Array.isArray(listData) && listData.length > 0) {
+        const listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res)) 
+          ? (res.result || res.data || res) 
+          : null;
+
+        if (Array.isArray(listData)) {
           const mapped: ReportItem[] = listData.map((r: any, idx: number) => {
-            let dateStr = r.reportDate || "28/08/2569";
+            let dateStr = r.reportDate || "";
             if (dateStr.includes("-")) {
               const [y, m, d] = dateStr.split("-");
               dateStr = `${d}/${m}/${Number(y) + 543}`;
             }
+            const reportIdStr = String(r.reportId || idx + 1);
+            const rawImg = r.image;
+            let imgVal = rawImg && rawImg !== "-" && rawImg !== "null" && rawImg !== "undefined" ? rawImg : null;
+            if (!imgVal && typeof window !== "undefined") {
+              imgVal = localStorage.getItem(`greenpass_report_img_${reportIdStr}`) || null;
+            }
             return {
-              id: String(r.reportId || idx + 1),
-              reportDate: dateStr,
-              category: "ทั่วไป",
+              id: reportIdStr,
+              reportDate: dateStr || "วันนี้",
+              category: r.type?.typeName || r.category || "ทั่วไป",
               status: r.status === "Pending" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status || "แจ้งรายงาน",
-              reportDetails: r.description ? `${r.name}: ${r.description}` : (r.name || ""),
-              ranger: r.parkRangerName && r.parkRangerName !== "-" ? r.parkRangerName : (r.parkName || "เจ้าหน้าที่อุทยาน"),
-              startDate: dateStr,
-              completedDate: "-"
+              reportDetails: r.description ? `${r.name ? r.name + ": " : ""}${r.description}` : (r.name || ""),
+              ranger: r.parkRangerName && r.parkRangerName !== "-" ? r.parkRangerName : (r.park?.name || r.parkName || "เจ้าหน้าที่อุทยาน"),
+              startDate: dateStr || "-",
+              completedDate: "-",
+              image: imgVal
             };
           });
           setReports(mapped);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("greenpass_member_reports");
+          }
           return;
         }
       } catch (err) {
-        console.log("Backend reports fetch info: using local data fallback", err);
-        setError("ไม่สามารถดึงรายงานเหตุการจากฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+        console.log("Backend reports fetch info:", err);
       }
 
-      const saved = localStorage.getItem("greenpass_member_reports");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const mapped = parsed.map((r: any, idx: number) => ({
-            id: String(idx + 1),
-            reportDate: r.reportDate || "10/02/2567",
-            category: r.category || "ทั่วไป",
-            status:
-              r.status === "New"
-                ? "แจ้งรายงาน"
-                : r.status === "InProgress"
-                ? "กำลังดำเนินการ"
-                : r.status === "Completed"
-                ? "ดำเนินการแก้ไขสำเร็จ"
-                : r.status,
-            reportDetails: r.reportDetails || r.name || "",
-            ranger:
-              r.ranger && r.ranger !== "-"
-                ? r.ranger
-                : idx === 0
-                ? "ใจดี มากๆ"
-                : idx === 1
-                ? "D3D3D3"
-                : idx === 2
-                ? "ใจดี มากๆ"
-                : "สมชาย อังยอง",
-            startDate: r.startDate || "-",
-            completedDate: r.completedDate || "-"
-          }));
-          setReports(mapped);
-        } catch (e) {
-          console.error("Failed to parse reports", e);
-          setReports(INITIAL_REPORTS);
-        }
-      } else {
-        setReports(INITIAL_REPORTS);
+      // หากดึงข้อมูลจาก DB ไม่ได้จริงๆ ให้ตั้งค่าเป็นรายการว่างเปล่า หรือดึงเฉพาะรายงานจริง
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("greenpass_member_reports");
       }
+      setReports([]);
     }
     loadReports();
+
+    const handleReportUpdate = () => {
+      loadReports();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("greenpass_report_updated", handleReportUpdate);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("greenpass_report_updated", handleReportUpdate);
+      }
+    };
   }, []);
 
   const handleToggle = (id: string) => {
@@ -176,84 +194,18 @@ export default function ListReportMember() {
     (r) => r.status === "ดำเนินการแก้ไขสำเร็จ" || r.status === "ดำเนินการสำเร็จ"
   ).length;
 
-  const handleTriggerEmergencyReport = () => {
-    const timeStr = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-    const dateStr = new Date().toLocaleDateString("th-TH");
-    const newReport: ReportItem = {
-      id: String(Date.now()),
-      reportDate: dateStr,
-      category: "🚨 เหตุฉุกเฉินด่วน",
-      status: "แจ้งรายงาน",
-      reportDetails: "🚨 พบนกท่องเที่ยวหกล้มบาดเจ็บ / ต้องการความช่วยเหลือปฐมพยาบาลด่วน บริเวณน้ำตกชั้น 3!",
-      ranger: "เจ้าหน้าที่อุทยาน",
-      startDate: dateStr,
-      completedDate: "-",
-      isEmergency: true
-    };
-
-    setReports(prev => [newReport, ...prev]);
-
-    const saved = typeof window !== "undefined" ? localStorage.getItem("greenpass_member_reports") : null;
-    let currentList = [];
-    if (saved) {
-      try { currentList = JSON.parse(saved); } catch (e) {}
-    }
-    if (typeof window !== "undefined") {
-      localStorage.setItem("greenpass_member_reports", JSON.stringify([newReport, ...currentList]));
-    }
-
-    const emergencyPayload = {
-      id: newReport.id,
-      details: newReport.reportDetails,
-      location: "บริเวณน้ำตกชั้น 3 (จุดชมวิว)",
-      time: `${timeStr} น.`,
-      reporter: "นักท่องเที่ยวในพื้นที่"
-    };
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("greenpass_emergency_alert", JSON.stringify(emergencyPayload));
-      window.dispatchEvent(new CustomEvent("greenpass_emergency_trigger", { detail: emergencyPayload }));
-    }
-  };
-
-  const handleTriggerNormalReport = () => {
-    const dateStr = new Date().toLocaleDateString("th-TH");
-    const newReport: ReportItem = {
-      id: String(Date.now()),
-      reportDate: dateStr,
-      category: "ทั่วไป",
-      status: "แจ้งรายงาน",
-      reportDetails: "พบถังขยะบริเวณจุดพักผ่อนเต็ม มีขยะล้นออกมาข้างนอกเล็กน้อย",
-      ranger: "เจ้าหน้าที่อุทยาน",
-      startDate: dateStr,
-      completedDate: "-",
-      isEmergency: false
-    };
-
-    setReports(prev => [newReport, ...prev]);
-
-    const saved = typeof window !== "undefined" ? localStorage.getItem("greenpass_member_reports") : null;
-    let currentList = [];
-    if (saved) {
-      try { currentList = JSON.parse(saved); } catch (e) {}
-    }
-    if (typeof window !== "undefined") {
-      localStorage.setItem("greenpass_member_reports", JSON.stringify([newReport, ...currentList]));
-    }
-  };
-
   const filteredReports =
     selectedDate === "All"
       ? reports
       : reports.filter((r) => r.reportDate.includes(selectedDate) || r.reportDate.startsWith(selectedDate));
 
   return (
-    <div className="w-full max-w-7xl mx-auto font-sans relative py-4 space-y-6 px-2 sm:px-4">
+    <div className="w-full max-w-[1600px] mx-auto font-sans relative py-3 space-y-6 px-1 sm:px-3">
       
       {/* Container หลัก */}
       <div className="bg-emerald-950/5 backdrop-blur-md border border-emerald-800/10 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-emerald-950/5">
         
-        {/* Header Title Section with Emergency Action Bar */}
+        {/* Header Title Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-emerald-900/10 pb-5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20">
@@ -270,22 +222,6 @@ export default function ListReportMember() {
                 ติดตามและจัดการสถานะรายงานเหตุฉุกเฉินความชำรุดในเขตอุทยาน
               </p>
             </div>
-          </div>
-
-          {/* Simulation Action Buttons for Testing Emergency Siren */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleTriggerNormalReport}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-300 flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <span>📋 ทดลองรายงานปกติ (ไม่ส่งเสียงร้อง)</span>
-            </button>
-            <button
-              onClick={handleTriggerEmergencyReport}
-              className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded-xl text-xs font-bold transition-all border border-rose-400/30 flex items-center gap-1.5 cursor-pointer shadow-md shadow-rose-950/20 animate-pulse"
-            >
-              <span>🚨 จำลองส่งเหตุฉุกเฉิน (เปิดไซเรนเตือนภัย)</span>
-            </button>
           </div>
         </div>
 
@@ -390,6 +326,7 @@ export default function ListReportMember() {
                 <tr className="bg-slate-800 text-slate-100 font-semibold border-b border-slate-700">
                   <th className="py-3.5 px-4 w-16 text-center">ลำดับ</th>
                   <th className="py-3.5 px-4 w-36 text-center">วันที่แจ้งรายงาน</th>
+                  <th className="py-3.5 px-4 w-28 text-center">รูปภาพ</th>
                   <th className="py-3.5 px-4 w-44 text-center">สถานะ</th>
                   <th className="py-3.5 px-4 w-48 text-center">เจ้าหน้าที่ผู้รับผิดชอบ</th>
                   <th className="py-3.5 px-4 min-w-[260px] text-center">รายละเอียดเหตุการณ์</th>
@@ -400,7 +337,7 @@ export default function ListReportMember() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredReports.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
                       ไม่พบข้อมูลรายงานตามวันที่เลือก
                     </td>
                   </tr>
@@ -426,6 +363,33 @@ export default function ListReportMember() {
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
                             <span>วันที่ {report.reportDate}</span>
                           </div>
+                        </td>
+
+                        {/* รูปภาพ */}
+                        <td className="py-3.5 px-3 text-center">
+                          {getReportImageUrl(report) ? (
+                            <div 
+                              onClick={() => setSelectedImage(getReportImageUrl(report))}
+                              className="relative w-12 h-12 mx-auto rounded-xl overflow-hidden border border-slate-200/80 shadow-2xs group cursor-pointer hover:scale-105 hover:shadow-md transition-all bg-slate-100"
+                              title="คลิกเพื่อขยายรูปภาพ"
+                            >
+                              <img
+                                src={getReportImageUrl(report)!}
+                                alt="รูปภาพรายงาน"
+                                className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=300&q=80";
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                <ZoomIn className="w-4 h-4" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 mx-auto rounded-xl bg-slate-100 border border-slate-200/60 flex items-center justify-center text-slate-400" title="ไม่มีรูปภาพ">
+                              <ImageIcon className="w-4 h-4" />
+                            </div>
+                          )}
                         </td>
 
                         {/* สถานะ */}
@@ -474,7 +438,7 @@ export default function ListReportMember() {
                               className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              <span>แก้ไขสถานะ/ดูเพิ่มเติม &gt;</span>
+                              <span>อัปเดตสถานะ &gt;</span>
                             </Link>
                           </div>
                         </td>
@@ -489,6 +453,31 @@ export default function ListReportMember() {
         </div>
 
       </div>
+
+      {/* Image Modal Lightbox */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div 
+            className="relative max-w-3xl max-h-[90vh] bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white flex items-center justify-center transition-all cursor-pointer border border-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={selectedImage}
+              alt="รูปภาพรายงานขนาดใหญ่"
+              className="max-w-full max-h-[82vh] object-contain rounded-2xl mx-auto"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

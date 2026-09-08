@@ -136,7 +136,7 @@ function EditNewsDetailsContent() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 font-sans">
       
       {/* Toast Notification */}
       {error && (

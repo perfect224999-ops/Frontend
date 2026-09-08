@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { rangerApi, parkApi } from "@/service/api";
+import SockJS from "sockjs-client";
+import { Client } from "@stomp/stompjs";
 import { 
   ShieldAlert, 
   Lock, 
@@ -149,25 +151,88 @@ export default function RangerDashboardLayout({
     };
   }, []);
 
+  // ----------------------------------------------------
+  // 📡 Real-time WebSocket Listener via @stomp/stompjs & SockJS
+  // ----------------------------------------------------
+  useEffect(() => {
+    const parkId = typeof window !== "undefined" 
+      ? localStorage.getItem("ranger_park_id") || "4" 
+      : null;
+    
+    if (!parkId) return;
+
+    let stompClient: Client | null = null;
+
+    try {
+      stompClient = new Client({
+        webSocketFactory: () => new SockJS("http://localhost:8080/ws-greenpass"),
+        debug: () => {}, // ปิด log debug ใน console
+        reconnectDelay: 5000,
+        onConnect: () => {
+          console.log(`📡 WebSocket Connected for Park ID: ${parkId}`);
+
+          stompClient?.subscribe(`/topic/park/${parkId}/notifications`, (message: any) => {
+            if (message.body) {
+              try {
+                const notification = JSON.parse(message.body);
+                const report = notification.report || {};
+                const title = notification.title || "";
+                const messageText = notification.message || report.description || "";
+                
+                // 🔍 ตรวจสอบว่าเป็นรายงานฉุกเฉินหรือไม่
+                const isEmergency = 
+                  notification.isEmergency ||
+                  title.includes("ฉุกเฉิน") ||
+                  messageText.includes("ฉุกเฉิน") ||
+                  report.type?.typeName?.includes("ฉุกเฉิน");
+
+                if (isEmergency) {
+                  // 🚨 กรณีฉุกเฉิน: เด้ง Pop-up ด่วนที่สุดกลางจอ + เปิดเสียงไซเรน
+                  setActiveEmergencyAlert({
+                    id: String(report.reportId || notification.id || Date.now()),
+                    details: messageText || "พบเหตุการณ์ฉุกเฉินในพื้นที่อุทยาน",
+                    location: parkName || "พื้นที่อุทยานแห่งชาติ",
+                    time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+                    reporter: report.user?.username || notification.username || "ผู้ใช้งาน GreenPass"
+                  });
+                  startEmergencySirenSound(); // เปิดเสียงไซเรน
+                } else {
+                  // ℹ️ กรณีไม่ฉุกเฉิน: ไม่เปิด Pop-up ใหญ่ และ ไม่เปิดเสียงไซเรน
+                  console.log("ℹ️ ได้รับรายงานปกติ:", notification);
+                }
+
+                // 🔄 สั่งให้ตารางรายงาน (ListReportMember) อัปเดตโหลดข้อมูลใหม่ทันที
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: notification }));
+                }
+              } catch (e) {
+                console.error("Error parsing WebSocket message:", e);
+              }
+            }
+          });
+        },
+        onStompError: (frame) => {
+          console.warn("WebSocket STOMP Error:", frame.headers["message"]);
+        }
+      });
+
+      stompClient.activate();
+    } catch (e) {
+      console.error("Failed to initialize WebSocket Client:", e);
+    }
+
+    return () => {
+      if (stompClient) {
+        stompClient.deactivate();
+      }
+    };
+  }, [parkName]);
+
   const handleAcknowledgeEmergency = () => {
     stopEmergencySirenSound();
     if (typeof window !== "undefined") {
       localStorage.removeItem("greenpass_emergency_alert");
-      
-      // อัปเดตสถานะในรายการรายงาน local data
-      const savedReports = localStorage.getItem("greenpass_member_reports");
-      if (savedReports && activeEmergencyAlert) {
-        try {
-          const parsed = JSON.parse(savedReports);
-          const updated = parsed.map((r: any) => {
-            if (String(r.id) === String(activeEmergencyAlert.id) || r.isEmergency) {
-              return { ...r, status: "กำลังดำเนินการ", acknowledged: true };
-            }
-            return r;
-          });
-          localStorage.setItem("greenpass_member_reports", JSON.stringify(updated));
-        } catch (e) {}
-      }
+      localStorage.removeItem("greenpass_member_reports");
     }
     setActiveEmergencyAlert(null);
   };
@@ -428,7 +493,7 @@ export default function RangerDashboardLayout({
       </header>
 
       {/* เนื้อหาเว็บหลัก */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 relative z-10">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 relative z-10">
         {isAccessDenied ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4">
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-rose-100 text-center space-y-5">

@@ -1,10 +1,5 @@
-import MainAdminPage from "./MainAdminPage";
-
-export const metadata = {
-  title: "หน้าหลักผู้ดูแลระบบ - GreenPass Admin",
-  description: "ภาพรวมสถิติและการเข้าถึงส่วนควบคุมสำหรับผู้ดูแลระบบ GreenPass",
-};
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <MainAdminPage />;
+  redirect("/admin/add-reward");
 }

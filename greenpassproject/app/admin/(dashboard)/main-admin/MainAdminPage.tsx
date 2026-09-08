@@ -55,7 +55,7 @@ export default function MainAdminPage() {
   });
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-white/95 border border-zinc-200 shadow-2xl rounded-2xl p-6 font-sans space-y-6 text-zinc-800 relative z-10 my-6">
+    <div className="w-full max-w-[1600px] mx-auto bg-white/95 border border-zinc-200 shadow-2xl rounded-3xl p-6 md:p-8 font-sans space-y-6 text-zinc-800 relative z-10 my-6">
       
       {/* Welcome Banner */}
       <div className="p-6 bg-gradient-to-r from-[#064e3b] to-[#10b981] rounded-2xl text-white shadow-sm space-y-2">

@@ -177,7 +177,7 @@ export default function EditParkDetails() {
   };
 
   return (
-    <form onSubmit={handleSave} className="max-w-4xl mx-auto bg-white shadow-sm rounded-2xl p-6 md:p-8 font-sans border border-emerald-100 space-y-6">
+    <form onSubmit={handleSave} className="w-full max-w-[1600px] mx-auto bg-white/90 backdrop-blur-xl shadow-xl rounded-3xl p-6 md:p-8 font-sans border border-slate-200/90 space-y-6">
       
       {/* Header Bar */}
       <div className="flex justify-between items-center border-b border-slate-100 pb-4">

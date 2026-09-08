@@ -178,7 +178,7 @@ export default function ScanCheckinQRCode() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 font-sans">
       
       <style dangerouslySetInnerHTML={{__html: `
         #qr-reader {

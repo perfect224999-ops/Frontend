@@ -133,6 +133,7 @@ export const rangerApi = {
   },
   updateRanger: async (username: string, payload: Partial<{
     employeeId: string;
+    password?: string;
     firstName: string;
     lastName: string;
     birthDate: string;
@@ -142,6 +143,7 @@ export const rangerApi = {
     district: string;
     subDistrict: string;
     province: string;
+    zipcode?: string;
     gender: string;
     phone: string;
     email: string;

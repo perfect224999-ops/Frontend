@@ -33,7 +33,7 @@ export default function AddParkRangerPage() {
   
   // Form states
   const [employeeId, setEmployeeId] = useState("PR01");
-  const [password, setPassword] = useState("pass1234");
+  const [password, setPassword] = useState("Pass1234");
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("สมพร");
   const [lastName, setLastName] = useState("ดงศักดิ์");
@@ -110,7 +110,22 @@ export default function AddParkRangerPage() {
 
     const cleanPassword = password.trim();
     if (!cleanPassword) {
-      return "กรุณากรอกรหัสผ่าน (Password)";
+      return "กรุณากรอกรหัสผ่าน (ห้ามเป็นค่าว่าง)";
+    }
+    if (/[\u0E00-\u0E7F]/.test(password)) {
+      return "รหัสผ่านต้องเป็นภาษาอังกฤษเท่านั้น (ห้ามมีภาษาไทย)";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "รหัสผ่านต้องมีตัวอักษรภาษาอังกฤษพิมพ์เล็กอย่างน้อย 1 ตัว (a-z)";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "รหัสผ่านต้องมีตัวอักษรภาษาอังกฤษพิมพ์ใหญ่อย่างน้อย 1 ตัว (A-Z)";
+    }
+    if (!/[0-9]/.test(password)) {
+      return "รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว (0-9)";
+    }
+    if (!/^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(password)) {
+      return "รหัสผ่านต้องเป็นภาษาอังกฤษ ตัวเลข หรืออักขระพิเศษมาตรฐานเท่านั้น (ห้ามมีภาษาไทยหรือภาษาอื่น)";
     }
     if (cleanPassword.length < 4 || cleanPassword.length > 16) {
       return "รหัสผ่านต้องมีความยาว 4 ถึง 16 ตัวอักษร";
@@ -292,7 +307,7 @@ export default function AddParkRangerPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl xl:max-w-6xl mx-auto font-sans relative py-4 my-2 px-2 sm:px-4">
+    <div className="w-full max-w-[1600px] mx-auto font-sans relative py-4 my-2 px-2 sm:px-4">
       
       {/* Container หลัก สีขาว */}
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl shadow-slate-200/50 text-slate-800">

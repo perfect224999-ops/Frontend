@@ -191,7 +191,7 @@ export default function ListNews() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 font-sans">
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 font-sans">
       
       {deleteSuccess && (
         <div className="p-4 bg-rose-50 border border-rose-300 text-rose-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-fade-in">

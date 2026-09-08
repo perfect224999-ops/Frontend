@@ -206,7 +206,7 @@ export default function ViewVisitStatistics() {
   const foreignerPercentage = 100 - thaiPercentage;
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 font-sans pb-12 px-2 sm:px-4">
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 font-sans pb-12 px-1 sm:px-3">
       
       {/* 1. HERO TITLE HEADER & FILTER TOGGLE */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#042d15] via-[#094721] to-[#042410] text-white p-6 sm:p-8 shadow-xl border border-emerald-500/30">

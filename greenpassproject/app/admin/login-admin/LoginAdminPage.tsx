@@ -73,7 +73,7 @@ export default function LoginAdminPage() {
         // Save Admin session
         localStorage.setItem("admin_username", username);
         localStorage.setItem("admin_role", "SUPER_ADMIN");
-        router.push("/admin/main-admin");
+        router.push("/admin/add-reward");
       } else {
         setError(response.message || "เข้าสู่ระบบไม่สำเร็จ");
         setIsLoading(false);

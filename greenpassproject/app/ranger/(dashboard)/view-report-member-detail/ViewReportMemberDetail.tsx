@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { reportApi } from "@/service/api";
 import { 
-  FileText, 
   Calendar, 
   Check, 
   ArrowLeft, 
@@ -15,8 +14,7 @@ import {
   UserCheck,
   CheckCircle2,
   Sparkles,
-  ShieldCheck,
-  ImageIcon
+  ShieldCheck
 } from "lucide-react";
 
 interface MemberReport {
@@ -53,7 +51,7 @@ const INITIAL_REPORTS: MemberReport[] = [
     reportDetails: "พบเจอขยะพลาสติกและเศษขวดแก้วจำนวนมากบริเวณจุดชมวิวทางขึ้นอุทยาน",
     ranger: "ใจดี มากๆ",
     parkName: "อุทยานแห่งชาติเขาใหญ่",
-    image: "https://images.unsplash.com/photo-1530587191325-3db32d826c18",
+    image: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80",
     startDate: "10/02/2567",
     completedDate: "-"
   },
@@ -67,7 +65,7 @@ const INITIAL_REPORTS: MemberReport[] = [
     reportDetails: "พบกิ่งไม้ขนาดใหญ่ล้มขวางเส้นทางศึกษาธรรมชาติกิโลเมตรที่ 4",
     ranger: "D3D3D3",
     parkName: "อุทยานแห่งชาติเขาใหญ่",
-    image: "https://images.unsplash.com/photo-1511497584788-876761c139ab",
+    image: "https://images.unsplash.com/photo-1511497584788-876761c139ab?auto=format&fit=crop&w=600&q=80",
     startDate: "15/02/2567",
     completedDate: "-"
   },
@@ -95,7 +93,7 @@ const INITIAL_REPORTS: MemberReport[] = [
     reportDetails: "ป้ายเตือนระวังช้างป่าล้มชำรุดเสียหายบริเวณกิโลเมตรที่ 12",
     ranger: "สมชาย อังยอง",
     parkName: "อุทยานแห่งชาติเขาใหญ่",
-    image: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09",
+    image: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=600&q=80",
     startDate: "27/02/2567",
     completedDate: "27/02/2567"
   }
@@ -264,33 +262,8 @@ function ViewReportMemberDetailContent() {
         await reportApi.updateReportStatus(Number(reportId), backendStatus, rangerUsername);
       }
 
-      const updated = reports.map((r) => {
-        if (r.id === reportId) {
-          return {
-            ...r,
-            status,
-            startDate: finalStartDate,
-            completedDate: finalCompletedDate,
-            ranger: status === "แจ้งรายงาน" ? "-" : (r.ranger && r.ranger !== "-" ? r.ranger : "เจ้าหน้าที่อุทยาน")
-          };
-        }
-        return r;
-      });
-
-      const toSave = updated.map(r => ({
-        id: r.id,
-        reportDate: r.reportDate,
-        category: r.category,
-        status: r.status === "แจ้งรายงาน" ? "New" : r.status === "กำลังดำเนินการ" ? "InProgress" : "Completed",
-        reportDetails: r.reportDetails,
-        ranger: r.ranger,
-        startDate: r.startDate,
-        completedDate: r.completedDate
-      }));
-
-      localStorage.setItem("greenpass_member_reports", JSON.stringify(toSave));
       setIsLoading(false);
-      setSuccess("บันทึกและอัปเดตสถานะรายงานสำเร็จเรียบร้อยแล้ว");
+      setSuccess("บันทึกและอัปเดตสถานะรายงานเรียบร้อย");
 
       setTimeout(() => {
         router.push("/ranger/list-report-member");
@@ -320,7 +293,7 @@ function ViewReportMemberDetailContent() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-4 font-sans py-4">
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 font-sans py-4">
       
       {/* Header back bar */}
       <div className="flex justify-between items-center text-xs px-1">

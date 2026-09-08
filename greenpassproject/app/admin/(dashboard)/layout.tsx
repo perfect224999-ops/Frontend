@@ -40,7 +40,6 @@ export default function AdminDashboardLayout({
   };
 
   const menuItems = [
-    { name: "หน้าแรก", href: "/admin/main-admin", icon: Home },
     { name: "เพิ่มของรางวัล", href: "/admin/add-reward", icon: Gift },
     { name: "แสดงของรางวัล", href: "/admin/view-reward-admin", icon: Award },
     { name: "รายงานสรุป", href: "/admin/view-all-statistics", icon: BarChart3 },
@@ -56,7 +55,7 @@ export default function AdminDashboardLayout({
         <div className="w-full px-4 sm:px-8 h-16 flex items-center justify-between">
           
           {/* Brand Logo & Tag */}
-          <Link href="/admin/main-admin" className="flex items-center gap-3 group transition-transform duration-200 active:scale-95">
+          <Link href="/admin/add-reward" className="flex items-center gap-3 group transition-transform duration-200 active:scale-95">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-900/50 ring-1 ring-emerald-300/40 group-hover:shadow-emerald-400/30 transition-all duration-300">
               <Trees className="w-5 h-5 text-white transform group-hover:scale-110 transition-transform duration-300" />
             </div>

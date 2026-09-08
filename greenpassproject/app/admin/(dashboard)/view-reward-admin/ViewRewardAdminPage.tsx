@@ -108,22 +108,8 @@ export default function ViewRewardAdminPage() {
     }
   };
 
-  const handleClearAllRewards = async () => {
-    if (!window.confirm("คุณต้องการลบรายการของรางวัลทั้งหมดออกจากฐานข้อมูลใช่หรือไม่?")) return;
-    for (const r of rewards) {
-      const targetId = parseInt(r.id);
-      if (targetId) {
-        try {
-          await rewardApi.deleteReward(targetId);
-          localStorage.removeItem(`greenpass_reward_img_${r.id}`);
-        } catch (e) {}
-      }
-    }
-    await fetchRewards();
-  };
-
   return (
-    <div className="w-full max-w-7xl xl:max-w-[1380px] mx-auto font-sans relative py-4 space-y-6 my-2 px-2 sm:px-4">
+    <div className="w-full max-w-[1600px] mx-auto font-sans relative py-4 space-y-6 my-2 px-2 sm:px-4">
       
       {/* Container หลัก */}
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-slate-200/50">
@@ -148,16 +134,6 @@ export default function ViewRewardAdminPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {rewards.length > 0 && (
-              <button
-                onClick={handleClearAllRewards}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4 text-red-600" />
-                <span>ลบทั้งหมด</span>
-              </button>
-            )}
-
             <button
               onClick={() => router.push("/admin/add-reward")}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-600/20 hover:shadow-emerald-600/30 cursor-pointer"
