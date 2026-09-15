@@ -356,7 +356,7 @@ export default function ViewAllStatisticesPage() {
                 รายงานสรุปภาพรวมและสถิติอุทยานแห่งชาติ
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                ภาพรวมข้อมูลอุทยาน เจ้าหน้าที่ ข่าวประกาศ
+                ภาพรวมข้อมูลอุทยาน
               </p>
             </div>
           </div>

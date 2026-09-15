@@ -232,10 +232,7 @@ export default function ListReportMember() {
     (r) => r.status === "ดำเนินการแก้ไขสำเร็จ" || r.status === "ดำเนินการสำเร็จ"
   ).length;
 
-  const filteredReports =
-    selectedDate === "All"
-      ? reports
-      : reports.filter((r) => r.reportDate.includes(selectedDate) || r.reportDate.startsWith(selectedDate));
+  const filteredReports = reports;
 
   return (
     <div className="w-full max-w-[1600px] mx-auto font-sans relative py-3 space-y-6 px-1 sm:px-3">
@@ -326,32 +323,6 @@ export default function ListReportMember() {
             </div>
           </div>
 
-        </div>
-
-        {/* Filter Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white/90 p-3.5 rounded-2xl border border-slate-200/90 shadow-sm">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-            <Filter className="w-4 h-4 text-emerald-600" />
-            <span>กรองข้อมูลตามวันที่:</span>
-          </div>
-
-          <div className="relative inline-flex items-center">
-            <Calendar className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="pl-9 pr-8 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer appearance-none shadow-sm"
-            >
-              <option value="All">ทุกวันที่ (แสดงทั้งหมด)</option>
-              <option value="10/02">10 กุมภาพันธ์ 2567</option>
-              <option value="15/02">15 กุมภาพันธ์ 2567</option>
-              <option value="25/02">25 กุมภาพันธ์ 2567</option>
-              <option value="27/02">27 กุมภาพันธ์ 2567</option>
-            </select>
-            <div className="absolute right-2.5 pointer-events-none text-slate-400 text-[10px]">
-              ▼
-            </div>
-          </div>
         </div>
 
         {/* Table View */}

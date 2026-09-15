@@ -129,8 +129,10 @@ export default function ViewParkDetail() {
             1: { location: "14.3109229, 101.5304415", address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130" },
             2: { location: "12.8850041, 99.6317361", address: "ต.แก่งกระจาน อ.แก่งกระจาน จ.เพชรบุรี 76170" },
             3: { location: "14.3755029, 99.1426559", address: "ต.ท่ากระดาน อ.ศรีสวัสดิ์ จ.กาญจนบุรี 71250" },
-            4: { location: "18.8070052, 98.9160906", address: "ถนน ศรีวิชัย ตำบลสุเทพ อำเภอเมืองเชียงใหม่ เชียงใหม่ 50200" },
-            5: { location: "18.5356313, 98.519549", address: "119 ตำบลบ้านหลวง อำเภอจอมทอง เชียงใหม่ 50160" }
+            4: { location: "18.8070052, 98.9160906", address: "ถนนศรีวิชัย ตำบลสุเทพ อำเภอเมืองเชียงใหม่ จังหวัดเชียงใหม่ 50200" },
+            5: { location: "18.5356313, 98.519549", address: "119 หมู่ 7 ตำบลบ้านหลวง อำเภอจอมทอง จังหวัดเชียงใหม่ 50160" },
+            6: { location: "16.8833, 101.8333", address: "หมู่ 1 ตำบลศรีฐาน อำเภอภูกระดึง จังหวัดเลย 42180" },
+            7: { location: "8.6500, 97.6333", address: "ตู้ ปณ. 9 ตำบลลำแก่น อำเภอท้ายเหมือง จังหวัดพังงา 82120" }
           };
           const defaultPark = DEFAULT_PARK_INFO[targetParkId] || DEFAULT_PARK_INFO[1];
 
@@ -138,7 +140,7 @@ export default function ViewParkDetail() {
             parkId: dbPark.parkId || targetParkId,
             parkName: cleanName(dbPark.name),
             openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openStr} น. - ${closeStr} น.`,
-            description: (dbPark.description && !dbPark.description.endsWith("...")) ? dbPark.description : DEFAULT_PARK_DATA.description,
+            description: dbPark.description || DEFAULT_PARK_DATA.description,
             address: (dbPark.address && dbPark.address.trim() !== "") ? dbPark.address : defaultPark.address,
             location: (dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location,
             eventNote: dbPark.eventNote || "เปิดให้บริการตามปกติ",
@@ -281,7 +283,7 @@ export default function ViewParkDetail() {
           </div>
           <div>
             <p className="text-[11px] font-bold text-slate-400">เวลาให้บริการ</p>
-            <p className="text-xs font-bold text-slate-800 mt-0.5">06.00 - 18.00 น.</p>
+            <p className="text-xs font-bold text-slate-800 mt-0.5">{parkData.openHours.replace("เปิดทุกวัน ตั้งแต่เวลา ", "")}</p>
           </div>
         </div>
       </div>

@@ -79,6 +79,12 @@ function EditNewsDetailsContent() {
     const cleanTitle = title.trim();
     const cleanContent = content.trim();
 
+    const scriptRegex = /<script\b[^>]*>|<\/script>|javascript:|onerror\s*=|onload\s*=|<iframe\b|<embed\b|<object\b/i;
+    if (scriptRegex.test(cleanTitle) || scriptRegex.test(cleanContent)) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
+      return;
+    }
+
     if (!cleanTitle || cleanTitle.length < 2 || cleanTitle.length > 250 ||
         !cleanContent || cleanContent.length < 4 || cleanContent.length > 2000 ||
         !currentNews) {

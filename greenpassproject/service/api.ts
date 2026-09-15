@@ -93,10 +93,7 @@ export const announcementApi = {
     const response = await api.post(`/announcement/update?id=${id}`, payload);
     return response.data;
   },
-  deleteAnnouncement: async (id: string | number) => {
-    if (!id || id === "undefined" || id === "null") {
-      return { success: true, message: "Local item deleted" };
-    }
+  deleteAnnouncement: async (id: string) => {
     const response = await api.delete(`/announcement/delete?id=${id}`);
     return response.data;
   }
@@ -279,5 +276,5 @@ export const adminApi = {
     return response.data;
   }
 };
-
+          
 export default api;

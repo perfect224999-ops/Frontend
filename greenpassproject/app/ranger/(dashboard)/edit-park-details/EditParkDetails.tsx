@@ -4,54 +4,52 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parkApi, rangerApi } from "@/service/api";
 
-const DEFAULT_PARK_DATA = {
-  parkName: "อุทยานแห่งชาติเขาใหญ่",
-  openHours: "เปิดทุกวัน ตั้งแต่เวลา 06.00 น.-18.00 น.",
-  description: "อุทยานแห่งชาติเขาใหญ่ มีความสำคัญในระดับโลกและระดับภูมิภาคอาเซียน คือ เป็นหนึ่งในพื้นที่มรดกโลกทางธรรมชาติ (World Heritage Site) และอุทยานแห่งชาติอาเซียน (ASEAN Heritage Park) ครอบคลุม 4 จังหวัด ประกอบด้วย สระบุรี นครนายก ปราจีนบุรี และนครราชสีมา พื้นที่เกือบ 2,206 ตารางกิโลเมตร ของอุทยานแห่งชาติเขาใหญ่ เป็นแหล่งกำเนิดต้นน้ำลำธารสำคัญหลายสาย มีความหลากหลายทางชีวภาพ และเป็นบ้านหลังใหญ่ของสัตว์ป่าที่สำคัญ มากมาย และใกล้สูญพันธุ์หลายชนิด รวมถึงนกมากกว่า 280 ชนิด จึงทำให้เป็นที่นิยมของนักท่องเที่ยวทั่วโลกหลั่งไหลมาเที่ยวพักผ่อน",
-  address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130",
-  location: "14.3109, 101.5304"
-};
-
 export default function EditParkDetails() {
   const router = useRouter();
 
   const [currentParkId, setCurrentParkId] = useState<number>(1);
   const [parkName, setParkName] = useState("");
-  const [openHours, setOpenHours] = useState("");
+  const [openTime, setOpenTime] = useState("06:00");
+  const [closeTime, setCloseTime] = useState("18:00");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState("");
+  const [eventNote, setEventNote] = useState("");
+  const [status, setStatus] = useState("เปิดตามปกติ");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
 
   useEffect(() => {
     const fetchParkFromDb = async () => {
-      const savedParkData = typeof window !== "undefined" ? localStorage.getItem("greenpass_park_saved_data") : null;
-      if (savedParkData) {
-        try {
-          const parsed = JSON.parse(savedParkData);
-          if (parsed && parsed.name) {
-            setParkName(parsed.name);
-            setOpenHours(parsed.openHours || DEFAULT_PARK_DATA.openHours);
-            setDescription(parsed.description || DEFAULT_PARK_DATA.description);
-            setAddress(parsed.address || DEFAULT_PARK_DATA.address);
-            setLocation(parsed.location || DEFAULT_PARK_DATA.location);
-          }
-        } catch (e) {}
+      setIsFetching(true);
+      let targetParkId = 1;
+
+      if (typeof window !== "undefined") {
+        const storedParkId = localStorage.getItem("ranger_park_id");
+        if (storedParkId && !isNaN(Number(storedParkId)) && Number(storedParkId) > 0) {
+          targetParkId = Number(storedParkId);
+        }
+
+        const storedRanger = localStorage.getItem("ranger_username");
+        if (storedRanger) {
+          try {
+            const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
+            const rObj = rangerRes?.result || rangerRes?.data;
+            const rParkId = rObj?.park?.parkId || rObj?.parkId;
+            if (rParkId) {
+              targetParkId = Number(rParkId);
+              localStorage.setItem("ranger_park_id", String(targetParkId));
+            }
+          } catch (e) {}
+        }
       }
 
+      setCurrentParkId(targetParkId);
+
       try {
-        let targetParkId = 1;
-        const storedRanger = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
-        const storedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
-
-        if (storedParkId) {
-          targetParkId = parseInt(storedParkId, 10);
-        }
-        setCurrentParkId(targetParkId);
-
         const res = await parkApi.getParkById(targetParkId);
         const dbPark = res?.result || res?.data;
         if (res && (res.success || res.status) && dbPark) {
@@ -60,40 +58,21 @@ export default function EditParkDetails() {
             const stripped = n.replace(/^(อุทยานแห่งชาติ)+/g, "").trim();
             return `อุทยานแห่งชาติ${stripped}`;
           };
-          const formatTime = (t: string) => t ? t.substring(0, 5) : "";
-          const openStr = dbPark.openTime ? formatTime(dbPark.openTime) : "06.00";
-          const closeStr = dbPark.closeTime ? formatTime(dbPark.closeTime) : "18.00";
+          const formatTime = (t: string) => (t ? t.substring(0, 5) : "06:00");
 
           setParkName(cleanName(dbPark.name));
-          setOpenHours(`เปิดทุกวัน ตั้งแต่เวลา ${openStr} น.-${closeStr} น.`);
-          if (dbPark.description && !dbPark.description.endsWith("...")) {
-            setDescription(dbPark.description);
-          } else {
-            setDescription(DEFAULT_PARK_DATA.description);
-          }
-          const DEFAULT_PARK_INFO: Record<number, { location: string; address: string }> = {
-            1: { location: "14.3109229, 101.5304415", address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130" },
-            2: { location: "12.8850041, 99.6317361", address: "ต.แก่งกระจาน อ.แก่งกระจาน จ.เพชรบุรี 76170" },
-            3: { location: "14.3755029, 99.1426559", address: "ต.ท่ากระดาน อ.ศรีสวัสดิ์ จ.กาญจนบุรี 71250" },
-            4: { location: "18.8070052, 98.9160906", address: "ถนน ศรีวิชัย ตำบลสุเทพ อำเภอเมืองเชียงใหม่ เชียงใหม่ 50200" },
-            5: { location: "18.5356313, 98.519549", address: "119 ตำบลบ้านหลวง อำเภอจอมทอง เชียงใหม่ 50160" }
-          };
-          const defaultPark = DEFAULT_PARK_INFO[targetParkId] || DEFAULT_PARK_INFO[1];
-
-          setAddress((dbPark.address && dbPark.address.trim() !== "") ? dbPark.address : defaultPark.address);
-          setLocation((dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location);
-          return;
+          setOpenTime(formatTime(dbPark.openTime) || "06:00");
+          setCloseTime(formatTime(dbPark.closeTime) || "18:00");
+          setDescription(dbPark.description || "");
+          setAddress(dbPark.address || "");
+          setLocation(dbPark.location || "");
+          setEventNote(dbPark.eventNote || "เปิดให้บริการตามปกติ");
+          setStatus(dbPark.status || "เปิดตามปกติ");
         }
       } catch (e) {
         console.warn("Could not fetch park detail from DB API", e);
-      }
-
-      if (!savedParkData) {
-        setParkName(DEFAULT_PARK_DATA.parkName);
-        setOpenHours(DEFAULT_PARK_DATA.openHours);
-        setDescription(DEFAULT_PARK_DATA.description);
-        setAddress(DEFAULT_PARK_DATA.address);
-        setLocation(DEFAULT_PARK_DATA.location);
+      } finally {
+        setIsFetching(false);
       }
     };
     fetchParkFromDb();
@@ -105,90 +84,100 @@ export default function EditParkDetails() {
     setSuccess("");
 
     const cleanName = parkName.trim();
-    const cleanOpenHours = openHours.trim();
     const cleanDesc = description.trim();
     const cleanAddress = address.trim();
+    const cleanLocation = location.trim();
+    const cleanEventNote = eventNote.trim();
 
-    if (!cleanName || cleanName.length < 4 || cleanName.length > 50 ||
-        !cleanOpenHours ||
-        !cleanDesc || cleanDesc.length < 4 || cleanDesc.length > 1000 ||
-        !cleanAddress) {
+    const scriptRegex = /<script\b[^>]*>|<\/script>|javascript:|onerror\s*=|onload\s*=|<iframe\b|<embed\b|<object\b/i;
+    if (
+      scriptRegex.test(cleanName) ||
+      scriptRegex.test(cleanDesc) ||
+      scriptRegex.test(cleanAddress) ||
+      scriptRegex.test(cleanLocation) ||
+      scriptRegex.test(cleanEventNote)
+    ) {
       setError("กรุณากรอกข้อมูลให้ถูกต้อง");
+      return;
+    }
+
+    if (
+      !cleanName || cleanName.length < 4 || cleanName.length > 50 ||
+      !cleanDesc || cleanDesc.length < 4 || cleanDesc.length > 5000 ||
+      !cleanAddress ||
+      !cleanLocation
+    ) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน");
       return;
     }
 
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("greenpass_park_data");
-      }
-
-      await parkApi.updatePark({
+      const payload = {
         parkId: currentParkId,
-        name: parkName,
-        image: "src/park1.jpg",
-        address,
-        location,
-        description,
-        openTime: "06:00:00",
-        closeTime: "18:00:00",
-        isSeasonalPark: false,
-        isTemporaryClosed: false,
-        eventNote: "เปิดให้บริการตามปกติ",
-        status: "เปิดตามปกติ"
-      });
-
-      const updatedParkObj = {
-        parkId: currentParkId,
-        name: parkName,
-        address,
-        location,
-        description,
-        openTime: "06:00:00",
-        closeTime: "18:00:00",
-        status: "เปิดตามปกติ"
+        id: currentParkId,
+        name: cleanName,
+        address: cleanAddress,
+        location: cleanLocation,
+        description: cleanDesc,
+        openTime: openTime.length === 5 ? `${openTime}:00` : openTime,
+        closeTime: closeTime.length === 5 ? `${closeTime}:00` : closeTime,
+        eventNote: cleanEventNote || "เปิดให้บริการตามปกติ",
+        status: status || "เปิดตามปกติ"
       };
-      localStorage.setItem("greenpass_park_saved_data", JSON.stringify(updatedParkObj));
+
+      await parkApi.updatePark(payload);
+
+      const savedData = {
+        parkId: currentParkId,
+        name: cleanName,
+        address: cleanAddress,
+        location: cleanLocation,
+        description: cleanDesc,
+        openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openTime} น. - ${closeTime} น.`,
+        eventNote: cleanEventNote,
+        status
+      };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("greenpass_park_saved_data", JSON.stringify(savedData));
+      }
 
       setSuccess("บันทึกข้อมูลอุทยานลงฐานข้อมูลเสร็จสมบูรณ์เรียบร้อยแล้ว!");
       setTimeout(() => {
         router.push("/ranger/view-park-detail");
-      }, 1200);
+      }, 1000);
     } catch (err) {
       console.error("Park update error:", err);
-      const updatedParkObj = {
-        parkId: currentParkId,
-        name: parkName,
-        address,
-        location,
-        description,
-        openTime: "06:00:00",
-        closeTime: "18:00:00",
-        status: "เปิดตามปกติ"
-      };
-      localStorage.setItem("greenpass_park_saved_data", JSON.stringify(updatedParkObj));
-      setSuccess("บันทึกข้อมูลอุทยานเสร็จสมบูรณ์เรียบร้อยแล้ว!");
-      setTimeout(() => {
-        router.push("/ranger/view-park-detail");
-      }, 1200);
+      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล ลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isFetching) {
+    return (
+      <div className="max-w-5xl mx-auto py-20 flex flex-col items-center justify-center space-y-4 font-sans">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-600">กำลังโหลดข้อมูลอุทยานจากฐานข้อมูล...</p>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSave} className="w-full max-w-[1600px] mx-auto bg-white/90 backdrop-blur-xl shadow-xl rounded-3xl p-6 md:p-8 font-sans border border-slate-200/90 space-y-6">
-      
+    <form
+      onSubmit={handleSave}
+      className="w-full max-w-[1600px] mx-auto bg-white/90 backdrop-blur-xl shadow-xl rounded-3xl p-6 md:p-8 font-sans border border-slate-200/90 space-y-6"
+    >
       {/* Header Bar */}
       <div className="flex justify-between items-center border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-base font-bold text-slate-800">แก้ไขรายละเอียดข้อมูลอุทยาน</h2>
-          <p className="text-xs text-slate-500">ปรับปรุงข้อมูลทั่วไป เวลาทำการ และที่ตั้งอุทยานแห่งชาติ</p>
+          <p className="text-xs text-slate-500">ปรับปรุงข้อมูลทั่วไป เวลาทำการ ด่านตรวจ และที่ตั้งอุทยานแห่งชาติ</p>
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={() => router.push("/ranger/view-park-detail")}
-          className="text-xs text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+          className="text-xs text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
         >
           &larr; ย้อนกลับ
         </button>
@@ -221,14 +210,14 @@ export default function EditParkDetails() {
             placeholder="ระบุชื่ออุทยานแห่งชาติ"
           />
         </div>
-        
+
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-slate-700" htmlFor="edit-desc">
             รายละเอียดคำอธิบาย <span className="text-red-500">*</span>
           </label>
           <textarea
             id="edit-desc"
-            rows={5}
+            rows={8}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-800 text-xs rounded-xl p-3.5 leading-relaxed focus:outline-none transition-colors"
@@ -237,25 +226,70 @@ export default function EditParkDetails() {
         </div>
       </div>
 
-      {/* 2. Operating Hours & Address Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+      {/* 2. Operating Hours, Status & Gate Info Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700" htmlFor="edit-openHours">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="edit-openTime">
             เวลาเปิดทำการ <span className="text-red-500">*</span>
           </label>
           <input
-            id="edit-openHours"
-            type="text"
-            value={openHours}
-            onChange={(e) => setOpenHours(e.target.value)}
+            id="edit-openTime"
+            type="time"
+            value={openTime}
+            onChange={(e) => setOpenTime(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-800 text-xs p-3 rounded-xl focus:outline-none transition-colors"
-            placeholder="เช่น เปิดทุกวัน ตั้งแต่เวลา 06.00 น. - 18.00 น."
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="edit-closeTime">
+            เวลาปิดทำการ <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="edit-closeTime"
+            type="time"
+            value={closeTime}
+            onChange={(e) => setCloseTime(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-800 text-xs p-3 rounded-xl focus:outline-none transition-colors"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="edit-status">
+            สถานะเปิดทำการ <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="edit-status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-800 text-xs p-3 rounded-xl focus:outline-none font-bold transition-colors"
+          >
+            <option value="เปิดตามปกติ">เปิดตามปกติ</option>
+            <option value="ปิดชั่วคราว">ปิดชั่วคราว</option>
+            <option value="ปิดประจำฤดูกาล">ปิดประจำฤดูกาล</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 3. Gate Info & Address Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="edit-eventNote">
+            ข้อมูลด่านตรวจ / หมายเหตุเพิ่มเติม
+          </label>
+          <input
+            id="edit-eventNote"
+            type="text"
+            value={eventNote}
+            onChange={(e) => setEventNote(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-800 text-xs p-3 rounded-xl focus:outline-none transition-colors"
+            placeholder="เช่น ด่านตรวจที่ 1 (กม.8) & ด่านตรวจที่ 2 (กม.38)"
           />
         </div>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-slate-700" htmlFor="edit-location">
-            พิกัดภูมิศาสตร์ (GPS Coordinates)
+            พิกัดภูมิศาสตร์ (GPS Coordinates) <span className="text-red-500">*</span>
           </label>
           <input
             id="edit-location"
@@ -263,7 +297,7 @@ export default function EditParkDetails() {
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-800 text-xs p-3 rounded-xl focus:outline-none font-mono transition-colors"
-            placeholder="เช่น 14.4374° N, 101.4013° E"
+            placeholder="เช่น 18.5356313, 98.519549"
           />
         </div>
       </div>
@@ -299,7 +333,6 @@ export default function EditParkDetails() {
           {isLoading ? "กำลังบันทึกข้อมูล..." : "บันทึกการเปลี่ยนแปลง"}
         </button>
       </div>
-
     </form>
   );
 }

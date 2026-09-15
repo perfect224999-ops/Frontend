@@ -92,6 +92,11 @@ function SetRoleContent() {
 
     setError("");
     setSuccess("");
+    if (!scanStamp && !announceNews && !editDetail && !reportIncident) {
+      setError("กรุณาเลือก Role 1 รายการ");
+      return;
+    }
+
     setIsLoading(true);
 
     const selectedRoles: string[] = [];

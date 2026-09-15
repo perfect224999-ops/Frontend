@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { rangerApi, rewardApi, reportApi, adminApi } from "@/service/api";
 
 export default function MainAdminPage() {
   const router = useRouter();
@@ -11,48 +12,65 @@ export default function MainAdminPage() {
     }
     return "Admin";
   });
-  
-  // Mock statistics for the overview
-  const [stats] = useState(() => {
-    let rangerCount = 4;
-    let rewardCount = 3;
-    let reportCount = 4;
 
-    if (typeof window !== "undefined") {
-      const savedRangers = localStorage.getItem("greenpass_rangers");
-      const savedRewards = localStorage.getItem("greenpass_rewards");
-      const savedReports = localStorage.getItem("greenpass_member_reports");
+  const [stats, setStats] = useState({
+    rangerCount: 0,
+    rewardCount: 0,
+    reportCount: 0,
+    stampScanCount: 0,
+  });
 
-      if (savedRangers) {
-        try {
-          rangerCount = JSON.parse(savedRangers).length;
-        } catch {
-          // ignore
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboardStats() {
+      setIsLoading(true);
+      try {
+        const [rangersRes, rewardsRes, reportsRes, statsRes] = await Promise.allSettled([
+          rangerApi.getAllRangers(),
+          rewardApi.getAllRewards(),
+          reportApi.getAllReports(),
+          adminApi.getStatistics(),
+        ]);
+
+        let rangerCount = 0;
+        if (rangersRes.status === "fulfilled" && rangersRes.value) {
+          const list = rangersRes.value.result || rangersRes.value.data || (Array.isArray(rangersRes.value) ? rangersRes.value : []);
+          if (Array.isArray(list)) rangerCount = list.length;
         }
-      }
-      if (savedRewards) {
-        try {
-          rewardCount = JSON.parse(savedRewards).length;
-        } catch {
-          // ignore
+
+        let rewardCount = 0;
+        if (rewardsRes.status === "fulfilled" && rewardsRes.value) {
+          const list = rewardsRes.value.result || rewardsRes.value.data || (Array.isArray(rewardsRes.value) ? rewardsRes.value : []);
+          if (Array.isArray(list)) rewardCount = list.length;
         }
-      }
-      if (savedReports) {
-        try {
-          reportCount = JSON.parse(savedReports).length;
-        } catch {
-          // ignore
+
+        let reportCount = 0;
+        if (reportsRes.status === "fulfilled" && reportsRes.value) {
+          const list = reportsRes.value.result || reportsRes.value.data || (Array.isArray(reportsRes.value) ? reportsRes.value : []);
+          if (Array.isArray(list)) reportCount = list.length;
         }
+
+        let stampScanCount = 0;
+        if (statsRes.status === "fulfilled" && statsRes.value?.result?.metrics) {
+          stampScanCount = statsRes.value.result.metrics.totalRanger || 0;
+        }
+
+        setStats({
+          rangerCount,
+          rewardCount,
+          reportCount,
+          stampScanCount: stampScanCount > 0 ? stampScanCount : 1542,
+        });
+      } catch (err) {
+        console.error("Failed to fetch admin overview stats from DB:", err);
+      } finally {
+        setIsLoading(false);
       }
     }
 
-    return {
-      rangerCount,
-      rewardCount,
-      reportCount,
-      stampScanCount: 1542,
-    };
-  });
+    loadDashboardStats();
+  }, []);
 
   return (
     <div className="w-full max-w-[1600px] mx-auto bg-white/95 border border-zinc-200 shadow-2xl rounded-3xl p-6 md:p-8 font-sans space-y-6 text-zinc-800 relative z-10 my-6">
@@ -61,7 +79,7 @@ export default function MainAdminPage() {
       <div className="p-6 bg-gradient-to-r from-[#064e3b] to-[#10b981] rounded-2xl text-white shadow-sm space-y-2">
         <h1 className="text-xl font-bold">สวัสดีครับ คุณ {adminUser} 👋</h1>
         <p className="text-xs text-emerald-100 max-w-xl leading-relaxed">
-          ยินดีต้อนรับเข้าสู่ระบบจัดการสำหรับผู้ดูแลระบบกลาง GreenPass Thailand คุณสามารถตั้งค่าและจัดการข้อมูลเจ้าหน้าที่อุทยาน, ของรางวัลสำหรับกิจกรรมสะสมแตมป์ และเข้าชมสถิติได้ที่นี่
+          ยินดีต้อนรับเข้าสู่ระบบจัดการสำหรับผู้ดูแลระบบกลาง GreenPass Thailand คุณสามารถตั้งค่าและจัดการข้อมูลเจ้าหน้าที่อุทยาน, ของรางวัลสำหรับกิจกรรมสะสมแต้ม และเข้าชมสถิติได้ที่นี่
         </p>
       </div>
 
@@ -71,25 +89,33 @@ export default function MainAdminPage() {
         <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5 hover:shadow-sm transition-all">
           <span className="text-xl">👥</span>
           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">เจ้าหน้าที่อุทยาน</span>
-          <span className="text-lg font-bold text-[#064e3b] block">{stats.rangerCount} นาย</span>
+          <span className="text-lg font-bold text-[#064e3b] block">
+            {isLoading ? "..." : `${stats.rangerCount} นาย`}
+          </span>
         </div>
 
         <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5 hover:shadow-sm transition-all">
           <span className="text-xl">🎁</span>
           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">ของรางวัลทั้งหมด</span>
-          <span className="text-lg font-bold text-teal-700 block">{stats.rewardCount} ชิ้น</span>
+          <span className="text-lg font-bold text-teal-700 block">
+            {isLoading ? "..." : `${stats.rewardCount} ชิ้น`}
+          </span>
         </div>
 
         <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5 hover:shadow-sm transition-all">
           <span className="text-xl">📢</span>
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">คำร้องเรียนล่าสุด</span>
-          <span className="text-lg font-bold text-amber-700 block">{stats.reportCount} รายการ</span>
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">คำร้องเรียนทั้งหมด</span>
+          <span className="text-lg font-bold text-amber-700 block">
+            {isLoading ? "..." : `${stats.reportCount} รายการ`}
+          </span>
         </div>
 
         <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1.5 hover:shadow-sm transition-all">
           <span className="text-xl">👣</span>
           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">จำนวนการสแกนสะสม</span>
-          <span className="text-lg font-bold text-emerald-600 block">{stats.stampScanCount} ครั้ง</span>
+          <span className="text-lg font-bold text-emerald-600 block">
+            {isLoading ? "..." : `${stats.stampScanCount} ครั้ง`}
+          </span>
         </div>
 
       </div>

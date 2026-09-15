@@ -758,8 +758,8 @@ function EditProfileContent() {
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
                     disabled={isLoading}
                   >
-                    {getProvincesList().map((p) => (
-                      <option key={p} value={p}>{p}</option>
+                    {getProvincesList().map((p, idx) => (
+                      <option key={`${p}-${idx}`} value={p}>{p}</option>
                     ))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -781,8 +781,8 @@ function EditProfileContent() {
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
                     disabled={isLoading}
                   >
-                    {getDistrictsByProvince(province).map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                    {getDistrictsByProvince(province).map((d, idx) => (
+                      <option key={`${d}-${idx}`} value={d}>{d}</option>
                     ))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -799,8 +799,8 @@ function EditProfileContent() {
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
                     disabled={isLoading}
                   >
-                    {getSubDistrictsByDistrict(province, district).map((sd) => (
-                      <option key={sd} value={sd}>{sd}</option>
+                    {getSubDistrictsByDistrict(province, district).map((sd, idx) => (
+                      <option key={`${sd}-${idx}`} value={sd}>{sd}</option>
                     ))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />

@@ -56,9 +56,15 @@ export default function AnnounceNews() {
     const cleanTitle = title.trim();
     const cleanContent = content.trim();
 
+    const scriptRegex = /<script\b[^>]*>|<\/script>|javascript:|onerror\s*=|onload\s*=|<iframe\b|<embed\b|<object\b/i;
+    if (scriptRegex.test(cleanTitle) || scriptRegex.test(cleanContent)) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน");
+      return;
+    }
+
     if (!cleanTitle || cleanTitle.length < 2 || cleanTitle.length > 250 ||
         !cleanContent || cleanContent.length < 4 || cleanContent.length > 2000) {
-      setError("กรุณากรอกหัวข้อประกาศ (2-250 ตัวอักษร) และเนื้อหาประกาศ (4-2000 ตัวอักษร) ให้ถูกต้อง");
+      setError("กรุณากรอกหัวข้อประกาศ (2-250 ตัวอักษร) และเนื้อหาประกาศ (4-2000 ตัวอักษร) ให้ถูกต้องและครบถ้วน");
       return;
     }
 

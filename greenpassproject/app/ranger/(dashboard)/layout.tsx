@@ -373,13 +373,9 @@ export default function RangerDashboardLayout({
   }, []);
   const navItems = [
     { name: "กล้องสแกน", href: "/ranger/scan-checkin-qrcode", icon: QrCode },
-    { 
-      name: "เกี่ยวกับอุทยาน", 
-      href: "/ranger/view-park-detail",
-      hasDropdown: true,
-      dropdownType: "park",
-      icon: Trees
-    },
+    { name: "เกี่ยวกับอุทยาน", href: "/ranger/view-park-detail", icon: Trees },
+    { name: "ประกาศข่าวสาร", href: "/ranger/announce-news", icon: Megaphone },
+    { name: "ประกาศข่าวสารจากอุทยาน", href: "/ranger/list-news", icon: Newspaper },
     { name: "รายงาน", href: "/ranger/list-report-member", icon: ClipboardList },
     { name: "สถิติ", href: "/ranger/view-visit-statistics", icon: BarChart3 }
   ];
@@ -426,15 +422,23 @@ export default function RangerDashboardLayout({
             </div>
           </Link>
 
-          {/* เมนูบาร์นำทางหลัก */}
-          <nav className="hidden lg:flex items-center gap-2.5 sm:gap-3 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
+          {/* เมนูบาร์นำทางหลัก (แสดงเรียงกันทุกเมนู ไม่ต้องกดเข้า Dropdown) */}
+          <nav className="hidden lg:flex items-center gap-2 sm:gap-2.5 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isParkActive = 
-                item.dropdownType === "park" && (
+                item.href === "/ranger/view-park-detail" && (
                   pathname === "/ranger/view-park-detail" || 
-                  pathname === "/ranger/edit-park-details" ||
-                  pathname === "/ranger/announce-news" ||
+                  pathname === "/ranger/edit-park-details"
+                );
+
+              const isAnnounceActive =
+                item.href === "/ranger/announce-news" && (
+                  pathname === "/ranger/announce-news"
+                );
+
+              const isListNewsActive =
+                item.href === "/ranger/list-news" && (
                   pathname === "/ranger/list-news" ||
                   pathname === "/ranger/edit-news-details"
                 );
@@ -446,72 +450,13 @@ export default function RangerDashboardLayout({
                 );
 
               const isActive = 
-                pathname === item.href || isParkActive || isReportActive;
+                pathname === item.href || isParkActive || isAnnounceActive || isListNewsActive || isReportActive;
 
-              // 1. จัดการเมนูดรอปดาวน์สำหรับ "เกี่ยวกับอุทยาน" (คลิกเปิด-ปิด dropdown เท่านั้น)
-              if (item.dropdownType === "park") {
-                const isVisible = showParkDropdown;
-
-                return (
-                  <div 
-                    key={item.name}
-                    ref={parkDropdownRef}
-                    className="relative h-full flex items-center"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setShowParkDropdown((prev) => !prev)}
-                      className={`px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                        isActive 
-                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
-                          : "text-emerald-100/90 hover:text-white hover:bg-white/10"
-                      }`}
-                    >
-                      {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-emerald-300/80"}`} />}
-                      <span>{item.name}</span>
-                      <span className="text-[9px] opacity-70">▼</span>
-                    </button>
-
-                    {isVisible && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-52 pt-2 z-50 transition-all select-none">
-                        <div className="bg-[#052b13]/95 backdrop-blur-md rounded-xl shadow-2xl border border-emerald-500/30 text-xs overflow-hidden p-1.5 space-y-1 relative">
-                          <Link 
-                            href="/ranger/view-park-detail"
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all"
-                            onClick={() => setShowParkDropdown(false)}
-                          >
-                            <Info className="w-3.5 h-3.5 text-emerald-300" />
-                            <span>ข้อมูลอุทยานหลัก</span>
-                          </Link>
-                          <Link 
-                            href="/ranger/announce-news"
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all border-t border-emerald-500/20"
-                            onClick={() => setShowParkDropdown(false)}
-                          >
-                            <Megaphone className="w-3.5 h-3.5 text-emerald-300" />
-                            <span>ประกาศข่าวสาร</span>
-                          </Link>
-                          <Link 
-                            href="/ranger/list-news"
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-white hover:text-emerald-300 hover:bg-emerald-500/20 font-bold transition-all border-t border-emerald-500/20"
-                            onClick={() => setShowParkDropdown(false)}
-                          >
-                            <Newspaper className="w-3.5 h-3.5 text-emerald-300" />
-                            <span>ประกาศข่าวสารจากอุทยาน</span>
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              // เมนูอื่นๆ ทั่วไป (รวมถึง "รายงาน")
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive 
                       ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
                       : "text-emerald-100/90 hover:text-white hover:bg-white/10"

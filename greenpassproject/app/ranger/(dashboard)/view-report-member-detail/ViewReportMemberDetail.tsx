@@ -393,17 +393,17 @@ function ViewReportMemberDetailContent() {
                   className={`w-full bg-slate-900/90 text-emerald-100 text-xs font-semibold px-4 py-3 rounded-2xl border border-emerald-500/40 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none cursor-pointer appearance-none pr-10 transition-all shadow-md ${!canProgressReport ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   <option value="แจ้งรายงาน" className="bg-slate-900 text-white">
-                    แจ้งรายงาน (Pending)
+                    แจ้งรายงาน
                   </option>
                   <option value="กำลังดำเนินการ" className="bg-slate-900 text-white">
-                    กำลังดำเนินการ (InProgress)
+                    กำลังดำเนินการ
                   </option>
                   <option 
                     value="ดำเนินการแก้ไขสำเร็จ" 
                     disabled={currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending"} 
                     className={(currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending") ? "bg-slate-900 text-slate-500 font-normal" : "bg-slate-900 text-white"}
                   >
-                    ดำเนินการแก้ไขสำเร็จ (Completed) {(currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending") ? "🔒 (ต้องเปลี่ยนเป็นกำลังดำเนินการก่อน)" : ""}
+                    ดำเนินการแก้ไขสำเร็จ {(currentReport?.status === "แจ้งรายงาน" || currentReport?.status === "Pending") ? "🔒 (ต้องเปลี่ยนเป็นกำลังดำเนินการก่อน)" : ""}
                   </option>
                 </select>
                 <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />

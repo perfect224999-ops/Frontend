@@ -93,8 +93,17 @@ function EditRewardContent() {
     setError("");
     setSuccess("");
 
-    if (!rewardTitle.trim() || !rewardDetails.trim()) {
-      setError("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน");
+    const cleanTitle = rewardTitle.trim();
+    const cleanDetails = rewardDetails.trim();
+
+    const scriptRegex = /<script\b[^>]*>|<\/script>|javascript:|onerror\s*=|onload\s*=|<iframe\b|<embed\b|<object\b/i;
+    if (scriptRegex.test(cleanTitle) || scriptRegex.test(cleanDetails)) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
+      return;
+    }
+
+    if (!cleanTitle || !cleanDetails) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 

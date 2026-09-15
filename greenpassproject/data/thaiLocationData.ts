@@ -606,13 +606,13 @@ export const THAI_PROVINCES: ProvinceData[] = [
 
 // Helper functions
 export const getProvincesList = (): string[] => {
-  return THAI_PROVINCES.map(p => p.name);
+  return Array.from(new Set(THAI_PROVINCES.map(p => p.name)));
 };
 
 export const getDistrictsByProvince = (provinceName: string): string[] => {
   const p = THAI_PROVINCES.find(item => item.name === provinceName);
   if (!p) return ["เมือง", "อื่นๆ"];
-  return p.districts.map(d => d.name);
+  return Array.from(new Set(p.districts.map(d => d.name)));
 };
 
 export const getSubDistrictsByDistrict = (provinceName: string, districtName: string): string[] => {
@@ -620,5 +620,5 @@ export const getSubDistrictsByDistrict = (provinceName: string, districtName: st
   if (!p) return ["ในเมือง", "อื่นๆ"];
   const d = p.districts.find(item => item.name === districtName);
   if (!d) return ["ในเมือง", "อื่นๆ"];
-  return d.subDistricts;
+  return Array.from(new Set(d.subDistricts));
 };
