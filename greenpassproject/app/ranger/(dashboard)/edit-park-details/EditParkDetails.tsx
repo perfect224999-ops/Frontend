@@ -60,12 +60,20 @@ export default function EditParkDetails() {
           };
           const formatTime = (t: string) => (t ? t.substring(0, 5) : "06:00");
 
+          let loc = dbPark.location || "";
+          if (loc.includes("99.6317361")) {
+            loc = loc.replace("99.6317361", "99.5317361");
+          }
+          if (targetParkId === 2 && (!loc || loc.includes("99.63"))) {
+            loc = "12.8850041, 99.5317361";
+          }
+
           setParkName(cleanName(dbPark.name));
           setOpenTime(formatTime(dbPark.openTime) || "06:00");
           setCloseTime(formatTime(dbPark.closeTime) || "18:00");
           setDescription(dbPark.description || "");
           setAddress(dbPark.address || "");
-          setLocation(dbPark.location || "");
+          setLocation(loc);
           setEventNote(dbPark.eventNote || "เปิดให้บริการตามปกติ");
           setStatus(dbPark.status || "เปิดตามปกติ");
         }

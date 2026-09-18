@@ -50,12 +50,15 @@ export default function ScanCheckinQRCode() {
         await html5QrCode.start(
           { facingMode: "environment" },
           {
-            fps: 15,
-            qrbox: (width: number, height: number) => {
-              const min = Math.min(width, height);
-              const size = Math.floor(min * 0.88);
-              return { width: size, height: size };
+            fps: 25,
+            videoConstraints: {
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
             },
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true,
+            },
+            disableFlip: false,
           },
           async (decodedText: string) => {
             if (!isActive) return;
@@ -189,7 +192,7 @@ export default function ScanCheckinQRCode() {
         #qr-reader video {
           width: 100% !important;
           height: 100% !important;
-          object-fit: cover !important;
+          object-fit: contain !important;
           border-radius: 20px;
         }
       `}} />

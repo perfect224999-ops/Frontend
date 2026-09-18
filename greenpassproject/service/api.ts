@@ -7,11 +7,7 @@ import axios from 'axios';
 
 // สร้าง axios instance พร้อม config ตั้งต้น
 const getBaseURL = () => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:8081/api/v1`;
-  }
-  return 'http://localhost:8081/api/v1';
+  return 'http://172.20.10.2:8081/api/v1';
 };
 
 const api = axios.create({
@@ -45,8 +41,11 @@ export const stampApi = {
       throw err;
     }
   },
-  getStatistics: async () => {
-    const response = await api.get('/stamp/statistics');
+  getStatistics: async (parkId?: number, username?: string) => {
+    const params: Record<string, any> = {};
+    if (parkId) params.parkId = parkId;
+    if (username) params.username = username;
+    const response = await api.get('/stamp/statistics', { params });
     return response.data;
   },
   getQr: async (username: string) => {
@@ -241,10 +240,18 @@ export const reportApi = {
     const response = await api.get(`/report/${id}`);
     return response.data;
   },
-  updateReportStatus: async (id: number, status: string, rangerUsername?: string) => {
-    const response = await api.put(`/report/${id}/status`, { status }, {
+  updateReportStatus: async (id: number, status: string, rangerUsername?: string, progress?: string, image?: string) => {
+    const response = await api.put(`/report/${id}/status`, { status, progress, image }, {
       headers: rangerUsername ? { username: rangerUsername } : {}
     });
+    return response.data;
+  }
+};
+
+// replyReportApi สำหรับดึงข้อมูลความคืบหน้าการตอบกลับรายงาน
+export const replyReportApi = {
+  getReplyReports: async (reportId: number) => {
+    const response = await api.get(`/reply-report/my-reply-report?reportId=${reportId}`);
     return response.data;
   }
 };
@@ -276,5 +283,5 @@ export const adminApi = {
     return response.data;
   }
 };
-          
+
 export default api;

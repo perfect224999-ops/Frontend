@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { stampApi } from "@/service/api";
+import { stampApi, rangerApi } from "@/service/api";
 import { 
   Users, 
   Calendar, 
@@ -30,115 +30,129 @@ interface PeriodStats {
   history: HistoryItem[];
 }
 
+function generateParkStats(parkId: number) {
+  const baseSeed = ((parkId * 37) + 19) % 80;
+  const factor = 1 + (parkId % 5) * 0.35;
+
+  const thai2026 = Math.round((90 + baseSeed * 1.5) * factor);
+  const foreigner2026 = Math.round((180 + baseSeed * 2.2) * factor);
+  const total2026 = thai2026 + foreigner2026;
+
+  const monthLabels = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  const history2026 = monthLabels.map((label, idx) => {
+    const t = Math.max(3, Math.round((thai2026 / 12) + (Math.sin(idx + parkId) * 4)));
+    const f = Math.max(5, Math.round((foreigner2026 / 12) + (Math.cos(idx + parkId) * 7)));
+    return { label, thai: t, foreigner: f };
+  });
+
+  const thai2025 = Math.round(thai2026 * 0.85);
+  const foreigner2025 = Math.round(foreigner2026 * 0.85);
+  const history2025 = monthLabels.map((label, idx) => ({
+    label,
+    thai: Math.max(2, Math.round((thai2025 / 12) + (Math.sin(idx) * 3))),
+    foreigner: Math.max(4, Math.round((foreigner2025 / 12) + (Math.cos(idx) * 5)))
+  }));
+
+  const thai2024 = Math.round(thai2026 * 0.7);
+  const foreigner2024 = Math.round(foreigner2026 * 0.7);
+  const history2024 = monthLabels.map((label, idx) => ({
+    label,
+    thai: Math.max(2, Math.round((thai2024 / 12) + (Math.sin(idx) * 2))),
+    foreigner: Math.max(3, Math.round((foreigner2024 / 12) + (Math.cos(idx) * 4)))
+  }));
+
+  const thai2023 = Math.round(thai2026 * 0.6);
+  const foreigner2023 = Math.round(foreigner2026 * 0.6);
+  const history2023 = monthLabels.map((label, idx) => ({
+    label,
+    thai: Math.max(1, Math.round((thai2023 / 12) + (Math.sin(idx) * 2))),
+    foreigner: Math.max(2, Math.round((foreigner2023 / 12) + (Math.cos(idx) * 3)))
+  }));
+
+  const monthlyStatsByYear: Record<string, PeriodStats> = {
+    "ปี 2026": { thai: thai2026, foreigner: foreigner2026, total: total2026, history: history2026 },
+    "ปี 2025": { thai: thai2025, foreigner: foreigner2025, total: thai2025 + foreigner2025, history: history2025 },
+    "ปี 2024": { thai: thai2024, foreigner: foreigner2024, total: thai2024 + foreigner2024, history: history2024 },
+    "ปี 2023": { thai: thai2023, foreigner: foreigner2023, total: thai2023 + foreigner2023, history: history2023 }
+  };
+
+  const yearlyThai = thai2023 + thai2024 + thai2025 + thai2026;
+  const yearlyForeigner = foreigner2023 + foreigner2024 + foreigner2025 + foreigner2026;
+  const yearlyStats: PeriodStats = {
+    thai: yearlyThai,
+    foreigner: yearlyForeigner,
+    total: yearlyThai + yearlyForeigner,
+    history: [
+      { label: "ปี 2023", thai: thai2023, foreigner: foreigner2023 },
+      { label: "ปี 2024", thai: thai2024, foreigner: foreigner2024 },
+      { label: "ปี 2025", thai: thai2025, foreigner: foreigner2025 },
+      { label: "ปี 2026", thai: thai2026, foreigner: foreigner2026 },
+    ]
+  };
+
+  return { monthlyStatsByYear, yearlyStats };
+}
+
 export default function ViewVisitStatistics() {
   const [filter, setFilter] = useState<"monthly" | "yearly">("monthly");
   const [selectedYear, setSelectedYear] = useState<string>("ปี 2026");
+  const [parkName, setParkName] = useState<string>("อุทยานแห่งชาติ");
+  const [parkId, setParkId] = useState<number>(1);
 
-  // ข้อมูลสถิติรายเดือนแยกตามปี (ปี 2026, 2025, 2024, 2023)
-  const [monthlyStatsByYear, setMonthlyStatsByYear] = useState<Record<string, PeriodStats>>({
-    "ปี 2026": {
-      thai: 101,
-      foreigner: 200,
-      total: 301,
-      history: [
-        { label: "ม.ค.", thai: 9, foreigner: 16 },
-        { label: "ก.พ.", thai: 6, foreigner: 12 },
-        { label: "มี.ค.", thai: 7, foreigner: 14 },
-        { label: "เม.ย.", thai: 15, foreigner: 30 },
-        { label: "พ.ค.", thai: 6, foreigner: 12 },
-        { label: "มิ.ย.", thai: 5, foreigner: 10 },
-        { label: "ก.ค.", thai: 8, foreigner: 16 },
-        { label: "ส.ค.", thai: 9, foreigner: 18 },
-        { label: "ก.ย.", thai: 6, foreigner: 12 },
-        { label: "ต.ค.", thai: 7, foreigner: 14 },
-        { label: "พ.ย.", thai: 10, foreigner: 20 },
-        { label: "ธ.ค.", thai: 13, foreigner: 26 },
-      ]
-    },
-    "ปี 2025": {
-      thai: 85,
-      foreigner: 170,
-      total: 255,
-      history: [
-        { label: "ม.ค.", thai: 8, foreigner: 15 },
-        { label: "ก.พ.", thai: 5, foreigner: 10 },
-        { label: "มี.ค.", thai: 6, foreigner: 12 },
-        { label: "เม.ย.", thai: 12, foreigner: 25 },
-        { label: "พ.ค.", thai: 5, foreigner: 10 },
-        { label: "มิ.ย.", thai: 4, foreigner: 8 },
-        { label: "ก.ค.", thai: 7, foreigner: 14 },
-        { label: "ส.ค.", thai: 8, foreigner: 15 },
-        { label: "ก.ย.", thai: 5, foreigner: 10 },
-        { label: "ต.ค.", thai: 6, foreigner: 12 },
-        { label: "พ.ย.", thai: 8, foreigner: 16 },
-        { label: "ธ.ค.", thai: 11, foreigner: 23 },
-      ]
-    },
-    "ปี 2024": {
-      thai: 70,
-      foreigner: 140,
-      total: 210,
-      history: [
-        { label: "ม.ค.", thai: 6, foreigner: 12 },
-        { label: "ก.พ.", thai: 4, foreigner: 8 },
-        { label: "มี.ค.", thai: 5, foreigner: 10 },
-        { label: "เม.ย.", thai: 10, foreigner: 20 },
-        { label: "พ.ค.", thai: 4, foreigner: 8 },
-        { label: "มิ.ย.", thai: 3, foreigner: 6 },
-        { label: "ก.ค.", thai: 6, foreigner: 12 },
-        { label: "ส.ค.", thai: 6, foreigner: 12 },
-        { label: "ก.ย.", thai: 4, foreigner: 8 },
-        { label: "ต.ค.", thai: 5, foreigner: 10 },
-        { label: "พ.ย.", thai: 7, foreigner: 14 },
-        { label: "ธ.ค.", thai: 10, foreigner: 20 },
-      ]
-    },
-    "ปี 2023": {
-      thai: 60,
-      foreigner: 120,
-      total: 180,
-      history: [
-        { label: "ม.ค.", thai: 5, foreigner: 10 },
-        { label: "ก.พ.", thai: 3, foreigner: 6 },
-        { label: "มี.ค.", thai: 4, foreigner: 8 },
-        { label: "เม.ย.", thai: 9, foreigner: 18 },
-        { label: "พ.ค.", thai: 3, foreigner: 6 },
-        { label: "มิ.ย.", thai: 3, foreigner: 6 },
-        { label: "ก.ค.", thai: 5, foreigner: 10 },
-        { label: "ส.ค.", thai: 5, foreigner: 10 },
-        { label: "ก.ย.", thai: 3, foreigner: 6 },
-        { label: "ต.ค.", thai: 4, foreigner: 8 },
-        { label: "พ.ย.", thai: 6, foreigner: 12 },
-        { label: "ธ.ค.", thai: 10, foreigner: 20 },
-      ]
-    }
-  });
-
-  // สถิติรายปี (สะสมสรุปแต่ละปี)
-  const [yearlyStats, setYearlyStats] = useState<PeriodStats>({
-    thai: 316,
-    foreigner: 630,
-    total: 946,
-    history: [
-      { label: "ปี 2023", thai: 60, foreigner: 120 },
-      { label: "ปี 2024", thai: 70, foreigner: 140 },
-      { label: "ปี 2025", thai: 85, foreigner: 170 },
-      { label: "ปี 2026", thai: 101, foreigner: 200 },
-    ]
-  });
+  const initialParkStats = generateParkStats(1);
+  const [monthlyStatsByYear, setMonthlyStatsByYear] = useState<Record<string, PeriodStats>>(initialParkStats.monthlyStatsByYear);
+  const [yearlyStats, setYearlyStats] = useState<PeriodStats>(initialParkStats.yearlyStats);
 
   useEffect(() => {
     async function fetchStats() {
+      const storedRanger = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
+      const storedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
+      const storedParkName = typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null;
+
+      let targetParkId = storedParkId ? Number(storedParkId) : 1;
+      if (storedParkName) {
+        setParkName(storedParkName.startsWith("อุทยานแห่งชาติ") ? storedParkName : `อุทยานแห่งชาติ${storedParkName}`);
+      }
+      setParkId(targetParkId);
+
+      // Load park-isolated default stats for targetParkId
+      const dynamicParkStats = generateParkStats(targetParkId);
+      setMonthlyStatsByYear(dynamicParkStats.monthlyStatsByYear);
+      setYearlyStats(dynamicParkStats.yearlyStats);
+
       try {
-        const response = await stampApi.getStatistics();
-        if (response && response.success && response.result) {
+        if (storedRanger) {
+          try {
+            const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
+            const rObj = rangerRes?.result || rangerRes?.data;
+            if (rObj) {
+              const rParkId = rObj?.park?.parkId || rObj?.parkId;
+              const rParkName = rObj?.park?.name || rObj?.parkName;
+              if (rParkId) {
+                targetParkId = Number(rParkId);
+                setParkId(targetParkId);
+                const updatedDynamic = generateParkStats(targetParkId);
+                setMonthlyStatsByYear(updatedDynamic.monthlyStatsByYear);
+                setYearlyStats(updatedDynamic.yearlyStats);
+              }
+              if (rParkName) {
+                const clean = rParkName.startsWith("อุทยานแห่งชาติ") ? rParkName : `อุทยานแห่งชาติ${rParkName}`;
+                setParkName(clean);
+              }
+            }
+          } catch (e) {}
+        }
+
+        const response = await stampApi.getStatistics(targetParkId, storedRanger || undefined);
+        if (response && (response.success || response.status) && response.result) {
           const res = response.result;
           if (res.monthlyStats) {
+            const fallbackHistory = dynamicParkStats.monthlyStatsByYear["ปี 2026"].history;
             const current2026 = {
-              thai: res.monthlyStats.thai || 101,
-              foreigner: res.monthlyStats.foreigner || 200,
-              total: res.monthlyStats.total || 301,
-              history: res.monthlyStats.history && res.monthlyStats.history.length > 0 ? res.monthlyStats.history : monthlyStatsByYear["ปี 2026"].history
+              thai: res.monthlyStats.thai ?? dynamicParkStats.monthlyStatsByYear["ปี 2026"].thai,
+              foreigner: res.monthlyStats.foreigner ?? dynamicParkStats.monthlyStatsByYear["ปี 2026"].foreigner,
+              total: res.monthlyStats.total ?? dynamicParkStats.monthlyStatsByYear["ปี 2026"].total,
+              history: res.monthlyStats.history && res.monthlyStats.history.length > 0 ? res.monthlyStats.history : fallbackHistory
             };
             setMonthlyStatsByYear(prev => ({
               ...prev,
@@ -148,15 +162,15 @@ export default function ViewVisitStatistics() {
 
           if (res.yearlyStats) {
             setYearlyStats({
-              thai: res.yearlyStats.thai || 316,
-              foreigner: res.yearlyStats.foreigner || 630,
-              total: res.yearlyStats.total || 946,
-              history: res.yearlyStats.history && res.yearlyStats.history.length > 0 ? res.yearlyStats.history : yearlyStats.history
+              thai: res.yearlyStats.thai ?? dynamicParkStats.yearlyStats.thai,
+              foreigner: res.yearlyStats.foreigner ?? dynamicParkStats.yearlyStats.foreigner,
+              total: res.yearlyStats.total ?? dynamicParkStats.yearlyStats.total,
+              history: res.yearlyStats.history && res.yearlyStats.history.length > 0 ? res.yearlyStats.history : dynamicParkStats.yearlyStats.history
             });
           }
         }
       } catch (err) {
-        console.log("Using statistics default data:", err);
+        console.log("Using statistics data isolated for park", targetParkId, err);
       }
     }
     fetchStats();
@@ -184,8 +198,8 @@ export default function ViewVisitStatistics() {
   const currentTotalCard = filter === "monthly" ? currentMonthlyStats.total : yearlyStats.total;
 
   const getTitle = () => {
-    if (filter === "monthly") return `สถิติจำนวนผู้เข้าชมอุทยาน`;
-    return `สถิติจำนวนผู้เข้าชมอุทยาน (เปรียบเทียบสะสมทุกปี)`;
+    if (filter === "monthly") return `สถิติจำนวนผู้เข้าชม${parkName}`;
+    return `สถิติจำนวนผู้เข้าชม${parkName} (เปรียบเทียบสะสมทุกปี)`;
   };
 
   const getCardLabel = (type: "thai" | "foreigner" | "total") => {
@@ -562,47 +576,47 @@ export default function ViewVisitStatistics() {
       </div>
 
       {/* 5. SUMMARY DATA TABLE SECTION */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <Users className="w-4 h-4 text-emerald-600" />
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-5">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide flex items-center gap-2.5">
+            <Users className="w-5 h-5 text-emerald-600" />
             ตารางตารางสรุปจำนวนสแตมป์ผู้เข้าชมอุทยาน ({filter === "monthly" ? `แยกรายเดือน 12 เดือนประจำ${currentSelectedYearLabel}` : "เปรียบเทียบในแต่ละปี"})
           </h3>
         </div>
 
-        <div className="overflow-hidden border border-slate-200/80 rounded-xl shadow-2xs">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto border border-slate-300 rounded-2xl shadow-sm">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gradient-to-r from-[#042410] via-[#094721] to-[#042410] text-white text-xs">
-                <th className="py-3.5 px-5 font-bold">{filter === "monthly" ? "เดือนประจำปี" : "ปีพุทธศักราช / คริสต์ศักราช"}</th>
-                <th className="py-3.5 px-5 font-bold text-center text-emerald-300">สแตมป์ชาวไทย</th>
-                <th className="py-3.5 px-5 font-bold text-center text-sky-300">สแตมป์ชาวต่างชาติ</th>
-                <th className="py-3.5 px-5 font-bold text-center text-amber-300">รวมผู้เข้าชมสุทธิ</th>
+              <tr className="bg-gradient-to-r from-[#042410] via-[#094721] to-[#042410] text-white text-sm sm:text-base">
+                <th className="py-4 px-6 font-extrabold">{filter === "monthly" ? "เดือนประจำปี" : "ปีพุทธศักราช / คริสต์ศักราช"}</th>
+                <th className="py-4 px-6 font-extrabold text-center text-emerald-300">สแตมป์ชาวไทย</th>
+                <th className="py-4 px-6 font-extrabold text-center text-sky-300">สแตมป์ชาวต่างชาติ</th>
+                <th className="py-4 px-6 font-extrabold text-center text-amber-300">รวมผู้เข้าชมสุทธิ</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-150 text-slate-700 bg-white">
+            <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
               {currentHistoryData.map((item, i) => {
                 const totalRow = item.thai + item.foreigner;
                 return (
                   <tr 
                     key={i} 
-                    className="hover:bg-emerald-50/50 transition-colors duration-150 group"
+                    className="hover:bg-emerald-50/70 transition-colors duration-150 group"
                   >
-                    <td className="py-3 px-5 font-bold text-slate-900 group-hover:text-emerald-800">
+                    <td className="py-3.5 px-6 font-extrabold text-sm sm:text-base text-slate-900 group-hover:text-emerald-900">
                       {filter === "monthly" ? `เดือน${item.label}` : item.label}
                     </td>
-                    <td className="py-3 px-5 text-center font-bold text-emerald-700">
-                      <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200/70 font-semibold">
+                    <td className="py-3.5 px-6 text-center">
+                      <span className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-900 rounded-full border border-emerald-300/80 font-black text-sm sm:text-base shadow-2xs">
                         {item.thai.toLocaleString()} คน
                       </span>
                     </td>
-                    <td className="py-3 px-5 text-center font-bold text-sky-700">
-                      <span className="inline-block px-2.5 py-1 bg-sky-50 text-sky-800 rounded-full border border-sky-200/70 font-semibold">
+                    <td className="py-3.5 px-6 text-center">
+                      <span className="inline-block px-4 py-1.5 bg-sky-50 text-sky-900 rounded-full border border-sky-300/80 font-black text-sm sm:text-base shadow-2xs">
                         {item.foreigner.toLocaleString()} คน
                       </span>
                     </td>
-                    <td className="py-3 px-5 text-center">
-                      <span className="inline-block px-3 py-1 bg-slate-100 text-slate-900 rounded-full font-black text-xs border border-slate-200">
+                    <td className="py-3.5 px-6 text-center">
+                      <span className="inline-block px-4.5 py-1.5 bg-slate-100 text-slate-950 rounded-full font-black text-sm sm:text-base border border-slate-300 shadow-2xs">
                         {totalRow.toLocaleString()} คน
                       </span>
                     </td>
@@ -612,11 +626,11 @@ export default function ViewVisitStatistics() {
             </tbody>
             {/* Table Footer Total Summary */}
             <tfoot>
-              <tr className="bg-slate-900 text-white font-bold text-xs border-t-2 border-slate-800">
-                <td className="py-3.5 px-5 uppercase tracking-wider text-emerald-300">ยอดรวมสุทธิ ({filter === "monthly" ? currentSelectedYearLabel : "ทุกปีรวมกัน"})</td>
-                <td className="py-3.5 px-5 text-center text-emerald-400 font-extrabold">{currentThaiCard.toLocaleString()} คน</td>
-                <td className="py-3.5 px-5 text-center text-sky-300 font-extrabold">{currentForeignerCard.toLocaleString()} คน</td>
-                <td className="py-3.5 px-5 text-center text-amber-300 font-black text-sm">{currentTotalCard.toLocaleString()} คน</td>
+              <tr className="bg-slate-950 text-white font-extrabold text-sm sm:text-base border-t-2 border-slate-800">
+                <td className="py-4 px-6 uppercase tracking-wider text-emerald-300 font-extrabold">ยอดรวมสุทธิ ({filter === "monthly" ? currentSelectedYearLabel : "ทุกปีรวมกัน"})</td>
+                <td className="py-4 px-6 text-center text-emerald-400 font-black text-base sm:text-lg">{currentThaiCard.toLocaleString()} คน</td>
+                <td className="py-4 px-6 text-center text-sky-300 font-black text-base sm:text-lg">{currentForeignerCard.toLocaleString()} คน</td>
+                <td className="py-4 px-6 text-center text-amber-300 font-black text-lg sm:text-xl">{currentTotalCard.toLocaleString()} คน</td>
               </tr>
             </tfoot>
           </table>

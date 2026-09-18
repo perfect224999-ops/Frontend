@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { reportApi } from "@/service/api";
+import { reportApi, replyReportApi } from "@/service/api";
 import { 
   Calendar, 
   Check, 
@@ -14,7 +14,13 @@ import {
   UserCheck,
   CheckCircle2,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  FileText,
+  Image as ImageIcon,
+  Upload,
+  X,
+  History,
+  MessageSquare
 } from "lucide-react";
 
 interface MemberReport {
@@ -110,11 +116,28 @@ function ViewReportMemberDetailContent() {
   const [status, setStatus] = useState("");
   const [startDate, setStartDate] = useState("");
   const [completedDate, setCompletedDate] = useState("");
+  const [progressText, setProgressText] = useState("");
+  const [progressImage, setProgressImage] = useState<string | null>(null);
+  const [replyHistory, setReplyHistory] = useState<any[]>([]);
   
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [canProgressReport, setCanProgressReport] = useState(true);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("ขนาดไฟล์รูปภาพต้องไม่เกิน 10MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProgressImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
@@ -163,6 +186,21 @@ function ViewReportMemberDetailContent() {
             setStatus(backendReport.status);
             setStartDate(backendReport.startDate);
             setCompletedDate(backendReport.completedDate);
+
+            try {
+              const replyRes = await replyReportApi.getReplyReports(Number(reportId));
+              if (replyRes && replyRes.success && Array.isArray(replyRes.result || replyRes.data)) {
+                const logs = replyRes.result || replyRes.data;
+                setReplyHistory(logs);
+                const lastLog = logs[logs.length - 1];
+                if (lastLog && lastLog.progress && !lastLog.progress.startsWith("Status updated to")) {
+                  setProgressText(lastLog.progress);
+                }
+              }
+            } catch (e) {
+              console.log("No reply report history found", e);
+            }
+
             return;
           }
         } catch (err) {
@@ -274,7 +312,13 @@ function ViewReportMemberDetailContent() {
     setIsLoading(true);
     try {
       if (reportId && !isNaN(Number(reportId))) {
-        await reportApi.updateReportStatus(Number(reportId), backendStatus, rangerUsername);
+        await reportApi.updateReportStatus(
+          Number(reportId), 
+          backendStatus, 
+          rangerUsername, 
+          progressText || `อัปเดตสถานะเป็น ${status}`, 
+          progressImage || undefined
+        );
       }
 
       setIsLoading(false);
@@ -444,6 +488,64 @@ function ViewReportMemberDetailContent() {
               </div>
             )}
 
+            {/* Field 5: รายละเอียดความคืบหน้า / การแก้ไขงาน (Progress) */}
+            <div className="space-y-1.5 animate-fade-in">
+              <label className="text-xs font-semibold text-emerald-200 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                รายละเอียดความคืบหน้า / ผลการดำเนินการแก้ไข (Progress) <span className="text-amber-400">*</span>
+              </label>
+              <textarea
+                rows={3}
+                disabled={!canProgressReport}
+                value={progressText}
+                onChange={(e) => setProgressText(e.target.value)}
+                placeholder="ระบุรายละเอียดสิ่งที่ได้ดำเนินการแก้ไขไปแล้วจากที่ผู้ใช้แจ้ง เช่น ได้ทำการซ่อมแซมจุดที่ชำรุด และทำความสะอาดพื้นที่เรียบร้อยแล้ว..."
+                className={`w-full bg-slate-900/90 text-emerald-100 text-xs font-medium p-4 rounded-2xl border border-emerald-500/40 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all shadow-inner resize-none ${!canProgressReport ? 'opacity-60 cursor-not-allowed' : ''}`}
+              />
+            </div>
+
+            {/* Field 6: รูปภาพประกอบการดำเนินงาน (Image) */}
+            <div className="space-y-1.5 animate-fade-in">
+              <label className="text-xs font-semibold text-emerald-200 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+                รูปภาพประกอบการแก้ไข / หลักฐานผลการดำเนินงาน (Image)
+              </label>
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={!canProgressReport}
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="progress-image-upload"
+                />
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="progress-image-upload"
+                    className={`px-4 py-2.5 bg-emerald-900/60 hover:bg-emerald-800/80 text-emerald-200 border border-emerald-600/40 text-xs font-semibold rounded-xl cursor-pointer transition-all flex items-center gap-2 ${!canProgressReport ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
+                  >
+                    <Upload className="w-4 h-4 text-emerald-400" />
+                    <span>แนบไฟล์รูปภาพ</span>
+                  </label>
+                  {progressImage && (
+                    <button
+                      type="button"
+                      onClick={() => setProgressImage(null)}
+                      className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      ลบรูปภาพ
+                    </button>
+                  )}
+                </div>
+                {progressImage && (
+                  <div className="relative w-44 h-32 rounded-2xl overflow-hidden border border-emerald-500/40 shadow-md">
+                    <img src={progressImage} alt="Progress evidence" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Form Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-6 border-t border-emerald-800/40">
               <button
@@ -480,6 +582,42 @@ function ViewReportMemberDetailContent() {
             </div>
 
           </form>
+
+      {/* Reply Progress History Section */}
+      {replyHistory.length > 0 && (
+        <div className="bg-emerald-950/95 backdrop-blur-xl border border-emerald-700/30 text-white rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl">
+          <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm border-b border-emerald-800/40 pb-3">
+            <History className="w-4 h-4 text-emerald-400" />
+            <span>ประวัติการบันทึกความคืบหน้า ({replyHistory.length})</span>
+          </div>
+          <div className="space-y-4">
+            {replyHistory.map((item, idx) => (
+              <div key={idx} className="bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-4 text-xs space-y-2">
+                <div className="flex justify-between items-center text-slate-400 font-medium">
+                  <span className="font-bold text-emerald-400 bg-emerald-950 px-3 py-1 rounded-lg border border-emerald-600/30">
+                    {item.currentStatus === "Pending" ? "แจ้งรายงาน" : item.currentStatus === "InProgress" ? "กำลังดำเนินการ" : item.currentStatus === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : item.currentStatus}
+                  </span>
+                  <span className="text-emerald-300/70">{item.updateDate} {item.updateTime ? `(${item.updateTime})` : ''} {item.parkRangerName ? `• เจ้าหน้าที่: ${item.parkRangerName}` : ''}</span>
+                </div>
+                {item.progress && (
+                  <div className="text-emerald-100 leading-relaxed bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-800/40">
+                    <span className="font-bold text-emerald-300 block mb-1">รายละเอียดความคืบหน้า:</span>
+                    {item.progress}
+                  </div>
+                )}
+                {item.image && (
+                  <div className="pt-1">
+                    <span className="font-semibold text-emerald-300/80 block mb-1.5">หลักฐานประกอบ:</span>
+                    <div className="w-44 h-32 rounded-xl overflow-hidden border border-emerald-600/30 shadow-md">
+                      <img src={item.image} alt="Progress history image" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );

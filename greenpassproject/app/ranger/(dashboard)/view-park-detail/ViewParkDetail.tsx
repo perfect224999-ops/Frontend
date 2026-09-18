@@ -80,13 +80,20 @@ export default function ViewParkDetail() {
         try {
           const parsed = JSON.parse(savedParkData);
           if (parsed && parsed.name && (parsed.parkId === targetParkId || !parsed.parkId)) {
+            let loc = parsed.location || "";
+            if (loc.includes("99.6317361")) {
+              loc = loc.replace("99.6317361", "99.5317361");
+            }
+            if (targetParkId === 2 && (!loc || loc.includes("99.63"))) {
+              loc = "12.8850041, 99.5317361";
+            }
             setParkData({
               parkId: targetParkId,
               parkName: parsed.name,
               openHours: parsed.openHours || "เปิดทุกวัน ตั้งแต่เวลา 06.00 น. - 18.00 น.",
               description: parsed.description || "",
               address: parsed.address || "",
-              location: parsed.location || "",
+              location: loc,
               eventNote: "เปิดให้บริการตามปกติ",
               status: parsed.status || "เปิดตามปกติ",
               image: "https://images.unsplash.com/photo-1511497584788-8767611136f6"
@@ -127,7 +134,7 @@ export default function ViewParkDetail() {
 
           const DEFAULT_PARK_INFO: Record<number, { location: string; address: string }> = {
             1: { location: "14.3109229, 101.5304415", address: "ศูนย์บริการนักท่องเที่ยว ตู้ปณ. 9 ตำบลหมูสี อำเภอปากช่อง จังหวัดนครราชสีมา 30130" },
-            2: { location: "12.8850041, 99.6317361", address: "ต.แก่งกระจาน อ.แก่งกระจาน จ.เพชรบุรี 76170" },
+            2: { location: "12.8850041, 99.5317361", address: "ต.แก่งกระจาน อ.แก่งกระจาน จ.เพชรบุรี 76170" },
             3: { location: "14.3755029, 99.1426559", address: "ต.ท่ากระดาน อ.ศรีสวัสดิ์ จ.กาญจนบุรี 71250" },
             4: { location: "18.8070052, 98.9160906", address: "ถนนศรีวิชัย ตำบลสุเทพ อำเภอเมืองเชียงใหม่ จังหวัดเชียงใหม่ 50200" },
             5: { location: "18.5356313, 98.519549", address: "119 หมู่ 7 ตำบลบ้านหลวง อำเภอจอมทอง จังหวัดเชียงใหม่ 50160" },
@@ -136,13 +143,18 @@ export default function ViewParkDetail() {
           };
           const defaultPark = DEFAULT_PARK_INFO[targetParkId] || DEFAULT_PARK_INFO[1];
 
+          let loc = (dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location;
+          if (loc.includes("99.6317361")) {
+            loc = loc.replace("99.6317361", "99.5317361");
+          }
+
           setParkData({
             parkId: dbPark.parkId || targetParkId,
             parkName: cleanName(dbPark.name),
             openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openStr} น. - ${closeStr} น.`,
             description: dbPark.description || DEFAULT_PARK_DATA.description,
             address: (dbPark.address && dbPark.address.trim() !== "") ? dbPark.address : defaultPark.address,
-            location: (dbPark.location && dbPark.location.trim() !== "") ? dbPark.location : defaultPark.location,
+            location: loc,
             eventNote: dbPark.eventNote || "เปิดให้บริการตามปกติ",
             status: dbPark.status || "เปิดตามปกติ",
             image: dbPark.image || "https://images.unsplash.com/photo-1511497584788-8767611136f6"
@@ -166,21 +178,23 @@ export default function ViewParkDetail() {
     return null;
   };
 
-  const getMapEmbedUrl = (locStr: string, nameStr: string) => {
+  const getMapEmbedUrl = (locStr: string, nameStr: string, addressStr?: string) => {
     if (nameStr) {
-      return `https://maps.google.com/maps?q=${encodeURIComponent(nameStr)}&hl=th&z=15&ie=UTF8&iwloc=&output=embed`;
+      const query = addressStr ? `${nameStr} ${addressStr}` : nameStr;
+      return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&hl=th&z=14&ie=UTF8&iwloc=&output=embed`;
     }
     const coords = getCoordinates(locStr);
     if (coords) {
-      return `https://maps.google.com/maps?q=${coords.lat},${coords.lng}&hl=th&z=15&ie=UTF8&iwloc=&output=embed`;
+      return `https://maps.google.com/maps?q=${coords.lat},${coords.lng}&hl=th&z=14&ie=UTF8&iwloc=&output=embed`;
     }
-    return `https://maps.google.com/maps?q=${encodeURIComponent(nameStr)}&hl=th&z=15&ie=UTF8&iwloc=&output=embed`;
+    return `https://maps.google.com/maps?q=อุทยานแห่งชาติ&hl=th&z=14&ie=UTF8&iwloc=&output=embed`;
   };
 
   const openGoogleMaps = () => {
     if (!parkData) return;
     if (parkData.parkName) {
-      window.open(`https://www.google.com/maps/place/${encodeURIComponent(parkData.parkName)}`, "_blank");
+      const query = parkData.address ? `${parkData.parkName} ${parkData.address}` : parkData.parkName;
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, "_blank");
     } else {
       const coords = getCoordinates(parkData.location);
       if (coords) {
@@ -406,7 +420,7 @@ export default function ViewParkDetail() {
                 className="w-full h-full border-0"
                 loading="lazy"
                 allowFullScreen
-                src={getMapEmbedUrl(parkData.location, parkData.parkName)}
+                src={getMapEmbedUrl(parkData.location, parkData.parkName, parkData.address)}
               ></iframe>
               <button
                 onClick={openGoogleMaps} 

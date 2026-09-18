@@ -3,12 +3,12 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { rangerApi, parkApi } from "@/service/api";
+import { rangerApi, parkApi, reportApi } from "@/service/api";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
-import { 
-  ShieldAlert, 
-  Lock, 
+import {
+  ShieldAlert,
+  Lock,
   ArrowLeft,
   QrCode,
   Trees,
@@ -44,7 +44,7 @@ export default function RangerDashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  
+
   // สถานะเปิด-ปิด dropdown ของแต่ละเมนู
   const [showParkDropdown, setShowParkDropdown] = useState(false);
   const [showReportDropdown, setShowReportDropdown] = useState(false);
@@ -119,7 +119,7 @@ export default function RangerDashboardLayout({
 
           osc.start();
           osc.stop(ctx.currentTime + 0.4);
-        } catch (e) {}
+        } catch (e) { }
       };
 
       playSirenPulse();
@@ -135,14 +135,15 @@ export default function RangerDashboardLayout({
       sirenTimerRef.current = null;
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current.close().catch(() => { });
       audioContextRef.current = null;
     }
   };
 
-  // ตรวจจับเหตุฉุกเฉินผ่าน LocalStorage / Custom Event
+  // 🚨 ตรวจจับและดึงข้อมูลเหตุฉุกเฉินร้ายแรงแบบเรียลไทม์จากทั้ง LocalStorage / Custom Event / API ทุก 3 วินาที (ทำงานทุกหน้าในระบบ)
   useEffect(() => {
-    const checkEmergencyState = () => {
+    const checkEmergencyState = async () => {
+      // 1. เช็คจาก LocalStorage เดิมก่อน
       const savedEmergency = typeof window !== "undefined" ? localStorage.getItem("greenpass_emergency_alert") : null;
       if (savedEmergency) {
         try {
@@ -150,13 +151,67 @@ export default function RangerDashboardLayout({
           if (parsed && parsed.id) {
             setActiveEmergencyAlert(parsed);
             startEmergencySirenSound();
+            return;
           }
-        } catch (e) {}
+        } catch (e) { }
+      }
+
+      // 2. ดึงข้อมูลรายงานทั้งหมดจาก API โดยตรงเพื่อตรวจสอบว่ามีรายงานร้ายแรงใหม่เข้าหรือไม่ (ทำงานทุกหน้าในระบบ)
+      try {
+        const res = await reportApi.getAllReports();
+        const listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
+          ? (res.result || res.data || res)
+          : null;
+
+        if (Array.isArray(listData)) {
+          const ackList: string[] = typeof window !== "undefined"
+            ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
+            : [];
+
+          const unackEmergency = listData.find((r: any) => {
+            const rId = String(r.reportId || "");
+            const tName = String(r.typeName || r.type?.typeName || r.category || "");
+            const tId = r.typeId || r.type?.typeId;
+            const titleDesc = `${r.name || ""} ${r.description || ""}`;
+
+            const isSevere =
+              tId === 2 ||
+              String(tId) === "2" ||
+              tName.includes("ร้ายแรง") ||
+              tName.includes("ฉุกเฉิน") ||
+              titleDesc.includes("ร้ายแรง") ||
+              titleDesc.includes("ฉุกเฉิน") ||
+              r.isEmergency === true;
+
+            const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน";
+            return isSevere && isPending && rId && !ackList.includes(rId);
+          });
+
+          if (unackEmergency) {
+            const emergencyEventData = {
+              id: String(unackEmergency.reportId),
+              details: unackEmergency.description
+                ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}`
+                : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
+              location: unackEmergency.parkName || unackEmergency.park?.name || parkName || "พื้นที่อุทยานแห่งชาติ",
+              time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+              reporter: unackEmergency.username || unackEmergency.user?.username || "ผู้ใช้งาน GreenPass"
+            };
+
+            setActiveEmergencyAlert(emergencyEventData);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("greenpass_emergency_alert", JSON.stringify(emergencyEventData));
+            }
+            startEmergencySirenSound();
+          }
+        }
+      } catch (e) {
+        // ละเว้นข้อผิดพลาดจากการดึงเบื้องหลัง
       }
     };
 
+    // ตรวจสอบสถานะเหตุฉุกเฉินตอนเปิดหน้าเว็บครั้งแรก (Initial check)
     checkEmergencyState();
-    const interval = setInterval(checkEmergencyState, 2000);
 
     const handleCustomTrigger = (e: any) => {
       if (e.detail) {
@@ -173,7 +228,6 @@ export default function RangerDashboardLayout({
     }
 
     return () => {
-      clearInterval(interval);
       if (typeof window !== "undefined") {
         window.removeEventListener("greenpass_emergency_trigger", handleCustomTrigger);
       }
@@ -184,25 +238,26 @@ export default function RangerDashboardLayout({
   // 📡 Real-time WebSocket Listener via @stomp/stompjs & SockJS
   // ----------------------------------------------------
   useEffect(() => {
-    const parkId = typeof window !== "undefined" 
-      ? localStorage.getItem("ranger_park_id") || "4" 
+    const parkId = typeof window !== "undefined"
+      ? localStorage.getItem("ranger_park_id") || "4"
       : null;
-    
+
     if (!parkId) return;
 
     let stompClient: Client | null = null;
 
     try {
-      const getWsUrl = () => {
-        if (typeof window !== "undefined") {
-          return `http://${window.location.hostname}:8081/api/v1/ws-greenpass`;
-        }
-        return "http://localhost:8081/api/v1/ws-greenpass";
-      };
+      // const getWsUrl = () => {
+      //   if (typeof window !== "undefined") {
+      //     return `http://${window.location.hostname}:8081/api/v1/ws-greenpass`;
+      //   }
+      //   return "http://localhost:8081/api/v1/ws-greenpass";
+      // };
+      const getWsUrl = () => "http://172.20.10.2:8081/api/v1/ws-greenpass";
 
       stompClient = new Client({
         webSocketFactory: () => new SockJS(getWsUrl()),
-        debug: () => {}, // ปิด log debug ใน console
+        debug: () => { }, // ปิด log debug ใน console
         reconnectDelay: 5000,
         onConnect: () => {
           console.log(`📡 WebSocket Connected for Park ID: ${parkId}`);
@@ -222,7 +277,7 @@ export default function RangerDashboardLayout({
                   console.log("📡 [WebSocket] Received Notification:", notification);
 
                   // 🔍 ตรวจสอบว่าเป็นรายงานร้ายแรง / ฉุกเฉินหรือไม่
-                  const isEmergency = 
+                  const isEmergency =
                     typeId === 2 ||
                     String(typeId) === "2" ||
                     notification.isEmergency === true ||
@@ -290,7 +345,7 @@ export default function RangerDashboardLayout({
           ackList.push(activeEmergencyAlert.id);
           localStorage.setItem("greenpass_ack_reports", JSON.stringify(ackList));
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     if (typeof window !== "undefined") {
       localStorage.removeItem("greenpass_emergency_alert");
@@ -312,7 +367,7 @@ export default function RangerDashboardLayout({
         try {
           const parsed = JSON.parse(savedRoles);
           if (Array.isArray(parsed)) setRangerRoles(parsed);
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (u) {
@@ -350,7 +405,7 @@ export default function RangerDashboardLayout({
                     localStorage.setItem("ranger_park_name", pName);
                   }
                 }
-              } catch (e) {}
+              } catch (e) { }
             }
 
             // Sync database boolean flags to roles array if available
@@ -366,7 +421,7 @@ export default function RangerDashboardLayout({
               }
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     };
     loadRangerInfo();
@@ -397,11 +452,11 @@ export default function RangerDashboardLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-100 text-zinc-950 font-sans">
-      
+
       {/* Modern Executive Header Navbar */}
       <header className="sticky top-0 w-full bg-gradient-to-r from-[#042410] via-[#0b4822] to-[#042410] text-white shadow-xl shadow-emerald-950/40 relative z-50 border-b border-emerald-500/25 backdrop-blur-md">
         <div className="w-full px-4 sm:px-8 h-16 flex items-center justify-between">
-          
+
           {/* Brand Logo */}
           <Link href="/ranger/view-park-detail" className="flex items-center gap-3 group transition-transform duration-200 active:scale-95">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-900/50 ring-1 ring-emerald-300/40 group-hover:shadow-emerald-400/30 transition-all duration-300">
@@ -426,9 +481,9 @@ export default function RangerDashboardLayout({
           <nav className="hidden lg:flex items-center gap-2 sm:gap-2.5 bg-black/20 p-1.5 rounded-2xl border border-white/10 shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isParkActive = 
+              const isParkActive =
                 item.href === "/ranger/view-park-detail" && (
-                  pathname === "/ranger/view-park-detail" || 
+                  pathname === "/ranger/view-park-detail" ||
                   pathname === "/ranger/edit-park-details"
                 );
 
@@ -443,24 +498,23 @@ export default function RangerDashboardLayout({
                   pathname === "/ranger/edit-news-details"
                 );
 
-              const isReportActive = 
+              const isReportActive =
                 item.href === "/ranger/list-report-member" && (
-                  pathname === "/ranger/list-report-member" || 
+                  pathname === "/ranger/list-report-member" ||
                   pathname.startsWith("/ranger/view-report-member-detail")
                 );
 
-              const isActive = 
+              const isActive =
                 pathname === item.href || isParkActive || isAnnounceActive || isListNewsActive || isReportActive;
 
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                    isActive 
-                      ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40" 
-                      : "text-emerald-100/90 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${isActive
+                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-900/60 ring-1 ring-emerald-300/40"
+                    : "text-emerald-100/90 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-emerald-300/80"}`} />}
                   <span>{item.name}</span>
@@ -479,7 +533,7 @@ export default function RangerDashboardLayout({
                 )}
               </div>
             )}
-            <button 
+            <button
               onClick={() => {
                 localStorage.removeItem("ranger_username");
                 localStorage.removeItem("ranger_park_id");
@@ -532,7 +586,7 @@ export default function RangerDashboardLayout({
       {activeEmergencyAlert && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in font-sans">
           <div className="relative w-full max-w-lg bg-gradient-to-b from-rose-950 via-slate-900 to-rose-950 text-white rounded-3xl p-6 sm:p-8 border-2 border-rose-500 shadow-[0_0_80px_rgba(225,29,72,0.6)] space-y-6 text-center overflow-hidden animate-bounce-subtle">
-            
+
             {/* Pulsing Red Warning Light Accent */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-rose-600/30 rounded-full blur-3xl animate-ping" />
             <div className="absolute top-0 right-0 p-4">

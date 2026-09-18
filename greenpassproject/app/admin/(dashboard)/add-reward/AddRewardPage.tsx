@@ -28,23 +28,69 @@ export default function AddRewardPage() {
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          } else {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(event.target?.result as string);
+      };
+      reader.onerror = () => resolve("");
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setImage(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file);
+        setImage(compressedBase64);
+      } catch (err) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === "string") {
+            setImage(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
+    setSuccess(""); 
 
     if (!rewardTitle.trim() || !rewardDetails.trim()) {
       setError("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน");
@@ -58,15 +104,11 @@ export default function AddRewardPage() {
 
     setIsLoading(true);
     try {
-      const shortImageName = image.startsWith("http") || image.startsWith("/") 
-        ? image 
-        : `reward_${Date.now()}.png`;
-
-      // 1. บันทึกลงฐานข้อมูล MySQL ผ่าน Spring Boot API (ส่งชื่อรูปสั้นๆ ไปเก็บใน DB)
+      // 1. บันทึกลงฐานข้อมูล MySQL ผ่าน Spring Boot API (ส่งสตริงรูปภาพ Base64 ลงใน DB คอลัมน์ LONGTEXT เพื่อให้ทุกเครื่องและ Mobile อ่านได้)
       const result = await rewardApi.addReward({
         rewardTitle: rewardTitle.trim(),
         rewardDetails: rewardDetails.trim(),
-        image: shortImageName
+        image: image
       });
 
       const newRewardId = result?.result?.rewardId || result?.data?.rewardId;

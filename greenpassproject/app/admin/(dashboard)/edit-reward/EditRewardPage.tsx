@@ -54,7 +54,46 @@ function EditRewardContent() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          } else {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(event.target?.result as string);
+      };
+      reader.onerror = () => resolve("");
+    });
+  };
 
   useEffect(() => {
     const loadRewardData = async () => {
@@ -111,14 +150,11 @@ function EditRewardContent() {
 
     try {
       const targetId = currentReward.id || rewardId || "1";
-      const shortImageName = imageUrl.startsWith("http") || imageUrl.startsWith("/")
-        ? imageUrl
-        : `reward_${targetId}.png`;
 
       await rewardApi.updateReward(Number(targetId), {
         rewardTitle: rewardTitle.trim(),
         rewardDetails: rewardDetails.trim(),
-        image: shortImageName
+        image: imageUrl
       });
 
       if (imageUrl) {
@@ -267,16 +303,21 @@ function EditRewardContent() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        if (typeof reader.result === "string") {
-                          setImageUrl(reader.result);
-                        }
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const compressed = await compressImage(file);
+                        setImageUrl(compressed);
+                      } catch (err) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (typeof reader.result === "string") {
+                            setImageUrl(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }
                     }
                   }}
                   disabled={isLoading}

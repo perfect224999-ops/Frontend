@@ -118,8 +118,8 @@ export default function ListReportMember() {
           res = await reportApi.getReportsByParkId(4);
         }
 
-        const listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res)) 
-          ? (res.result || res.data || res) 
+        const listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
+          ? (res.result || res.data || res)
           : null;
 
         if (Array.isArray(listData)) {
@@ -139,8 +139,8 @@ export default function ListReportMember() {
               if (unackEmergency) {
                 const emergencyEventData = {
                   id: String(unackEmergency.reportId),
-                  details: unackEmergency.description 
-                    ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}` 
+                  details: unackEmergency.description
+                    ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}`
                     : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
                   location: unackEmergency.parkName || unackEmergency.park?.name || "พื้นที่อุทยานแห่งชาติ",
                   time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
@@ -197,12 +197,9 @@ export default function ListReportMember() {
     }
     loadReports();
 
-    // 🔄 Auto-polling ทุก 3.5 วินาที ดึงข้อมูลรายงานล่าสุดให้อัตโนมัติในพื้นหลังโดยไม่ต้องกด F5
-    const pollInterval = setInterval(() => {
-      loadReports();
-    }, 3500);
-
+    // 📡 รอรับ Event จาก WebSocket เมื่อมีรายงานใหม่เข้ามา จะโหลดข้อมูลทันทีโดยไม่ต้อง Poll ยิงซ้ำๆ
     const handleReportUpdate = () => {
+      console.log("📡 [ListReportMember] Received WebSocket update event -> Reloading reports");
       loadReports();
     };
 
@@ -211,7 +208,6 @@ export default function ListReportMember() {
     }
 
     return () => {
-      clearInterval(pollInterval);
       if (typeof window !== "undefined") {
         window.removeEventListener("greenpass_report_updated", handleReportUpdate);
       }
@@ -236,10 +232,10 @@ export default function ListReportMember() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto font-sans relative py-3 space-y-6 px-1 sm:px-3">
-      
+
       {/* Container หลัก */}
       <div className="bg-emerald-950/5 backdrop-blur-md border border-emerald-800/10 rounded-3xl p-6 sm:p-8 space-y-7 shadow-xl shadow-emerald-950/5">
-        
+
         {/* Header Title Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-emerald-900/10 pb-5">
           <div className="flex items-center gap-3">
@@ -262,7 +258,7 @@ export default function ListReportMember() {
 
         {/* 4 Summary Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: รวมทั้งหมด */}
           <div className="bg-white/80 backdrop-blur border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between group">
             <div>
@@ -329,7 +325,7 @@ export default function ListReportMember() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              
+
               {/* Header */}
               <thead>
                 <tr className="bg-slate-800 text-slate-100 font-semibold border-b border-slate-700">
@@ -360,7 +356,7 @@ export default function ListReportMember() {
                         key={report.id}
                         className="hover:bg-emerald-50/40 transition-colors duration-150 group"
                       >
-                        
+
                         {/* ลำดับ */}
                         <td className="py-3.5 px-4 text-center font-bold text-slate-500">
                           <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 inline-flex items-center justify-center text-xs group-hover:bg-emerald-100 group-hover:text-emerald-800 transition-colors">
@@ -394,7 +390,7 @@ export default function ListReportMember() {
                         {/* รูปภาพ */}
                         <td className="py-3.5 px-3 text-center">
                           {getReportImageUrl(report) ? (
-                            <div 
+                            <div
                               onClick={() => setSelectedImage(getReportImageUrl(report))}
                               className="relative w-12 h-12 mx-auto rounded-xl overflow-hidden border border-slate-200/80 shadow-2xs group cursor-pointer hover:scale-105 hover:shadow-md transition-all bg-slate-100"
                               title="คลิกเพื่อขยายรูปภาพ"
@@ -482,11 +478,11 @@ export default function ListReportMember() {
 
       {/* Image Modal Lightbox */}
       {selectedImage && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setSelectedImage(null)}
         >
-          <div 
+          <div
             className="relative max-w-3xl max-h-[90vh] bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl p-2"
             onClick={(e) => e.stopPropagation()}
           >

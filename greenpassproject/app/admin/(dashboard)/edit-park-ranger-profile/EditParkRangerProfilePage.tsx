@@ -6,7 +6,8 @@ import { rangerApi } from "../../../../service/api";
 import { 
   getProvincesList, 
   getDistrictsByProvince, 
-  getSubDistrictsByDistrict 
+  getSubDistrictsByDistrict,
+  getZipcodesBySubdistrict 
 } from "../../../../data/thaiLocationData";
 import { 
   UserCog, 
@@ -293,10 +294,14 @@ function EditProfileContent() {
       setPosition(foundRanger.position || "เจ้าหน้าที่อุทยาน");
       setParkName(foundRanger.parkName || "อุทยานแห่งชาติเขาใหญ่");
       setStartDate(foundRanger.startDate || "");
-      setDistrict(foundRanger.district || "");
-      setSubDistrict(foundRanger.subDistrict || "");
-      setProvince(foundRanger.province || "");
-      setZipcode(foundRanger.zipcode || "10000");
+      const cleanDist = (foundRanger.district && foundRanger.district !== "-") ? foundRanger.district : "";
+      const cleanSub = (foundRanger.subDistrict && foundRanger.subDistrict !== "-") ? foundRanger.subDistrict : "";
+      const cleanZip = (foundRanger.zipcode && foundRanger.zipcode !== "-") ? foundRanger.zipcode : "";
+      const cleanProv = (foundRanger.province && foundRanger.province !== "-") ? foundRanger.province : "";
+      setDistrict(cleanDist);
+      setSubDistrict(cleanSub);
+      setProvince(cleanProv);
+      setZipcode(cleanZip);
       setGender(foundRanger.gender || "ชาย");
       setPhone(foundRanger.phone || "");
       setEmail(foundRanger.email || "");
@@ -368,12 +373,22 @@ function EditProfileContent() {
       return "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรือภาษาอังกฤษเท่านั้น (ห้ามมีอักขระพิเศษ)";
     }
 
+    if (!province || province.trim() === "") {
+      return "กรุณาเลือกจังหวัด";
+    }
+    if (!district || district.trim() === "" || district === "-") {
+      return "กรุณาเลือกอำเภอ / เขต";
+    }
+    if (!subDistrict || subDistrict.trim() === "" || subDistrict === "-") {
+      return "กรุณาเลือกตำบล / แขวง";
+    }
+
     const cleanZipcode = zipcode.trim();
-    if (!cleanZipcode) {
-      return "กรุณากรอกรหัสไปรษณีย์";
+    if (!cleanZipcode || cleanZipcode === "-") {
+      return "กรุณาเลือกรหัสไปรษณีย์";
     }
     if (!/^\d{5}$/.test(cleanZipcode)) {
-      return "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก (เช่น 10000)";
+      return "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก";
     }
 
     const cleanPhone = phone.replace(/[-\s]/g, "");
@@ -680,7 +695,6 @@ function EditProfileContent() {
                     <option value="เจ้าหน้าที่ประชาสัมพันธ์">เจ้าหน้าที่ประชาสัมพันธ์</option>
                     <option value="หัวหน้าอุทยาน">หัวหน้าอุทยาน</option>
                     <option value="เจ้าหน้าที่พิทักษ์ป่า">เจ้าหน้าที่พิทักษ์ป่า</option>
-                    <option value="เจ้าหน้าที่บริการนักท่องเที่ยว">เจ้าหน้าที่บริการนักท่องเที่ยว</option>
                     <option value="เจ้าหน้าที่ธุรการ">เจ้าหน้าที่ธุรการ</option>
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -740,7 +754,7 @@ function EditProfileContent() {
               {/* จังหวัด (77 จังหวัดทั่วไทย) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-                  <span>จังหวัด</span>
+                  <span>จังหวัด <span className="text-red-500">*</span></span>
                   <span className="text-[10px] text-emerald-600 font-bold">(77 จังหวัด)</span>
                 </label>
                 <div className="relative">
@@ -749,15 +763,14 @@ function EditProfileContent() {
                     onChange={(e) => {
                       const newProv = e.target.value;
                       setProvince(newProv);
-                      const availableDistricts = getDistrictsByProvince(newProv);
-                      const defaultDist = availableDistricts[0] || "";
-                      setDistrict(defaultDist);
-                      const availableSub = getSubDistrictsByDistrict(newProv, defaultDist);
-                      setSubDistrict(availableSub[0] || "");
+                      setDistrict("");
+                      setSubDistrict("");
+                      setZipcode("");
                     }}
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
                     disabled={isLoading}
                   >
+                    <option value="" disabled>-- กรุณาเลือกจังหวัด --</option>
                     {getProvincesList().map((p, idx) => (
                       <option key={`${p}-${idx}`} value={p}>{p}</option>
                     ))}
@@ -768,19 +781,20 @@ function EditProfileContent() {
 
               {/* อำเภอ (อิงตามจังหวัดที่เลือก) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">อำเภอ / เขต</label>
+                <label className="text-xs font-semibold text-slate-700">อำเภอ / เขต <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <select
                     value={district}
                     onChange={(e) => {
                       const newDist = e.target.value;
                       setDistrict(newDist);
-                      const availableSub = getSubDistrictsByDistrict(province, newDist);
-                      setSubDistrict(availableSub[0] || "");
+                      setSubDistrict("");
+                      setZipcode("");
                     }}
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
-                    disabled={isLoading}
+                    disabled={!province || isLoading}
                   >
+                    <option value="" disabled>-- กรุณาเลือกอำเภอ / เขต --</option>
                     {getDistrictsByProvince(province).map((d, idx) => (
                       <option key={`${d}-${idx}`} value={d}>{d}</option>
                     ))}
@@ -791,14 +805,24 @@ function EditProfileContent() {
 
               {/* ตำบล (อิงตามอำเภอที่เลือก) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">ตำบล / แขวง</label>
+                <label className="text-xs font-semibold text-slate-700">ตำบล / แขวง <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <select
                     value={subDistrict}
-                    onChange={(e) => setSubDistrict(e.target.value)}
+                    onChange={(e) => {
+                      const newSub = e.target.value;
+                      setSubDistrict(newSub);
+                      if (newSub) {
+                        const zips = getZipcodesBySubdistrict(province, district, newSub);
+                        setZipcode(zips[0] || "");
+                      } else {
+                        setZipcode("");
+                      }
+                    }}
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
-                    disabled={isLoading}
+                    disabled={!district || isLoading}
                   >
+                    <option value="" disabled>-- กรุณาเลือกตำบล / แขวง --</option>
                     {getSubDistrictsByDistrict(province, district).map((sd, idx) => (
                       <option key={`${sd}-${idx}`} value={sd}>{sd}</option>
                     ))}
@@ -807,18 +831,23 @@ function EditProfileContent() {
                 </div>
               </div>
 
-              {/* รหัสไปรษณีย์ */}
+              {/* รหัสไปรษณีย์ (เลือกตามตำบล/อำเภอ) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">รหัสไปรษณีย์</label>
-                <input 
-                  type="text" 
-                  maxLength={5}
-                  value={zipcode}
-                  onChange={(e) => setZipcode(e.target.value.replace(/[^0-9]/g, ""))}
-                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all font-mono"
-                  disabled={isLoading}
-                  placeholder="เช่น 10000"
-                />
+                <label className="text-xs font-semibold text-slate-700">รหัสไปรษณีย์ <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <select 
+                    value={zipcode}
+                    onChange={(e) => setZipcode(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10 font-mono"
+                    disabled={!subDistrict || isLoading}
+                  >
+                    <option value="" disabled>-- เลือกรหัสไปรษณีย์ --</option>
+                    {getZipcodesBySubdistrict(province, district, subDistrict).map((z, idx) => (
+                      <option key={`${z}-${idx}`} value={z}>{z}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
               </div>
 
             </div>
@@ -842,10 +871,12 @@ function EditProfileContent() {
                 </label>
                 <input 
                   type="text" 
+                  maxLength={10}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
+                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all font-mono"
                   disabled={isLoading}
+                  placeholder="0812345678"
                 />
               </div>
 

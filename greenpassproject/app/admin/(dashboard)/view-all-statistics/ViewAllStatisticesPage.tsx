@@ -590,17 +590,17 @@ export default function ViewAllStatisticesPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-center text-xs border-collapse">
+            <table className="w-full text-center border-collapse">
               <thead>
-                <tr className="bg-slate-800 text-slate-100 font-semibold">
-                  <th className="py-3.5 px-5 text-center">อุทยานแห่งชาติ</th>
-                  <th className="py-3.5 px-4 text-center">ข่าวที่ประกาศ</th>
-                  <th className="py-3.5 px-4 text-center">รายงานทั้งหมด</th>
-                  <th className="py-3.5 px-4 text-center">กำลังดำเนินการ</th>
-                  <th className="py-3.5 px-4 text-center">ดำเนินการสำเร็จ</th>
+                <tr className="bg-slate-900 text-slate-100 font-bold text-sm sm:text-base">
+                  <th className="py-4 px-5 text-center">อุทยานแห่งชาติ</th>
+                  <th className="py-4 px-4 text-center">ข่าวที่ประกาศ</th>
+                  <th className="py-4 px-4 text-center">รายงานทั้งหมด</th>
+                  <th className="py-4 px-4 text-center">กำลังดำเนินการ</th>
+                  <th className="py-4 px-4 text-center">ดำเนินการสำเร็จ</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+              <tbody className="divide-y divide-slate-150 text-slate-800 font-bold text-sm sm:text-base">
                 {filteredParkStats.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
@@ -609,28 +609,28 @@ export default function ViewAllStatisticesPage() {
                   </tr>
                 ) : (
                   filteredParkStats.map((item) => (
-                    <tr key={item.parkId} className="hover:bg-emerald-50/40 transition-colors">
-                      <td className="py-4 px-5 font-bold text-slate-900 flex items-center justify-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <tr key={item.parkId} className="hover:bg-emerald-50/50 transition-colors">
+                      <td className="py-4 px-5 font-extrabold text-slate-900 flex items-center justify-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-emerald-500" />
                         <span>{item.parkName}</span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-indigo-50 text-indigo-900 border border-indigo-200">
                           {item.announcements} ข่าว
                         </span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-amber-50 text-amber-900 border border-amber-200">
                           {item.totalReports} รายการ
                         </span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-sky-50 text-sky-900 border border-sky-200">
                           {item.inProgress} รายการ
                         </span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-emerald-50 text-emerald-900 border border-emerald-200">
                           {item.completed} รายการ
                         </span>
                       </td>
