@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Edit3, Calendar, ArrowLeft, Image as ImageIcon, UploadCloud, CheckCircle2, X, Save } from "lucide-react";
-import { announcementApi } from "../../../../service/api";
+import { announcementApi, getBaseURL } from "../../../../service/api";
 
 interface NewsItem {
   id: string;
@@ -33,6 +33,24 @@ const DEFAULT_NEWS: NewsItem[] = [
   }
 ];
 
+const formatThaiDateLong = (dateStr?: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]);
+    const day = parseInt(parts[2]);
+    const months = [
+      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ];
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year) && months[month - 1]) {
+      return `${day} ${months[month - 1]} ${year + 543}`;
+    }
+  }
+  return dateStr;
+};
+
 function EditNewsDetailsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,28 +66,134 @@ function EditNewsDetailsContent() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
+  const resolveImageUrl = (img?: string | null) => {
+    if (!img) return "";
+    const trimmed = img.trim();
+    if (!trimmed || trimmed === "null" || trimmed === "undefined" || trimmed === "-") return "";
+    if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
+      return trimmed;
+    }
+    const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://localhost:8081/api/v1";
+    if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
+      const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+      return `${baseUrl}${cleanPath}`;
+    }
+    if (!trimmed.includes("/")) {
+      if (trimmed.toLowerCase() === "news1.jpg" || trimmed.toLowerCase() === "default.jpg") {
+        return "";
+      }
+      return `${baseUrl}/uploads/announcements/${trimmed}`;
+    }
+    if (trimmed.startsWith("/")) {
+      return `${baseUrl}${trimmed}`;
+    }
+    return `${baseUrl}/${trimmed}`;
+  };
+
   useEffect(() => {
-    const saved = localStorage.getItem("greenpass_news_data");
-    let list: NewsItem[] = [];
-    if (saved) {
-      try {
-        list = JSON.parse(saved);
-      } catch (e) {
+    if (!newsId) return;
+
+    let isMounted = true;
+    const loadNews = async () => {
+      // 1. Load from localStorage first for instant display
+      const saved = localStorage.getItem("greenpass_news_data");
+      let list: NewsItem[] = [];
+      if (saved) {
+        try {
+          list = JSON.parse(saved);
+        } catch (e) {
+          list = DEFAULT_NEWS;
+        }
+      } else {
         list = DEFAULT_NEWS;
       }
-    } else {
-      list = DEFAULT_NEWS;
-    }
-    setNewsList(list);
+      setNewsList(list);
 
-    const found = list.find((item) => item.id === newsId) || list[0];
-    if (found) {
-      setCurrentNews(found);
-      setTitle(found.title);
-      setContent(found.content);
-      setImage(found.image || "");
-    }
+      const customLocal = typeof window !== "undefined" ? localStorage.getItem(`greenpass_announcement_img_${newsId}`) : null;
+      const found = list.find((item) => String(item.id) === String(newsId));
+
+      if (found) {
+        setCurrentNews(found);
+        setTitle(found.title);
+        setContent(found.content);
+        setImage(customLocal || found.image || "");
+      }
+
+      // 2. Fetch latest data directly from backend database
+      try {
+        const idNum = Number(newsId);
+        if (!isNaN(idNum) && idNum > 0) {
+          const res = await announcementApi.getAnnouncementDetails(idNum);
+          const data = res?.result || res?.data;
+          if (data && isMounted) {
+            const apiItem: NewsItem = {
+              id: String(data.announcementId || data.id || newsId),
+              date: data.postDate || data.createdAt || data.date || "ไม่ระบุวันที่",
+              category: data.category || found?.category || "📢 ประกาศข่าวสารทั่วไป",
+              title: data.announcementTitle || data.title || "",
+              content: data.description || data.content || "",
+              image: data.image || found?.image || ""
+            };
+
+            setCurrentNews(apiItem);
+            setTitle(apiItem.title);
+            setContent(apiItem.content);
+            if (customLocal && customLocal.startsWith("data:")) {
+              setImage(customLocal);
+            } else if (apiItem.image) {
+              setImage(apiItem.image);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch announcement details from API:", err);
+      }
+    };
+
+    loadNews();
+    return () => { isMounted = false; };
   }, [newsId]);
+
+  const compressImage = (file: File, maxWidth = 900, maxHeight = 900, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          } else {
+            resolve((event.target?.result as string) || "");
+          }
+        };
+        img.onerror = () => resolve((event.target?.result as string) || "");
+      };
+      reader.onerror = () => resolve("");
+    });
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,35 +219,61 @@ function EditNewsDetailsContent() {
     setIsLoading(true);
     try {
       const username = localStorage.getItem("ranger_username") || "ranger01";
-      await announcementApi.updateAnnouncement(currentNews.id, {
-        title: cleanTitle,
-        content: cleanContent,
-        publishDate: currentNews.date,
-        username,
-        image
-      });
-    } catch (err) {
-      console.error("Failed to update announcement in database:", err);
-    } finally {
+      let serverImage = null;
+
+      // Keep existing image if not changed, do not default to dummy src/news1.jpg
+      const payloadImage = image ? image : (currentNews.image || "");
+
+      try {
+        const updateRes = await announcementApi.updateAnnouncement(String(currentNews.id), {
+          title: cleanTitle,
+          content: cleanContent,
+          publishDate: currentNews.date,
+          username,
+          image: payloadImage
+        });
+        serverImage = updateRes?.result?.image || updateRes?.data?.image;
+      } catch (err) {
+        console.error("Failed to update announcement in database:", err);
+      }
+
+      const finalImage = serverImage || image || currentNews.image || "";
+
+      if (finalImage && typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`greenpass_announcement_img_${currentNews.id}`, finalImage);
+        } catch (e) {}
+      } else if (!finalImage && typeof window !== "undefined") {
+        localStorage.removeItem(`greenpass_announcement_img_${currentNews.id}`);
+      }
+
       const updated = newsList.map((item) => {
-        if (item.id === currentNews.id) {
+        if (String(item.id) === String(currentNews.id)) {
           return {
             ...item,
             title: cleanTitle,
             content: cleanContent,
-            image: image
+            image: finalImage
           };
         }
         return item;
       });
 
-      localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
+      try {
+        localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
+      } catch (storageErr) {
+        console.warn("Could not save to localStorage:", storageErr);
+      }
       setSuccess("บันทึกแก้ไขข้อมูลข่าวสารสำเร็จเรียบร้อยแล้ว!");
       setIsLoading(false);
       
       setTimeout(() => {
         router.push("/ranger/list-news");
       }, 1000);
+    } catch (err) {
+      console.error("Failed to submit news update:", err);
+      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง");
+      setIsLoading(false);
     }
   };
 
@@ -196,11 +346,8 @@ function EditNewsDetailsContent() {
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center space-x-2 text-xs text-slate-500 font-bold">
             <Calendar className="w-4 h-4 text-emerald-600" />
-            <span>วันที่โพสต์ประกาศ: {currentNews.date}</span>
+            <span>วันที่โพสต์ประกาศ: {formatThaiDateLong(currentNews.date) || currentNews.date}</span>
           </div>
-          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-            ID: #{currentNews.id}
-          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -212,10 +359,10 @@ function EditNewsDetailsContent() {
               <span>รูปภาพประกาศ</span>
             </label>
 
-            <div className="w-full h-44 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden relative group flex flex-col items-center justify-center">
+            <div className="w-full min-h-[180px] max-h-[400px] bg-slate-900/5 border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden relative group flex flex-col items-center justify-center p-2">
               {image ? (
                 <>
-                  <img src={image} alt="News Preview" className="w-full h-full object-cover" />
+                  <img src={resolveImageUrl(image) || image} alt="News Preview" className="w-full h-auto max-h-[380px] object-contain rounded-xl shadow-sm mx-auto" />
                   <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
                     <label className="px-3 py-1.5 bg-white text-slate-900 font-bold text-[11px] rounded-xl cursor-pointer shadow-md">
                       เปลี่ยนรูปภาพ
@@ -223,16 +370,15 @@ function EditNewsDetailsContent() {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              if (typeof reader.result === "string") {
-                                setImage(reader.result);
-                              }
-                            };
-                            reader.readAsDataURL(file);
+                            try {
+                              const compressed = await compressImage(file, 900, 900, 0.7);
+                              setImage(compressed);
+                            } catch (err) {
+                              console.error("Image compression error:", err);
+                            }
                           }
                         }}
                       />
@@ -254,16 +400,15 @@ function EditNewsDetailsContent() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          if (typeof reader.result === "string") {
-                            setImage(reader.result);
-                          }
-                        };
-                        reader.readAsDataURL(file);
+                        try {
+                          const compressed = await compressImage(file, 900, 900, 0.7);
+                          setImage(compressed);
+                        } catch (err) {
+                          console.error("Image compression error:", err);
+                        }
                       }
                     }}
                   />

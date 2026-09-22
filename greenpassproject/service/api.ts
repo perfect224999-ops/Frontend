@@ -6,8 +6,13 @@
 import axios from 'axios';
 
 // สร้าง axios instance พร้อม config ตั้งต้น
-const getBaseURL = () => {
-  return 'http://172.20.10.2:8081/api/v1';
+export const getBaseURL = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    return `http://${hostname}:8081/api/v1`;
+  }
+  return 'http://localhost:8081/api/v1';
+  //return 'http://172.20.10.3:8081/api/v1';
 };
 
 const api = axios.create({
@@ -119,6 +124,7 @@ export const rangerApi = {
     gender: string | number;
     phone: string;
     email: string;
+    signature?: string;
   }) => {
     const response = await api.post('/ranger/add', payload);
     return response.data;
@@ -143,6 +149,7 @@ export const rangerApi = {
     gender: string;
     phone: string;
     email: string;
+    signature?: string;
     canIssueStamp: boolean;
     canAnnouncement: boolean;
     canEditParkDetails: boolean;
@@ -241,7 +248,7 @@ export const reportApi = {
     return response.data;
   },
   updateReportStatus: async (id: number, status: string, rangerUsername?: string, progress?: string, image?: string) => {
-    const response = await api.put(`/report/${id}/status`, { status, progress, image }, {
+    const response = await api.put(`/report/${id}/status`, { status, progress, image, username: rangerUsername, rangerUsername }, {
       headers: rangerUsername ? { username: rangerUsername } : {}
     });
     return response.data;

@@ -35,16 +35,56 @@ export default function AnnounceNews() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = (file: File, maxWidth = 900, maxHeight = 900, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          } else {
+            resolve((event.target?.result as string) || "");
+          }
+        };
+        img.onerror = () => resolve((event.target?.result as string) || "");
+      };
+      reader.onerror = () => resolve("");
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setImage(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file, 900, 900, 0.7);
+        setImage(compressedBase64);
+      } catch (err) {
+        console.error("Image compression error:", err);
+      }
     }
   };
 
@@ -72,28 +112,29 @@ export default function AnnounceNews() {
     try {
       const username = localStorage.getItem("ranger_username") || "pr01";
       const isoDate = new Date().toISOString().split("T")[0];
-      const apiImage = (image && image.length <= 255) ? image : "src/news1.jpg";
 
       const apiTitle = cleanTitle.length > 250 ? cleanTitle.substring(0, 250) : cleanTitle;
       const apiContent = `[${category}] ${cleanContent}`;
       const safeApiContent = apiContent.length > 250 ? apiContent.substring(0, 250) : apiContent;
 
       let createdId = null;
+      let serverImage = null;
       try {
         const res = await announcementApi.addAnnouncement({
           title: apiTitle,
           content: safeApiContent,
           publishDate: isoDate,
           username,
-          image: apiImage
+          image: image || "src/news1.jpg"
         });
         createdId = res?.result?.announcementId || res?.data?.announcementId;
+        serverImage = res?.result?.image || res?.data?.image;
       } catch (apiErr) {
         console.warn("API save warning, saving locally:", apiErr);
       }
 
       const newId = String(createdId || Date.now());
-      if (image && image.length > 255 && typeof window !== "undefined") {
+      if (image && typeof window !== "undefined") {
         try {
           localStorage.setItem(`greenpass_announcement_img_${newId}`, image);
         } catch (err) {}
@@ -101,24 +142,31 @@ export default function AnnounceNews() {
 
       // Save to local list for immediate display
       if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("greenpass_news_data");
-        let list: any[] = [];
-        if (saved) {
-          try { list = JSON.parse(saved); } catch (e) { list = []; }
+        try {
+          const saved = localStorage.getItem("greenpass_news_data");
+          let list: any[] = [];
+          if (saved) {
+            try { list = JSON.parse(saved); } catch (e) { list = []; }
+          }
+          const parkIdVal = Number(localStorage.getItem("ranger_park_id") || 1);
+          const parkNameVal = localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติเขาใหญ่";
+          list.unshift({
+            id: newId,
+            date: publishDate,
+            category,
+            title: cleanTitle,
+            content: cleanContent,
+            image: serverImage || image || "src/news1.jpg",
+            parkId: parkIdVal,
+            parkName: parkNameVal
+          });
+          if (list.length > 30) {
+            list = list.slice(0, 30);
+          }
+          localStorage.setItem("greenpass_news_data", JSON.stringify(list));
+        } catch (storageErr) {
+          console.warn("Could not save to localStorage due to quota or storage restrictions:", storageErr);
         }
-        const parkIdVal = Number(localStorage.getItem("ranger_park_id") || 1);
-        const parkNameVal = localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติเขาใหญ่";
-        list.unshift({
-          id: newId,
-          date: publishDate,
-          category,
-          title: cleanTitle,
-          content: cleanContent,
-          image: image || "src/news1.jpg",
-          parkId: parkIdVal,
-          parkName: parkNameVal
-        });
-        localStorage.setItem("greenpass_news_data", JSON.stringify(list));
       }
 
       setSuccess("บันทึกและประกาศข่าวสารอุทยานสำเร็จเรียบร้อยแล้ว!");
@@ -191,10 +239,10 @@ export default function AnnounceNews() {
             <span>รูปภาพประกอบประกาศ</span>
           </label>
 
-          <div className="w-full h-52 bg-slate-50 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl transition-all flex flex-col items-center justify-center relative overflow-hidden group">
+          <div className="w-full min-h-[220px] max-h-[520px] bg-slate-900/5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl transition-all flex flex-col items-center justify-center relative overflow-hidden group p-2">
             {image ? (
               <>
-                <img src={image} alt="Preview" className="w-full h-full object-cover" />
+                <img src={image} alt="Preview" className="w-full h-auto max-h-[500px] object-contain rounded-xl shadow-sm mx-auto" />
                 <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <label className="px-4 py-2 bg-white text-slate-900 font-bold text-xs rounded-xl cursor-pointer shadow-md hover:bg-slate-100">
                     เปลี่ยนรูปภาพ
@@ -203,7 +251,7 @@ export default function AnnounceNews() {
                   <button
                     type="button"
                     onClick={() => setImage("")}
-                    className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md hover:bg-rose-500"
+                    className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md hover:bg-rose-500 cursor-pointer"
                   >
                     ลบรูปภาพ
                   </button>

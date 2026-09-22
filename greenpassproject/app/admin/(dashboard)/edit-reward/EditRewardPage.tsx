@@ -54,6 +54,7 @@ function EditRewardContent() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const compressImage = (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.75): Promise<string> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -278,8 +279,8 @@ function EditRewardContent() {
             </label>
 
             {imageUrl ? (
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner group h-44 bg-slate-100">
-                <img src={imageUrl} alt="Reward Preview" className="w-full h-full object-cover" />
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner group min-h-[180px] max-h-[380px] bg-slate-900/5 flex items-center justify-center p-2">
+                <img src={imageUrl} alt="Reward Preview" className="w-full h-auto max-h-[360px] object-contain rounded-xl mx-auto shadow-sm" />
                 <button
                   type="button"
                   onClick={() => setImageUrl("")}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { rangerApi } from "../../../../service/api";
+import { rangerApi, parkApi, getBaseURL } from "../../../../service/api";
 import { 
   getProvincesList, 
   getDistrictsByProvince, 
@@ -22,11 +22,17 @@ import {
   ArrowLeft, 
   Check, 
   ChevronDown,
+  ChevronUp,
+  Search,
   Users,
   Lock,
   Hash,
   Eye,
-  EyeOff
+  EyeOff,
+  FileSignature,
+  UploadCloud,
+  X,
+  ImageIcon
 } from "lucide-react";
 
 interface Ranger {
@@ -47,6 +53,7 @@ interface Ranger {
   gender: string;
   phone: string;
   email: string;
+  signature?: string;
   role?: string;
 }
 
@@ -133,6 +140,71 @@ function EditProfileContent() {
   const [birthDate, setBirthDate] = useState("");
   const [position, setPosition] = useState("");
   const [parkName, setParkName] = useState("");
+  const [parkSearchQuery, setParkSearchQuery] = useState("");
+  const [isParkDropdownOpen, setIsParkDropdownOpen] = useState(false);
+  const parkDropdownRef = useRef<HTMLDivElement>(null);
+  const [dbParks, setDbParks] = useState<Array<{ parkId: number; name: string }>>([]);
+
+  useEffect(() => {
+    async function loadParks() {
+      try {
+        const res = await parkApi.searchParks("");
+        const list = res?.result || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped = list.map((p: any) => ({
+            parkId: p.parkId || p.id,
+            name: p.name
+          }));
+          setDbParks(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch parks from database:", err);
+      }
+    }
+    loadParks();
+  }, []);
+
+  const allParkOptions = useMemo(() => {
+    if (dbParks.length > 0) {
+      return dbParks.map((p) => p.name);
+    }
+    return [
+      "อุทยานแห่งชาติแก่งกระจาน",
+      "อุทยานแห่งชาติเขาใหญ่",
+      "อุทยานแห่งชาติเอราวัณ",
+      "อุทยานแห่งชาติสุเทพ-ปุย",
+      "อุทยานแห่งชาติดอยอินทนนท์"
+    ];
+  }, [dbParks]);
+
+  const filteredParks = useMemo(() => {
+    const q = parkSearchQuery.trim().toLowerCase();
+    if (!q) return allParkOptions;
+    return allParkOptions.filter((name) => 
+      name.toLowerCase().includes(q) ||
+      name.replace(/อุทยานแห่งชาติ/g, "").trim().toLowerCase().includes(q)
+    );
+  }, [allParkOptions, parkSearchQuery]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (parkDropdownRef.current && !parkDropdownRef.current.contains(event.target as Node)) {
+        setIsParkDropdownOpen(false);
+        setParkSearchQuery(parkName);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [parkName]);
+
+  const handleSelectPark = (selected: string) => {
+    setParkName(selected);
+    setParkSearchQuery(selected);
+    setIsParkDropdownOpen(false);
+  };
+
   const [startDate, setStartDate] = useState("");
   const [district, setDistrict] = useState("");
   const [subDistrict, setSubDistrict] = useState("");
@@ -141,10 +213,88 @@ function EditProfileContent() {
   const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [signature, setSignature] = useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const getSignatureImageSrc = (sig: string) => {
+    if (!sig) return "";
+    const trimmed = sig.trim();
+    if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
+      const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+      const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+      return `${baseUrl}${cleanPath}`;
+    }
+    if (trimmed.startsWith("src/")) {
+      return `/${trimmed}`;
+    }
+    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+    return `${baseUrl}/uploads/signatures/${trimmed}`;
+  };
+
+  const compressImage = (file: File, maxWidth = 800, maxHeight = 400, quality = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL(file.type || "image/png", quality));
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleSignatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressedBase64 = await compressImage(file);
+        setSignature(compressedBase64);
+      } catch (err) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === "string") {
+            setSignature(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchRangerData = async () => {
@@ -210,7 +360,8 @@ function EditProfileContent() {
               subDistrict: item.subDistrict || "-",
               province: item.province || "-",
               zipcode: item.zipcode || "10000",
-              gender: item.gender === 2 ? "หญิง" : "ชาย"
+              gender: item.gender === 2 ? "หญิง" : "ชาย",
+              signature: item.signature || "src/sig1.png"
             };
           }
         } catch (err) {
@@ -240,7 +391,8 @@ function EditProfileContent() {
               subDistrict: item.subDistrict || "-",
               province: item.province || "-",
               zipcode: item.zipcode || "10000",
-              gender: item.gender === 2 ? "หญิง" : "ชาย"
+              gender: item.gender === 2 ? "หญิง" : "ชาย",
+              signature: item.signature || "src/sig1.png"
             }));
             const found = list.find((r: any) => 
               String(r.id).toLowerCase() === targetUsername.toLowerCase() || 
@@ -292,7 +444,9 @@ function EditProfileContent() {
       setLastName(foundRanger.lastName || foundRanger.name.split(" ")[1] || "");
       setBirthDate(foundRanger.birthDate || "");
       setPosition(foundRanger.position || "เจ้าหน้าที่อุทยาน");
-      setParkName(foundRanger.parkName || "อุทยานแห่งชาติเขาใหญ่");
+      const initialPark = foundRanger.parkName || "อุทยานแห่งชาติเขาใหญ่";
+      setParkName(initialPark);
+      setParkSearchQuery(initialPark);
       setStartDate(foundRanger.startDate || "");
       const cleanDist = (foundRanger.district && foundRanger.district !== "-") ? foundRanger.district : "";
       const cleanSub = (foundRanger.subDistrict && foundRanger.subDistrict !== "-") ? foundRanger.subDistrict : "";
@@ -305,6 +459,8 @@ function EditProfileContent() {
       setGender(foundRanger.gender || "ชาย");
       setPhone(foundRanger.phone || "");
       setEmail(foundRanger.email || "");
+      const sigValue = foundRanger.signature || localStorage.getItem(`greenpass_ranger_sig_${foundRanger.id || foundRanger.employeeId}`) || "";
+      setSignature(sigValue);
     };
 
     fetchRangerData();
@@ -461,7 +617,8 @@ function EditProfileContent() {
           zipcode: zipcode.trim().slice(0, 5),
           gender: gender === "หญิง" ? "2" : "1",
           phone,
-          email
+          email,
+          signature: signature.trim() || currentRanger.signature || "src/sig1.png"
         });
       } catch (apiErr) {
         console.warn("Could not update ranger in backend DB API:", apiErr);
@@ -484,8 +641,15 @@ function EditProfileContent() {
         zipcode,
         gender,
         phone,
-        email
+        email,
+        signature: signature.trim() || currentRanger.signature || "src/sig1.png"
       };
+
+      if (signature) {
+        try {
+          localStorage.setItem(`greenpass_ranger_sig_${currentRanger.id}`, signature);
+        } catch (e) {}
+      }
 
       // Update in greenpass_rangers array
       const savedRangers = localStorage.getItem("greenpass_rangers");
@@ -701,26 +865,105 @@ function EditProfileContent() {
                 </div>
               </div>
 
-              {/* อุทยานที่สังกัด */}
-              <div className="space-y-1.5">
+              {/* อุทยานที่สังกัด (Searchable Combobox) */}
+              <div className="space-y-1.5 relative" ref={parkDropdownRef}>
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                   <Trees className="w-3.5 h-3.5 text-emerald-600" />
                   <span>อุทยานที่สังกัด</span>
                 </label>
                 <div className="relative">
-                  <select
-                    value={parkName}
-                    onChange={(e) => setParkName(e.target.value)}
-                    className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10"
-                    disabled={isLoading}
-                  >
-                    <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
-                    <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
-                    <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
-                    <option value="อุทยานแห่งชาติสุเทพ-ปุย">อุทยานแห่งชาติสุเทพ-ปุย</option>
-                    <option value="อุทยานแห่งชาติดอยอินทนนท์">อุทยานแห่งชาติดอยอินทนนท์</option>
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={isParkDropdownOpen ? parkSearchQuery : parkName}
+                      onChange={(e) => {
+                        setParkSearchQuery(e.target.value);
+                        if (!isParkDropdownOpen) setIsParkDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        setParkSearchQuery(parkName);
+                        setIsParkDropdownOpen(true);
+                      }}
+                      placeholder="พิมพ์ค้นหา หรือเลือกอุทยานแห่งชาติ..."
+                      className="w-full bg-slate-50 text-slate-900 rounded-xl pl-3.5 pr-16 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-text placeholder:text-slate-400"
+                      disabled={isLoading}
+                    />
+                    <div className="absolute right-2.5 flex items-center gap-1 text-slate-400">
+                      {isParkDropdownOpen && parkSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setParkSearchQuery("");
+                          }}
+                          className="p-1 hover:text-slate-600 rounded-full hover:bg-slate-200/60 transition-colors"
+                          title="ล้างคำค้นหา"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isParkDropdownOpen) {
+                            setParkSearchQuery(parkName);
+                          }
+                          setIsParkDropdownOpen(!isParkDropdownOpen);
+                        }}
+                        className="p-1 hover:text-emerald-700 rounded-full transition-colors"
+                      >
+                        {isParkDropdownOpen ? (
+                          <ChevronUp className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {isParkDropdownOpen && (
+                    <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/80 overflow-hidden max-h-64 flex flex-col animate-in fade-in-0 zoom-in-95 duration-100">
+                      <div className="p-2 border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium text-slate-500 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Search className="w-3 h-3 text-emerald-600" />
+                          ผลการค้นหา
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {filteredParks.length} แห่ง
+                        </span>
+                      </div>
+
+                      <div className="overflow-y-auto max-h-52 divide-y divide-slate-50">
+                        {filteredParks.length > 0 ? (
+                          filteredParks.map((pName) => {
+                            const isSelected = pName === parkName;
+                            return (
+                              <button
+                                key={pName}
+                                type="button"
+                                onClick={() => handleSelectPark(pName)}
+                                className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition-colors ${
+                                  isSelected 
+                                    ? "bg-emerald-50/90 text-emerald-800 font-bold" 
+                                    : "text-slate-700 hover:bg-slate-50 hover:text-emerald-700 font-medium"
+                                }`}
+                              >
+                                <span className="truncate pr-2">{pName}</span>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="p-4 text-center text-xs text-slate-400">
+                            ไม่พบข้อมูลอุทยานแห่งชาติที่ค้นหา
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -737,6 +980,82 @@ function EditProfileContent() {
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
                   disabled={isLoading}
                 />
+              </div>
+
+              {/* รูปลายเซ็นเจ้าหน้าที่ (Signature) */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <FileSignature className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>รูปลายเซ็นเจ้าหน้าที่ (Signature)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    รองรับไฟล์ JPG, PNG, WEBP (พื้นหลังโปร่งใสหรือสีขาว)
+                  </span>
+                </label>
+
+                {signature ? (
+                  <div className="relative rounded-2xl border border-emerald-200 bg-emerald-50/20 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-28 h-16 bg-white rounded-xl border border-slate-200 flex items-center justify-center p-1.5 overflow-hidden shadow-sm">
+                        <img 
+                          src={getSignatureImageSrc(signature)} 
+                          alt="Signature Preview" 
+                          className="max-w-full max-h-full object-contain" 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" /> แนบรูปลายเซ็นเรียบร้อย
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          รูปลายเซ็นนี้จะใช้สำหรับประทับตราดิจิทัล (Digital Stamp) ของเจ้าหน้าที่
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer border border-slate-200 shadow-xs">
+                        <UploadCloud className="w-3.5 h-3.5 text-emerald-600" />
+                        เปลี่ยนรูป
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleSignatureChange}
+                          disabled={isLoading}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setSignature("")}
+                        className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer border border-red-200/60 shadow-xs"
+                        disabled={isLoading}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        ลบรูป
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="w-full border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/70 hover:bg-emerald-50/30 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group text-center">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                      <UploadCloud className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 group-hover:text-emerald-700">
+                      คลิกเพื่อเลือกไฟล์รูปลายเซ็นเจ้าหน้าที่...
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      แนะนำภาพลายเซ็นแนวนอน (หรือรูปภาพที่มีลายมือชื่อเจ้าหน้าที่)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleSignatureChange}
+                      disabled={isLoading}
+                    />
+                  </label>
+                )}
               </div>
 
             </div>

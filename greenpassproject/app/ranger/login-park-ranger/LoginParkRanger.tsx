@@ -48,6 +48,10 @@ export default function LoginParkRanger() {
       if (isSuccess) {
         const rangerData = response.result || response.data;
         localStorage.setItem("ranger_username", cleanUsername);
+        const rangerFullName = rangerData?.firstname 
+          ? `${rangerData.firstname} ${rangerData.surname || ''}`.trim() 
+          : cleanUsername;
+        localStorage.setItem("ranger_name", rangerFullName);
         localStorage.removeItem("greenpass_park_saved_data");
 
         const targetParkId = rangerData?.park?.parkId || rangerData?.parkId;

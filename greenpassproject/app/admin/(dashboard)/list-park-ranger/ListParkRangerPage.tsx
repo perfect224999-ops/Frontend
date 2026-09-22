@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { rangerApi } from "../../../../service/api";
 import { Search, Filter, ChevronDown, UserCheck, Plus, ShieldCheck } from "lucide-react";
@@ -116,6 +116,21 @@ export default function ListParkRangerPage() {
   }, []);
 
 
+  const uniqueParks = useMemo(() => {
+    const defaultList = [
+      "อุทยานแห่งชาติเขาใหญ่",
+      "อุทยานแห่งชาติแก่งกระจาน",
+      "อุทยานแห่งชาติเอราวัณ",
+      "อุทยานแห่งชาติดอยสุเทพ-ปุย",
+      "อุทยานแห่งชาติดอยอินทนนท์"
+    ];
+    const set = new Set<string>(defaultList);
+    rangers.forEach((r) => {
+      if (r.parkName && r.parkName !== "อุทยานแห่งชาติ") set.add(r.parkName);
+    });
+    return Array.from(set);
+  }, [rangers]);
+
   const filteredRangers = rangers.filter((r) => {
     const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           r.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -181,11 +196,9 @@ export default function ListParkRangerPage() {
               className="w-full md:w-64 bg-white text-slate-800 rounded-xl pl-9 pr-10 py-2 text-xs font-medium border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer"
             >
               <option value="ทั้งหมด">เลือกอุทยานทั้งหมด</option>
-              <option value="อุทยานแห่งชาติเขาใหญ่">อุทยานแห่งชาติเขาใหญ่</option>
-              <option value="อุทยานแห่งชาติแก่งกระจาน">อุทยานแห่งชาติแก่งกระจาน</option>
-              <option value="อุทยานแห่งชาติเอราวัณ">อุทยานแห่งชาติเอราวัณ</option>
-              <option value="อุทยานแห่งชาติดอยสุเทพ-ปุย">อุทยานแห่งชาติดอยสุเทพ-ปุย</option>
-              <option value="อุทยานแห่งชาติดอยอินทนนท์">อุทยานแห่งชาติดอยอินทนนท์</option>
+              {uniqueParks.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>

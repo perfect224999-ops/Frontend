@@ -20,7 +20,7 @@ import {
   Share2,
   Newspaper
 } from "lucide-react";
-import { announcementApi } from "../../../../service/api";
+import { announcementApi, getBaseURL } from "../../../../service/api";
 
 interface NewsItem {
   id: string;
@@ -33,17 +33,39 @@ interface NewsItem {
   parkName?: string;
 }
 
+const resolveImageUrl = (img?: string | null) => {
+  if (!img) return null;
+  const trimmed = img.trim();
+  if (!trimmed || trimmed === "null" || trimmed === "undefined" || trimmed === "-") return null;
+  if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
+    return trimmed;
+  }
+  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://localhost:8081/api/v1";
+  if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
+    const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${baseUrl}${cleanPath}`;
+  }
+  if (!trimmed.includes("/")) {
+    if (trimmed.toLowerCase() === "news1.jpg" || trimmed.toLowerCase() === "default.jpg") {
+      return null;
+    }
+    return `${baseUrl}/uploads/announcements/${trimmed}`;
+  }
+  if (trimmed.startsWith("/")) {
+    return `${baseUrl}${trimmed}`;
+  }
+  return `${baseUrl}/${trimmed}`;
+};
+
 const getImageUrl = (item: NewsItem) => {
   if (typeof window !== "undefined" && item.id) {
     const customLocal = localStorage.getItem(`greenpass_announcement_img_${item.id}`);
-    if (customLocal) return customLocal;
+    if (customLocal) {
+      const resolved = resolveImageUrl(customLocal);
+      if (resolved) return resolved;
+    }
   }
-  const img = item.image;
-  if (!img) return null;
-  if (img.startsWith("data:") || img.startsWith("http://") || img.startsWith("https://") || img.startsWith("/")) {
-    return img;
-  }
-  return `/${img}`;
+  return resolveImageUrl(item.image);
 };
 
 const formatThaiDateLong = (dateStr: string) => {
@@ -141,7 +163,11 @@ export default function ListNews() {
       const mergedList = Array.from(map.values());
       mergedList.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
       setNews(mergedList);
-      localStorage.setItem("greenpass_news_data", JSON.stringify(mergedList));
+      try {
+        localStorage.setItem("greenpass_news_data", JSON.stringify(mergedList));
+      } catch (storageErr) {
+        console.warn("Could not save greenpass_news_data to localStorage:", storageErr);
+      }
       setIsLoading(false);
     };
 
@@ -164,7 +190,14 @@ export default function ListNews() {
     } finally {
       const updated = news.filter((item) => String(item.id) !== String(selectedDeleteId));
       setNews(updated);
-      localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
+      try {
+        localStorage.setItem("greenpass_news_data", JSON.stringify(updated));
+      } catch (storageErr) {
+        console.warn("Could not save to localStorage:", storageErr);
+      }
+      try {
+        localStorage.removeItem(`greenpass_announcement_img_${selectedDeleteId}`);
+      } catch (e) {}
       setShowDeleteModal(false);
       setSelectedDeleteId(null);
       setDeleteSuccess("ลบรายการประกาศข่าวสารเรียบร้อยแล้ว!");

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { rangerApi } from "../../../../service/api";
+import { rangerApi, getBaseURL } from "../../../../service/api";
 import { 
   User, 
   IdCard, 
@@ -17,12 +17,14 @@ import {
   ShieldCheck, 
   CheckCircle2, 
   XCircle,
-  Users
+  Users,
+  FileSignature
 } from "lucide-react";
 
 interface Ranger {
   id: string;
   employeeId: string;
+  username?: string;
   name: string;
   firstName: string;
   lastName: string;
@@ -39,6 +41,11 @@ interface Ranger {
   email: string;
   roles?: string[];
   role?: string;
+  signature?: string;
+  canIssueStamp?: boolean;
+  canAnnouncement?: boolean;
+  canEditParkDetails?: boolean;
+  canProgressReport?: boolean;
 }
 
 const DEFAULT_RANGERS: Ranger[] = [
@@ -107,6 +114,24 @@ const formatSlashDate = (dateStr: string) => {
   return dateStr;
 };
 
+const getSignatureImageSrc = (sig: string) => {
+  if (!sig) return "";
+  const trimmed = sig.trim();
+  if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
+    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+    const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${baseUrl}${cleanPath}`;
+  }
+  if (trimmed.startsWith("src/")) {
+    return `/${trimmed}`;
+  }
+  const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+  return `${baseUrl}/uploads/signatures/${trimmed}`;
+};
+
 function RangerDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -117,20 +142,218 @@ function RangerDetailContent() {
     const fetchRangerData = async () => {
       if (!rangerId) return;
 
-      // 1. Check local storage "greenpass_rangers" list first (handles newly added rangers with timestamp IDs)
+      const cleanRangerId = String(rangerId).trim();
+      const lowerRangerId = cleanRangerId.toLowerCase();
+
+      // Normalize target username for API calls
+      let targetUsername = cleanRangerId;
+      if (lowerRangerId.startsWith("ranger")) {
+        targetUsername = lowerRangerId;
+      } else if (/^\d+$/.test(cleanRangerId) && cleanRangerId.length <= 2) {
+        targetUsername = `ranger${cleanRangerId.padStart(2, "0")}`;
+      } else {
+        // If it's a numeric timestamp ID (from local storage mock), check greenpass_rangers for real username/employeeId
+        try {
+          const saved = localStorage.getItem("greenpass_rangers");
+          if (saved) {
+            const list = JSON.parse(saved);
+            const found = list.find((r: any) => String(r.id) === cleanRangerId);
+            if (found && (found.username || found.employeeId)) {
+              targetUsername = String(found.username || found.employeeId).trim();
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Helper to compute roles list from API item or local storage object
+      const computeRoles = (item: any, fallbackUsername?: string): string[] => {
+        // If boolean flags exist on the object, use them directly (authoritative from DB)
+        const hasFlags = (
+          item.canIssueStamp !== undefined ||
+          item.canAnnouncement !== undefined ||
+          item.canEditParkDetails !== undefined ||
+          item.canProgressReport !== undefined
+        );
+        if (hasFlags) {
+          return [
+            Boolean(item.canIssueStamp) && "สแกนแสตมป์",
+            Boolean(item.canAnnouncement) && "ประกาศข่าวสาร",
+            Boolean(item.canEditParkDetails) && "แก้ไขรายละเอียด",
+            Boolean(item.canProgressReport) && "รายงานความคืบหน้าของเหตุการณ์"
+          ].filter(Boolean) as string[];
+        }
+
+        // If explicit roles array exists and not empty
+        if (Array.isArray(item.roles) && item.roles.length > 0) {
+          return item.roles;
+        }
+
+        // Check local storage dedicated roles key
+        const userKey = (fallbackUsername || targetUsername || cleanRangerId).toLowerCase();
+        try {
+          const savedRoles = localStorage.getItem(`greenpass_ranger_roles_${userKey}`);
+          if (savedRoles) {
+            const parsed = JSON.parse(savedRoles);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed;
+            }
+          }
+        } catch (e) {}
+
+        // Default: By system design, newly created rangers have all 4 roles enabled
+        return [
+          "สแกนแสตมป์",
+          "ประกาศข่าวสาร",
+          "แก้ไขรายละเอียด",
+          "รายงานความคืบหน้าของเหตุการณ์"
+        ];
+      };
+
+      // 1. Try getRangerByUsername from MySQL DB API (Primary Source of Truth)
+      try {
+        const usernamesToTry = [
+          targetUsername,
+          targetUsername.toLowerCase(),
+          targetUsername.toUpperCase(),
+          cleanRangerId,
+          cleanRangerId.toLowerCase()
+        ];
+        const uniqueUsernames = Array.from(new Set(usernamesToTry));
+
+        for (const u of uniqueUsernames) {
+          try {
+            const res = await rangerApi.getRangerByUsername(u);
+            const item = res?.result || res?.data;
+            if (res && (res.success || res.status) && item) {
+              const activeRoles = computeRoles(item, item.username || u);
+              const mappedRanger: Ranger = {
+                id: item.username || u,
+                employeeId: (item.username || u).toUpperCase(),
+                name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username || u,
+                phone: item.mobilephone || "",
+                email: item.email || "",
+                position: item.position || "เจ้าหน้าที่อุทยาน",
+                parkName: item.park?.name || "อุทยานแห่งชาติเขาใหญ่",
+                firstName: item.firstname || "",
+                lastName: item.surname || "",
+                birthDate: formatThaiDate(item.birthDate),
+                startDate: formatSlashDate(item.startDate),
+                district: item.district || "-",
+                subDistrict: item.subDistrict || "-",
+                province: item.province || "-",
+                zipcode: item.zipcode || "",
+                gender: item.gender === 2 ? "หญิง" : "ชาย",
+                signature: item.signature || "src/sig1.png",
+                roles: activeRoles
+              };
+              setRanger(mappedRanger);
+
+              // Keep local storage in sync with DB data
+              try {
+                const savedRangers = localStorage.getItem("greenpass_rangers");
+                if (savedRangers) {
+                  const list = JSON.parse(savedRangers);
+                  const updatedList = list.map((r: any) => {
+                    const match =
+                      String(r.username || "").toLowerCase() === String(item.username || u).toLowerCase() ||
+                      String(r.employeeId || "").toLowerCase() === String(item.username || u).toLowerCase() ||
+                      String(r.id || "").toLowerCase() === cleanRangerId.toLowerCase();
+                    if (match) {
+                      return {
+                        ...r,
+                        ...mappedRanger,
+                        roles: activeRoles,
+                        canIssueStamp: Boolean(item.canIssueStamp),
+                        canAnnouncement: Boolean(item.canAnnouncement),
+                        canEditParkDetails: Boolean(item.canEditParkDetails),
+                        canProgressReport: Boolean(item.canProgressReport)
+                      };
+                    }
+                    return r;
+                  });
+                  localStorage.setItem("greenpass_rangers", JSON.stringify(updatedList));
+                }
+                localStorage.setItem(`greenpass_ranger_detail_${cleanRangerId}`, JSON.stringify(mappedRanger));
+                localStorage.setItem(`greenpass_ranger_roles_${String(item.username || u).toLowerCase()}`, JSON.stringify(activeRoles));
+              } catch (e) {}
+
+              return;
+            }
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.warn("Could not fetch ranger by username:", err);
+      }
+
+      // 2. Try getAllRangers from MySQL DB API
+      try {
+        const response = await rangerApi.getAllRangers();
+        const rawList = response?.result || response?.data || (Array.isArray(response) ? response : []);
+        if (Array.isArray(rawList)) {
+          const found = rawList.find((item: any) => {
+            const u = String(item.username || "").toLowerCase();
+            const emp = String(item.employeeId || "").toLowerCase();
+            const i = String(item.id || "").toLowerCase();
+            return (
+              u === lowerRangerId ||
+              emp === lowerRangerId ||
+              i === lowerRangerId ||
+              u === targetUsername.toLowerCase() ||
+              emp === targetUsername.toLowerCase()
+            );
+          });
+          if (found) {
+            const activeRoles = computeRoles(found, found.username);
+            const mappedRanger: Ranger = {
+              id: found.username,
+              employeeId: found.username.toUpperCase(),
+              name: `${found.firstname || ""} ${found.surname || ""}`.trim() || found.username,
+              phone: found.mobilephone || "",
+              email: found.email || "",
+              position: found.position || "เจ้าหน้าที่อุทยาน",
+              parkName: found.park?.name || "อุทยานแห่งชาติ",
+              firstName: found.firstname || "",
+              lastName: found.surname || "",
+              birthDate: formatThaiDate(found.birthDate),
+              startDate: formatSlashDate(found.startDate),
+              district: found.district || "-",
+              subDistrict: found.subDistrict || "-",
+              province: found.province || "-",
+              zipcode: found.zipcode || "",
+              gender: found.gender === 2 ? "หญิง" : "ชาย",
+              signature: found.signature || "src/sig1.png",
+              roles: activeRoles
+            };
+            setRanger(mappedRanger);
+
+            try {
+              localStorage.setItem(`greenpass_ranger_detail_${cleanRangerId}`, JSON.stringify(mappedRanger));
+              localStorage.setItem(`greenpass_ranger_roles_${String(found.username).toLowerCase()}`, JSON.stringify(activeRoles));
+            } catch (e) {}
+
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // 3. Check local storage "greenpass_rangers" list (Fallback for offline/local mocks)
       const savedRangers = localStorage.getItem("greenpass_rangers");
       if (savedRangers) {
         try {
           const list: Ranger[] = JSON.parse(savedRangers);
           const found = list.find((r: any) => 
-            String(r.id) === String(rangerId) ||
-            String(r.username) === String(rangerId) ||
-            String(r.employeeId) === String(rangerId) ||
-            `PR${r.id}` === rangerId ||
-            (r.username && r.username.toLowerCase() === rangerId.toLowerCase())
+            String(r.id).toLowerCase() === lowerRangerId ||
+            String(r.username || "").toLowerCase() === lowerRangerId ||
+            String(r.employeeId || "").toLowerCase() === lowerRangerId ||
+            `pr${r.id}`.toLowerCase() === lowerRangerId ||
+            String(r.username || "").toLowerCase() === targetUsername.toLowerCase()
           );
           if (found) {
-            setRanger(found);
+            const activeRoles = computeRoles(found, found.username || found.employeeId);
+            setRanger({
+              ...found,
+              roles: activeRoles
+            });
             return;
           }
         } catch (e) {
@@ -138,98 +361,26 @@ function RangerDetailContent() {
         }
       }
 
-      // 2. Check local storage individual key "greenpass_ranger_detail_" + rangerId
-      const savedIndividual = localStorage.getItem(`greenpass_ranger_detail_${rangerId}`);
+      // 4. Check local storage individual key "greenpass_ranger_detail_" + rangerId
+      const savedIndividual = localStorage.getItem(`greenpass_ranger_detail_${cleanRangerId}`);
       if (savedIndividual) {
         try {
-          setRanger(JSON.parse(savedIndividual));
+          const parsed = JSON.parse(savedIndividual);
+          const activeRoles = computeRoles(parsed, parsed.username || cleanRangerId);
+          setRanger({
+            ...parsed,
+            roles: activeRoles
+          });
           return;
         } catch (e) {}
       }
 
-      // Normalize username for API call (e.g. "01" -> "ranger01", "ranger01" -> "ranger01")
-      const targetUsername = rangerId.startsWith("ranger") 
-        ? rangerId 
-        : (rangerId.length <= 2 ? `ranger${rangerId.padStart(2, "0")}` : rangerId);
-
-      // 3. Try getRangerByUsername from MySQL DB API
-      try {
-        const res = await rangerApi.getRangerByUsername(targetUsername);
-        const item = res?.result || res?.data;
-        if (res && (res.success || res.status) && item) {
-          setRanger({
-            id: item.username,
-            employeeId: item.username.toUpperCase(),
-            name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username,
-            phone: item.mobilephone || "",
-            email: item.email || "",
-            position: item.position || "เจ้าหน้าที่อุทยาน",
-            parkName: item.park?.name || "อุทยานแห่งชาติเขาใหญ่",
-            firstName: item.firstname || "",
-            lastName: item.surname || "",
-            birthDate: formatThaiDate(item.birthDate),
-            startDate: formatSlashDate(item.startDate),
-            district: item.district || "-",
-            subDistrict: item.subDistrict || "-",
-            province: item.province || "-",
-            gender: item.gender === 2 ? "หญิง" : "ชาย",
-            roles: [
-              item.canIssueStamp && "สแกนแสตมป์",
-              item.canAnnouncement && "ประกาศข่าวสาร",
-              item.canEditParkDetails && "แก้ไขรายละเอียด",
-              item.canProgressReport && "รายงานความคืบหน้าของเหตุการณ์"
-            ].filter(Boolean) as string[]
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn("Could not fetch ranger by username:", err);
-      }
-
-      // 4. Try getAllRangers from MySQL DB API
-      try {
-        const response = await rangerApi.getAllRangers();
-        if (response && (response.success || response.status) && response.result) {
-          const list = response.result.map((item: any) => ({
-            id: item.username,
-            employeeId: item.username.toUpperCase(),
-            name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username,
-            phone: item.mobilephone || "",
-            email: item.email || "",
-            position: item.position || "เจ้าหน้าที่อุทยาน",
-            parkName: item.park?.name || "อุทยานแห่งชาติ",
-            firstName: item.firstname || "",
-            lastName: item.surname || "",
-            birthDate: formatThaiDate(item.birthDate),
-            startDate: formatSlashDate(item.startDate),
-            district: item.district || "-",
-            subDistrict: item.subDistrict || "-",
-            province: item.province || "-",
-            gender: item.gender === 2 ? "หญิง" : "ชาย",
-            roles: [
-              item.canIssueStamp && "สแกนแสตมป์",
-              item.canAnnouncement && "ประกาศข่าวสาร",
-              item.canEditParkDetails && "แก้ไขรายละเอียด",
-              item.canProgressReport && "รายงานความคืบหน้าของเหตุการณ์"
-            ].filter(Boolean) as string[]
-          }));
-          const found = list.find((r: any) => 
-            String(r.id).toLowerCase() === targetUsername.toLowerCase() || 
-            String(r.id).toLowerCase() === rangerId.toLowerCase()
-          );
-          if (found) {
-            setRanger(found);
-            return;
-          }
-        }
-      } catch (e) {}
-
       // 5. Check DEFAULT_RANGERS
       const defFound = DEFAULT_RANGERS.find(r => 
-        r.id === rangerId || 
-        r.id === targetUsername || 
-        `PR${r.id}` === rangerId ||
-        `PR${r.id}` === targetUsername
+        r.id.toLowerCase() === lowerRangerId || 
+        r.id.toLowerCase() === targetUsername.toLowerCase() || 
+        `pr${r.id}`.toLowerCase() === lowerRangerId ||
+        `pr${r.id}`.toLowerCase() === targetUsername.toLowerCase()
       );
       if (defFound) {
         setRanger(defFound);
@@ -238,22 +389,24 @@ function RangerDetailContent() {
 
       // 6. Fallback so page NEVER renders empty
       setRanger({
-        id: rangerId,
-        employeeId: rangerId.length <= 4 ? `PR${rangerId}` : rangerId.toUpperCase(),
+        id: cleanRangerId,
+        employeeId: cleanRangerId.length <= 4 ? `PR${cleanRangerId.replace(/^pr/i, "")}` : cleanRangerId.toUpperCase(),
         name: "สมชาย ใจดี",
         firstName: "สมชาย",
         lastName: "ใจดี",
         birthDate: "15 ต.ค. 2547",
-        position: "เจ้าหน้าที่อุทยาน",
+        position: "หัวหน้าอุทยาน",
         parkName: "อุทยานแห่งชาติเขาใหญ่",
         startDate: "15/10/2566",
         district: "ปากช่อง",
         subDistrict: "ปากช่อง",
         province: "นครราชสีมา",
+        zipcode: "30130",
         gender: "ชาย",
-        phone: "089-1234567",
-        email: "ranger01@park.go.th",
-        roles: ["สแกนแสตมป์", "ประกาศข่าวสาร", "แก้ไขรายละเอียด"]
+        phone: "065-5249531",
+        email: "ranger@greenpass.th",
+        signature: "src/sig1.png",
+        roles: computeRoles({}, cleanRangerId)
       });
     };
 
@@ -492,13 +645,13 @@ function RangerDetailContent() {
                 "แก้ไขรายละเอียด",
                 "รายงานความคืบหน้าของเหตุการณ์"
               ].map((roleTitle) => {
-                const isEnabled = ranger.roles?.includes(roleTitle);
+                const isEnabled = Boolean(ranger.roles?.some((r) => r && r.trim() === roleTitle.trim()));
                 return (
                   <div 
                     key={roleTitle}
                     className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all ${
                       isEnabled 
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-800 font-bold" 
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold shadow-xs" 
                         : "bg-slate-50 border-slate-200 text-slate-400 font-medium"
                     }`}
                   >
@@ -511,6 +664,37 @@ function RangerDetailContent() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Section 5: ลายเซ็นดิจิทัลเจ้าหน้าที่ */}
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
+              <FileSignature className="w-4 h-4 text-emerald-600" />
+              <span>รูปลายเซ็นเจ้าหน้าที่ (Signature)</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center gap-5">
+              <div className="w-40 h-24 bg-white rounded-xl border border-slate-200 flex items-center justify-center p-2 shadow-xs overflow-hidden shrink-0">
+                {ranger.signature ? (
+                  <img 
+                    src={getSignatureImageSrc(ranger.signature)} 
+                    alt="Officer Signature" 
+                    className="max-w-full max-h-full object-contain" 
+                  />
+                ) : (
+                  <span className="text-xs text-slate-400 font-medium italic">ไม่มีรูปลายเซ็น</span>
+                )}
+              </div>
+              <div className="space-y-1 text-center sm:text-left">
+                <div className="text-xs font-bold text-slate-800 flex items-center justify-center sm:justify-start gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ลายเซ็นสำหรับประทับตราดิจิทัล (Digital Stamp)
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  ลายเซ็นนี้จะปรากฏบนตราประทับสะสม (Stamp Passport) ของนักท่องเที่ยวเมื่อเจ้าหน้าที่ทำการสแกนออกตราประทับ
+                </p>
+              </div>
             </div>
           </div>
 

@@ -48,34 +48,103 @@ function SetRoleContent() {
     async function fetchRanger() {
       if (!rangerId) return;
       setIsLoading(true);
+      const targetIdLower = String(rangerId).toLowerCase();
       try {
-        const res = await rangerApi.getAllRangers();
-        const rawList = res?.result || res?.data || (Array.isArray(res) ? res : []);
-        if (Array.isArray(rawList)) {
-          const targetIdLower = String(rangerId).toLowerCase();
-          const found = rawList.find((r: any) =>
-            String(r.username || "").toLowerCase() === targetIdLower ||
-            String(r.employeeId || "").toLowerCase() === targetIdLower ||
-            String(r.id || "").toLowerCase() === targetIdLower
-          );
-          if (found) {
-            const fullName = `${found.firstname || ""} ${found.surname || ""}`.trim() || found.username;
-            const rObj: Ranger = {
-              id: found.username,
-              username: found.username,
-              name: fullName,
-              employeeId: found.username ? found.username.toUpperCase() : "",
-              canIssueStamp: Boolean(found.canIssueStamp),
-              canAnnouncement: Boolean(found.canAnnouncement),
-              canEditParkDetails: Boolean(found.canEditParkDetails),
-              canProgressReport: Boolean(found.canProgressReport)
-            };
-            setCurrentRanger(rObj);
-            setScanStamp(Boolean(found.canIssueStamp));
-            setAnnounceNews(Boolean(found.canAnnouncement));
-            setEditDetail(Boolean(found.canEditParkDetails));
-            setReportIncident(Boolean(found.canProgressReport));
+        let found: any = null;
+
+        // 1. Try getRangerByUsername
+        try {
+          const resUser = await rangerApi.getRangerByUsername(rangerId);
+          if (resUser && (resUser.success || resUser.status) && (resUser.result || resUser.data)) {
+            found = resUser.result || resUser.data;
           }
+        } catch (e) {}
+
+        // 2. Try getAllRangers
+        if (!found) {
+          try {
+            const res = await rangerApi.getAllRangers();
+            const rawList = res?.result || res?.data || (Array.isArray(res) ? res : []);
+            if (Array.isArray(rawList)) {
+              found = rawList.find((r: any) =>
+                String(r.username || "").toLowerCase() === targetIdLower ||
+                String(r.employeeId || "").toLowerCase() === targetIdLower ||
+                String(r.id || "").toLowerCase() === targetIdLower
+              );
+            }
+          } catch (e) {}
+        }
+
+        // 3. Try localStorage fallback
+        if (!found) {
+          const saved = localStorage.getItem("greenpass_rangers");
+          if (saved) {
+            try {
+              const list = JSON.parse(saved);
+              found = list.find((r: any) =>
+                String(r.username || "").toLowerCase() === targetIdLower ||
+                String(r.employeeId || "").toLowerCase() === targetIdLower ||
+                String(r.id || "").toLowerCase() === targetIdLower
+              );
+            } catch (e) {}
+          }
+        }
+
+        if (found) {
+          const fullName = `${found.firstname || found.firstName || ""} ${found.surname || found.lastName || ""}`.trim() || found.username || found.name;
+          
+          const hasFlags = (
+            found.canIssueStamp !== undefined ||
+            found.canAnnouncement !== undefined ||
+            found.canEditParkDetails !== undefined ||
+            found.canProgressReport !== undefined
+          );
+
+          let stamp = true;
+          let announce = true;
+          let edit = true;
+          let rep = true;
+
+          if (hasFlags) {
+            stamp = Boolean(found.canIssueStamp);
+            announce = Boolean(found.canAnnouncement);
+            edit = Boolean(found.canEditParkDetails);
+            rep = Boolean(found.canProgressReport);
+          } else if (Array.isArray(found.roles) && found.roles.length > 0) {
+            stamp = found.roles.includes("สแกนแสตมป์");
+            announce = found.roles.includes("ประกาศข่าวสาร");
+            edit = found.roles.includes("แก้ไขรายละเอียด");
+            rep = found.roles.includes("รายงานความคืบหน้าของเหตุการณ์");
+          } else {
+            try {
+              const storedRoles = localStorage.getItem(`greenpass_ranger_roles_${targetIdLower}`);
+              if (storedRoles) {
+                const parsed: string[] = JSON.parse(storedRoles);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  stamp = parsed.includes("สแกนแสตมป์");
+                  announce = parsed.includes("ประกาศข่าวสาร");
+                  edit = parsed.includes("แก้ไขรายละเอียด");
+                  rep = parsed.includes("รายงานความคืบหน้าของเหตุการณ์");
+                }
+              }
+            } catch (e) {}
+          }
+
+          const rObj: Ranger = {
+            id: found.username || found.id || rangerId,
+            username: found.username || rangerId,
+            name: fullName,
+            employeeId: (found.username || found.employeeId || rangerId).toUpperCase(),
+            canIssueStamp: stamp,
+            canAnnouncement: announce,
+            canEditParkDetails: edit,
+            canProgressReport: rep
+          };
+          setCurrentRanger(rObj);
+          setScanStamp(stamp);
+          setAnnounceNews(announce);
+          setEditDetail(edit);
+          setReportIncident(rep);
         }
       } catch (err) {
         console.error("Failed to load ranger info from database:", err);
@@ -115,6 +184,62 @@ function SetRoleContent() {
           canProgressReport: reportIncident
         });
       }
+
+      // Sync with localStorage
+      try {
+        const savedRangers = localStorage.getItem("greenpass_rangers");
+        if (savedRangers) {
+          const list = JSON.parse(savedRangers);
+          const updatedList = list.map((r: any) => {
+            const match =
+              String(r.username || "").toLowerCase() === username.toLowerCase() ||
+              String(r.employeeId || "").toLowerCase() === username.toLowerCase() ||
+              String(r.id || "").toLowerCase() === username.toLowerCase() ||
+              String(r.id || "").toLowerCase() === String(rangerId).toLowerCase();
+            if (match) {
+              return {
+                ...r,
+                roles: selectedRoles,
+                canIssueStamp: scanStamp,
+                canAnnouncement: announceNews,
+                canEditParkDetails: editDetail,
+                canProgressReport: reportIncident
+              };
+            }
+            return r;
+          });
+          localStorage.setItem("greenpass_rangers", JSON.stringify(updatedList));
+        }
+
+        const detailKeys = [
+          `greenpass_ranger_detail_${username}`,
+          `greenpass_ranger_detail_${username.toLowerCase()}`,
+          `greenpass_ranger_detail_${username.toUpperCase()}`,
+          `greenpass_ranger_detail_${rangerId}`
+        ];
+        detailKeys.forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            try {
+              const d = JSON.parse(raw);
+              d.roles = selectedRoles;
+              d.canIssueStamp = scanStamp;
+              d.canAnnouncement = announceNews;
+              d.canEditParkDetails = editDetail;
+              d.canProgressReport = reportIncident;
+              localStorage.setItem(k, JSON.stringify(d));
+            } catch (e) {}
+          }
+        });
+
+        localStorage.setItem(`greenpass_ranger_roles_${username.toLowerCase()}`, JSON.stringify(selectedRoles));
+        if (rangerId) {
+          localStorage.setItem(`greenpass_ranger_roles_${String(rangerId).toLowerCase()}`, JSON.stringify(selectedRoles));
+        }
+      } catch (e) {
+        console.error("Failed to sync roles to localStorage:", e);
+      }
+
       setSuccess("ตั้งค่าบทบาทและสิทธิ์ของเจ้าหน้าที่เรียบร้อยแล้ว!");
       setTimeout(() => {
         router.push(`/admin/view-park-ranger-detail?id=${username}`);
