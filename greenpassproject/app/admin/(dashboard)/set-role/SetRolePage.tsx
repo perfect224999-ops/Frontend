@@ -246,7 +246,7 @@ function SetRoleContent() {
       }, 1000);
     } catch (err) {
       console.error("Failed to update ranger permissions:", err);
-      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล");
+      setError("ไม่สามารถบันทึกข้อมูลได้กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }
@@ -254,8 +254,14 @@ function SetRoleContent() {
 
   if (!currentRanger) {
     return (
-      <div className="text-center py-14 text-slate-400 font-bold text-xs">
-        ไม่พบข้อมูลบัญชีผู้ใช้งานเจ้าหน้าที่อุทยาน
+      <div className="text-center py-14 text-slate-500 font-bold text-xs space-y-3">
+        <p>ไม่พบข้อมูล Park Ranger กรุณาลองใหม่อีกครั้ง</p>
+        <button
+          onClick={() => router.push("/admin/list-park-ranger")}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold"
+        >
+          กลับหน้ารายชื่อเจ้าหน้าที่
+        </button>
       </div>
     );
   }

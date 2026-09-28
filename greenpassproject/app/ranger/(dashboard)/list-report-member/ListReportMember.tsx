@@ -123,9 +123,11 @@ export default function ListReportMember() {
     "1": true,
     "2": true
   });
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadReports() {
+      setFetchError(null);
       const username = localStorage.getItem("ranger_username") || localStorage.getItem("username");
       if (username) setCurrentRangerUser(username);
       const parkId = localStorage.getItem("ranger_park_id") || localStorage.getItem("parkId");
@@ -229,7 +231,8 @@ export default function ListReportMember() {
           return;
         }
       } catch (err) {
-        console.log("Backend reports fetch info:", err);
+        console.error("Backend reports fetch error:", err);
+        setFetchError("ไม่สามารถดึงรายงานเหตุการจากฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
       }
 
       // หากดึงข้อมูลจาก DB ไม่ได้จริงๆ ให้ตั้งค่าเป็นรายการว่างเปล่า หรือดึงเฉพาะรายงานจริง
@@ -363,6 +366,21 @@ export default function ListReportMember() {
           </div>
 
         </div>
+
+        {fetchError && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span className="text-sm font-semibold">{fetchError}</span>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-xs bg-rose-600 text-white font-medium px-3 py-1.5 rounded-lg hover:bg-rose-700 transition"
+            >
+              ลองใหม่อีกครั้ง
+            </button>
+          </div>
+        )}
 
         {/* Table View */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

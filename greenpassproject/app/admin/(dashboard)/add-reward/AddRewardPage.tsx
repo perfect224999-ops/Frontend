@@ -92,13 +92,8 @@ export default function AddRewardPage() {
     setError("");
     setSuccess(""); 
 
-    if (!rewardTitle.trim() || !rewardDetails.trim()) {
-      setError("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน");
-      return;
-    }
-
-    if (!image) {
-      setError("กรุณาเลือกรูปภาพประกอบของรางวัล");
+    if (!rewardTitle.trim() || !rewardDetails.trim() || !image) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 
@@ -127,8 +122,7 @@ export default function AddRewardPage() {
 
     } catch (err: any) {
       console.error("Failed to add reward to database:", err);
-      const errMsg = err.response?.data?.message || err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล";
-      setError(errMsg);
+      setError("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }

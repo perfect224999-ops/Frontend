@@ -604,7 +604,7 @@ export default function ViewAllStatisticesPage() {
                 {filteredParkStats.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
-                      ไม่พบข้อมูลสถิติอุทยานที่เลือก
+                      ไม่พบข้อมูลสถิติ กรุณาลองใหม่อีกครั้ง
                     </td>
                   </tr>
                 ) : (

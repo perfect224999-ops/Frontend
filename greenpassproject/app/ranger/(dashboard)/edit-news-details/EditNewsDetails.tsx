@@ -62,9 +62,19 @@ function EditNewsDetailsContent() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [image, setImage] = useState("");
+  const [parkName, setParkName] = useState<string>("อุทยานแห่งชาติ");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedParkName = localStorage.getItem("ranger_park_name");
+      if (storedParkName) {
+        setParkName(storedParkName.startsWith("อุทยานแห่งชาติ") ? storedParkName : `อุทยานแห่งชาติ${storedParkName}`);
+      }
+    }
+  }, []);
 
   const resolveImageUrl = (img?: string | null) => {
     if (!img) return "";
@@ -138,6 +148,10 @@ function EditNewsDetailsContent() {
             setCurrentNews(apiItem);
             setTitle(apiItem.title);
             setContent(apiItem.content);
+            if (data.park?.name) {
+              const pName = data.park.name.startsWith("อุทยานแห่งชาติ") ? data.park.name : `อุทยานแห่งชาติ${data.park.name}`;
+              setParkName(pName);
+            }
             if (customLocal && customLocal.startsWith("data:")) {
               setImage(customLocal);
             } else if (apiItem.image) {
@@ -212,13 +226,13 @@ function EditNewsDetailsContent() {
     if (!cleanTitle || cleanTitle.length < 2 || cleanTitle.length > 250 ||
         !cleanContent || cleanContent.length < 4 || cleanContent.length > 2000 ||
         !currentNews) {
-      setError("กรุณากรอกหัวข้อประกาศ (2-250 ตัวอักษร) และเนื้อหาประกาศ (4-2000 ตัวอักษร) ให้ถูกต้อง");
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 
     setIsLoading(true);
     try {
-      const username = localStorage.getItem("ranger_username") || "ranger01";
+      const username = localStorage.getItem("ranger_username") || "PR01";
       let serverImage = null;
 
       // Keep existing image if not changed, do not default to dummy src/news1.jpg
@@ -272,7 +286,7 @@ function EditNewsDetailsContent() {
       }, 1000);
     } catch (err) {
       console.error("Failed to submit news update:", err);
-      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง");
+      setError("ไม่สามารถแก้ไขข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
       setIsLoading(false);
     }
   };
@@ -326,7 +340,7 @@ function EditNewsDetailsContent() {
           </div>
           <h1 className="text-xl sm:text-2xl font-bold">แก้ไขรายละเอียดข่าวสาร</h1>
           <p className="text-emerald-100 text-xs sm:text-sm max-w-xl">
-            ปรับเปลี่ยนข้อความรูปภาพ และเนื้อหาประกาศข่าวสารอุทยานแห่งชาติเขาใหญ่
+            ปรับเปลี่ยนข้อความ รูปภาพ และเนื้อหาประกาศข่าวสาร{parkName}
           </p>
         </div>
 

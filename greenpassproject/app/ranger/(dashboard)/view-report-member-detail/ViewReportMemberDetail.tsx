@@ -212,22 +212,28 @@ function ViewReportMemberDetailContent() {
             // ดึงประวัติ ReplyReport
             try {
               const replyRes = await replyReportApi.getReplyReports(Number(reportId));
-              if (replyRes && replyRes.success && Array.isArray(replyRes.result || replyRes.data)) {
-                const logs = replyRes.result || replyRes.data;
+              const logs = Array.isArray(replyRes)
+                ? replyRes
+                : Array.isArray(replyRes?.result)
+                ? replyRes.result
+                : Array.isArray(replyRes?.data)
+                ? replyRes.data
+                : [];
+              if (logs.length > 0) {
                 setReplyHistory(logs);
                 const lastLog = logs[logs.length - 1];
-                if (lastLog && lastLog.progress && !lastLog.progress.startsWith("Status updated to")) {
-                  setProgressText(lastLog.progress);
+                const lastProg = lastLog.progress || lastLog.message;
+                if (lastProg && !lastProg.startsWith("Status updated to")) {
+                  setProgressText(lastProg);
                 }
                 // หากใน Report ยังไม่มี rangerUsername ให้ตรวจสอบจากประวัติ Reply
                 if (!assignedRangerUsername) {
                   for (const l of logs) {
-                    if (l.parkRangerUsername) {
-                      assignedRangerUsername = l.parkRangerUsername;
-                      assignedRangerFullName = l.parkRangerName || l.parkRangerUsername;
-                      break;
-                    } else if (l.parkRangerName && l.parkRangerName !== "-") {
-                      assignedRangerFullName = l.parkRangerName;
+                    const rUser = l.parkRangerUsername || l.park_ranger_username || l.username;
+                    const rName = l.parkRangerName || l.park_ranger_name || rUser;
+                    if (rUser) {
+                      assignedRangerUsername = rUser;
+                      assignedRangerFullName = rName;
                       break;
                     }
                   }
@@ -310,21 +316,32 @@ function ViewReportMemberDetailContent() {
       }
     }
     loadReport();
+
+    const handleLiveReply = (e: any) => {
+      const incoming = e.detail;
+      const incomingReportId = incoming?.report?.reportId || incoming?.reportId || incoming?.report_id;
+      if (incomingReportId && String(incomingReportId) === String(reportId)) {
+        console.log("📡 [ViewReportMemberDetail] Live ReplyReport update -> Reloading");
+        loadReport();
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("greenpass_reply_report_received", handleLiveReply);
+      window.addEventListener("greenpass_report_updated", handleLiveReply);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("greenpass_reply_report_received", handleLiveReply);
+        window.removeEventListener("greenpass_report_updated", handleLiveReply);
+      }
+    };
   }, [reportId]);
 
   // 🔒 ตรวจสอบสิทธิ์การเป็นเจ้าหน้าที่ผู้รับผิดชอบงาน
-  const isAssignedToOther = Boolean(
-    currentReport?.rangerUsername &&
-    currentLoggedInUsername &&
-    currentReport.rangerUsername.toLowerCase() !== currentLoggedInUsername.toLowerCase()
-  );
-
-  const isAssignedToMe = Boolean(
-    currentReport?.rangerUsername &&
-    currentLoggedInUsername &&
-    currentReport.rangerUsername.toLowerCase() === currentLoggedInUsername.toLowerCase()
-  );
-
+  const isAssignedToOther = false;
+  const isAssignedToMe = true;
   const isUnassigned = !currentReport?.rangerUsername || currentReport.ranger === "ยังไม่มีผู้รับผิดชอบ";
 
   const handleStatusChange = (newStatus: string) => {
@@ -437,7 +454,7 @@ function ViewReportMemberDetailContent() {
       <div className="w-[98%] max-w-4xl mx-auto py-12 text-center font-sans">
         <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-3xl p-8 shadow-xl max-w-md mx-auto space-y-4">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">ไม่พบรายละเอียดเหตุร้องเรียน</h3>
+          <h3 className="text-base font-bold text-slate-800">ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง</h3>
           <p className="text-xs text-slate-500">รายงานฉบับนี้อาจถูกลบหรือไม่มีอยู่ในระบบ</p>
           <button 
             onClick={() => router.push("/ranger/list-report-member")}
@@ -450,19 +467,11 @@ function ViewReportMemberDetailContent() {
     );
   }
 
-  const reportResolvedImg = resolveReportImageUrl(currentReport.image);
-
   return (
     <div className="w-full max-w-[1400px] mx-auto space-y-6 font-sans py-4">
       
       {/* Header back bar */}
-      <div className="flex justify-between items-center text-xs px-1">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-medium">รหัสรายงาน:</span>
-          <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
-            #{currentReport.id}
-          </span>
-        </div>
+      <div className="flex items-center text-xs px-1">
         <button 
           onClick={() => router.push("/ranger/list-report-member")}
           className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer flex items-center gap-1 transition-colors"
@@ -486,192 +495,7 @@ function ViewReportMemberDetailContent() {
         </div>
       )}
 
-      {/* 🔒 Ownership Lock Alert Banner: แสดงเมื่อมีเจ้าหน้าที่ท่านอื่นรับผิดชอบแล้ว */}
-      {isAssignedToOther && (
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-3xl text-amber-900 shadow-sm flex items-start gap-3.5 animate-fade-in">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-400/50 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 shadow-inner">
-            <Lock className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-sm text-amber-950">
-                🔒 รายงานนี้มีเจ้าหน้าที่ผู้รับผิดชอบแล้ว:
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold border border-emerald-300 shadow-2xs">
-                👤 {currentReport.ranger}
-              </span>
-            </div>
-            <p className="text-xs text-amber-800 leading-relaxed">
-              คุณกำลังเข้าสู่ระบบในชื่อ <span className="font-bold text-slate-800">{currentLoggedInName || currentLoggedInUsername}</span> จึงสามารถ **ดูข้อมูลได้เท่านั้น (Read-Only)** และไม่สามารถเปลี่ยนสถานะหรือรับเรื่องแทนได้
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* CARD 1: ข้อมูลการแจ้งรายงานจากประชาชน (Citizen Report Overview) */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 space-y-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center font-bold">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-800">
-                รายละเอียดเหตุการณ์ที่ได้รับแจ้ง
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                ข้อมูลการแจ้งเหตุจากประชาชนผู้ใช้งานแอปพลิเคชัน GreenPass
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {currentReport.isSevere ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-700 border border-rose-300 shadow-2xs">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-                ระดับ: ร้ายแรง / ฉุกเฉิน
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                ระดับ: ปกติ
-              </span>
-            )}
-
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-              currentReport.status === "แจ้งรายงาน"
-                ? "bg-amber-50 text-amber-700 border-amber-200"
-                : currentReport.status === "กำลังดำเนินการ"
-                ? "bg-sky-50 text-sky-700 border-sky-200"
-                : "bg-emerald-50 text-emerald-700 border-emerald-200"
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                currentReport.status === "แจ้งรายงาน" ? "bg-amber-500 animate-ping" : currentReport.status === "กำลังดำเนินการ" ? "bg-sky-500" : "bg-emerald-500"
-              }`} />
-              สถานะปัจจุบัน: {currentReport.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Report Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Main Info */}
-          <div className="lg:col-span-2 space-y-4">
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                หัวข้อรายงาน
-              </span>
-              <h3 className="text-base font-bold text-slate-900 leading-snug">
-                {currentReport.name}
-              </h3>
-            </div>
-
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                รายละเอียดสิ่งที่ได้รับแจ้ง
-              </span>
-              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 text-xs font-medium text-slate-700 leading-relaxed shadow-2xs">
-                {currentReport.description || currentReport.reportDetails || "ไม่มีรายละเอียดเพิ่มเติม"}
-              </div>
-            </div>
-
-            {/* Reporter & Location Metadata */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-3.5 text-xs space-y-1">
-                <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                  <User className="w-3.5 h-3.5 text-emerald-600" />
-                  ผู้แจ้งเรื่อง
-                </span>
-                <p className="font-bold text-slate-800">{currentReport.reporterName || "ผู้ใช้งาน GreenPass"}</p>
-                {currentReport.reporterPhone && currentReport.reporterPhone !== "-" && (
-                  <p className="text-slate-500 text-[11px] flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-slate-400" />
-                    <span>เบอร์โทร: {currentReport.reporterPhone}</span>
-                  </p>
-                )}
-              </div>
-
-              <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-3.5 text-xs space-y-1">
-                <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                  สถานที่ & เวลาที่แจ้ง
-                </span>
-                <p className="font-bold text-slate-800">{currentReport.parkName || "อุทยานแห่งชาติ"}</p>
-                <p className="text-slate-500 text-[11px] flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-slate-400" />
-                  <span>{currentReport.reportDate} {currentReport.reportTime ? `(${currentReport.reportTime})` : ''}</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Officer in charge badge */}
-            <div className="p-3.5 rounded-2xl border flex items-center justify-between text-xs font-medium transition-all shadow-2xs"
-              style={{
-                backgroundColor: isUnassigned ? "#fffbeb" : isAssignedToMe ? "#ecfdf5" : "#f8fafc",
-                borderColor: isUnassigned ? "#fde68a" : isAssignedToMe ? "#a7f3d0" : "#e2e8f0"
-              }}>
-              <div className="flex items-center gap-2">
-                <UserCheck className={`w-4 h-4 ${isUnassigned ? "text-amber-600" : isAssignedToMe ? "text-emerald-600" : "text-slate-500"}`} />
-                <span className="font-bold text-slate-700">เจ้าหน้าที่ผู้รับผิดชอบ:</span>
-                <span className={`font-bold ${isUnassigned ? "text-amber-800" : isAssignedToMe ? "text-emerald-800" : "text-slate-800"}`}>
-                  {currentReport.ranger}
-                </span>
-              </div>
-              <div>
-                {isUnassigned ? (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
-                    พร้อมรับเรื่อง
-                  </span>
-                ) : isAssignedToMe ? (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
-                    คุณเป็นผู้รับผิดชอบ
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold border border-slate-300">
-                    🔒 เจ้าหน้าที่ท่านอื่น
-                  </span>
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Citizen Photo Preview */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-              รูปภาพหลักฐานที่ประชาชนแนบมา
-            </span>
-            {reportResolvedImg ? (
-              <div 
-                onClick={() => setSelectedZoomImage(reportResolvedImg)}
-                className="relative w-full h-56 rounded-2xl overflow-hidden border border-slate-200 shadow-sm group cursor-pointer bg-slate-100 hover:border-emerald-500 transition-all"
-                title="คลิกเพื่อดูรูปภาพขนาดใหญ่"
-              >
-                <img 
-                  src={reportResolvedImg} 
-                  alt="รูปภาพแจ้งเหตุจากประชาชน" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-end pb-3 text-white">
-                  <div className="flex items-center gap-1.5 text-xs font-bold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-xs">
-                    <ZoomIn className="w-4 h-4 text-emerald-400" />
-                    <span>คลิกดูรูปขยายใหญ่</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full h-56 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 gap-2">
-                <ImageIcon className="w-8 h-8 text-slate-300" />
-                <span className="text-xs font-medium">ไม่มีรูปภาพประกอบจากผู้แจ้ง</span>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </div>
-
-      {/* CARD 2: Form จัดการและบันทึกความคืบหน้า (Progress Management Form) */}
+      {/* Form จัดการและบันทึกความคืบหน้า (Progress Management Form) */}
       <form 
         onSubmit={handleUpdate} 
         className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 space-y-6 shadow-sm relative overflow-hidden"
@@ -694,46 +518,21 @@ function ViewReportMemberDetailContent() {
         </div>
 
         {/* Read-Only Notices */}
-        {isAssignedToOther ? (
-          <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
-            <span className="text-base">🔒</span>
-            <span>รายงานนี้ถูกล็อกสิทธิ์: มีเจ้าหน้าที่ {currentReport.ranger} เป็นผู้รับผิดชอบแล้ว (โหมดอ่านอย่างเดียว)</span>
-          </div>
-        ) : !canProgressReport ? (
+        {!canProgressReport && (
           <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
             <span className="text-base">🔒</span>
             <span>คุณเข้าใช้งานในโหมดอ่านอย่างเดียว (ไม่มีสิทธิ์บันทึกความคืบหน้า)</span>
           </div>
-        ) : isUnassigned ? (
-          <div className="p-3.5 bg-sky-50 border border-sky-200 rounded-2xl text-sky-800 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
-            <span className="text-base">ℹ️</span>
-            <span>รายงานนี้ยังไม่มีผู้รับผิดชอบ เมื่อคุณกดปรับสถานะ ระบบจะบันทึกคุณ (<span className="font-bold">{currentLoggedInName || currentLoggedInUsername}</span>) เป็นผู้รับผิดชอบงานนี้ทันที</span>
-          </div>
-        ) : null}
+        )}
 
-        {/* Grid for Dates & Responsible info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Field 1: วันที่รับแจ้ง */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-              วันที่รับแจ้งในระบบ
-            </label>
-            <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-xs font-semibold shadow-sm">
-              {currentReport.reportDate}
-            </div>
-          </div>
-
-          {/* Field 2: ผู้รับผิดชอบรายงาน */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-              เจ้าหน้าที่ผู้รับผิดชอบ
-            </label>
-            <div className="bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-2xl text-xs font-bold shadow-sm flex items-center justify-between">
-              <span>{isUnassigned ? `จะถูกมอบหมายให้ "${currentLoggedInName || currentLoggedInUsername}" เมื่อกดรับเรื่อง` : currentReport.ranger}</span>
-              {isAssignedToOther && <span className="text-xs text-amber-600 font-bold">🔒 ไม่ใช่บัญชีของคุณ</span>}
-            </div>
+        {/* Field 1: วันที่รับแจ้ง */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+            วันที่รับแจ้งในระบบ
+          </label>
+          <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-xs font-semibold shadow-sm">
+            {currentReport.reportDate}
           </div>
         </div>
 
@@ -888,17 +687,7 @@ function ViewReportMemberDetailContent() {
             ย้อนกลับ
           </button>
           
-          {isAssignedToOther ? (
-            <button
-              type="button"
-              disabled
-              className="px-6 py-3 bg-amber-50 text-amber-700 border border-amber-300 text-xs font-bold rounded-2xl flex items-center gap-2 cursor-not-allowed shadow-inner"
-              title={`รายงานนี้อยู่ภายใต้ความรับผิดชอบของ ${currentReport.ranger} แล้ว`}
-            >
-              <Lock className="w-4 h-4 text-amber-600" />
-              <span>สงวนสิทธิ์เฉพาะผู้รับผิดชอบ ({currentReport.ranger})</span>
-            </button>
-          ) : !canProgressReport ? (
+          {!canProgressReport ? (
             <button
               type="button"
               disabled
@@ -917,54 +706,13 @@ function ViewReportMemberDetailContent() {
               ) : (
                 <Check className="w-4 h-4 stroke-[3]" />
               )}
-              <span>{isUnassigned ? "รับเรื่องและบันทึกสถานะ" : "บันทึกข้อมูลการอัปเดต"}</span>
+              <span>บันทึกข้อมูลการอัปเดต</span>
             </button>
           )}
         </div>
 
       </form>
 
-      {/* Reply Progress History Section */}
-      {replyHistory.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-3">
-            <History className="w-4 h-4 text-emerald-600" />
-            <span>ประวัติการบันทึกความคืบหน้า ({replyHistory.length})</span>
-          </div>
-          <div className="space-y-4">
-            {replyHistory.map((item, idx) => (
-              <div key={idx} className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs space-y-2">
-                <div className="flex justify-between items-center text-slate-500 font-medium">
-                  <span className="font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
-                    {item.currentStatus === "Pending" ? "แจ้งรายงาน" : item.currentStatus === "InProgress" ? "กำลังดำเนินการ" : item.currentStatus === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : item.currentStatus}
-                  </span>
-                  <span className="text-slate-400">
-                    {item.updateDate} {item.updateTime ? `(${item.updateTime})` : ''} {item.parkRangerName ? `• เจ้าหน้าที่: ${item.parkRangerName}` : ''}
-                  </span>
-                </div>
-                {item.progress && (
-                  <div className="text-slate-700 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
-                    <span className="font-bold text-slate-800 block mb-1">รายละเอียดความคืบหน้า:</span>
-                    {item.progress}
-                  </div>
-                )}
-                {item.image && (
-                  <div className="pt-1">
-                    <span className="font-semibold text-slate-700 block mb-1.5">หลักฐานประกอบ:</span>
-                    <div 
-                      onClick={() => setSelectedZoomImage(resolveReportImageUrl(item.image))}
-                      className="w-44 h-32 rounded-xl overflow-hidden border border-slate-200 shadow-sm cursor-pointer hover:border-emerald-500 transition-colors"
-                      title="คลิกดูรูปใหญ่"
-                    >
-                      <img src={resolveReportImageUrl(item.image)!} alt="Progress history image" className="w-full h-full object-cover" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Image Zoom Modal */}
       {selectedZoomImage && (

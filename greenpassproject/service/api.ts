@@ -12,11 +12,16 @@ export const getBaseURL = () => {
     return `http://${hostname}:8081/api/v1`;
   }
   return 'http://localhost:8081/api/v1';
-  //return 'http://172.20.10.3:8081/api/v1';
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
+});
+
+// อัปเดต baseURL อัตโนมัติในทุก request ตาม hostname ปัจจุบัน
+api.interceptors.request.use((config) => {
+  config.baseURL = getBaseURL();
+  return config;
 });
 
 // authApi สำหรับล็อกอิน
@@ -248,18 +253,99 @@ export const reportApi = {
     return response.data;
   },
   updateReportStatus: async (id: number, status: string, rangerUsername?: string, progress?: string, image?: string) => {
-    const response = await api.put(`/report/${id}/status`, { status, progress, image, username: rangerUsername, rangerUsername }, {
-      headers: rangerUsername ? { username: rangerUsername } : {}
-    });
-    return response.data;
+    const payload = {
+      status,
+      currentStatus: status,
+      progress: progress || `อัปเดตสถานะเป็น ${status}`,
+      image: image || undefined,
+      rangerUsername: rangerUsername || '',
+      username: rangerUsername || ''
+    };
+    const headers = rangerUsername ? { username: rangerUsername } : {};
+
+    try {
+      const response = await api.put(`/report/${id}/status`, payload, { headers });
+      return response.data;
+    } catch (err: any) {
+      // Fallback: หาก endpoint PUT ล้มเหลว ให้ลองผ่าน replyReportApi
+      return replyReportApi.createReplyReport({
+        reportId: id,
+        ...payload
+      });
+    }
   }
 };
 
-// replyReportApi สำหรับดึงข้อมูลความคืบหน้าการตอบกลับรายงาน
+// replyReportApi สำหรับดึงและส่งข้อมูลการตอบกลับรายงาน (Replyreport)
 export const replyReportApi = {
   getReplyReports: async (reportId: number) => {
-    const response = await api.get(`/reply-report/my-reply-report?reportId=${reportId}`);
-    return response.data;
+    try {
+      const response = await api.get(`/reply-report/my-reply-report?reportId=${reportId}`);
+      return response.data;
+    } catch (e: any) {
+      try {
+        const fallback = await api.get(`/reply-report/${reportId}`);
+        return fallback.data;
+      } catch {
+        throw e;
+      }
+    }
+  },
+  createReplyReport: async (payload: {
+    reportId: number;
+    currentStatus?: string;
+    status?: string;
+    progress?: string;
+    image?: string;
+    parkRangerUsername?: string;
+    username?: string;
+  }) => {
+    const username = payload.parkRangerUsername || payload.username || '';
+    const headers = username ? { username } : {};
+
+    const requestBody = {
+      reportId: payload.reportId,
+      report_id: payload.reportId,
+      currentStatus: payload.currentStatus || payload.status || '',
+      current_status: payload.currentStatus || payload.status || '',
+      status: payload.status || payload.currentStatus || '',
+      progress: payload.progress || '',
+      image: payload.image || undefined,
+      parkRangerUsername: username,
+      park_ranger_username: username,
+      username: username,
+      rangerUsername: username
+    };
+
+    // 1. ลองส่งไปที่ /report/{id}/status (PUT) ก่อนเนื่องจากเป็น endpoint หลักที่ backend รองรับ
+    if (payload.reportId) {
+      try {
+        const res = await api.put(`/report/${payload.reportId}/status`, requestBody, { headers });
+        return res.data;
+      } catch (errPut: any) {
+        // หากได้ 400 Bad Request หรือ 403 Forbidden จาก backend ให้โยน error ขึ้นไปเลย
+        if (errPut?.response?.status && errPut?.response?.status !== 404 && errPut?.response?.status !== 405) {
+          throw errPut;
+        }
+      }
+    }
+
+    // 2. หากไม่มี reportId หรือ PUT 404/405 ให้ลอง POST /reply-report
+    try {
+      const res = await api.post('/reply-report', requestBody, { headers });
+      return res.data;
+    } catch (err1: any) {
+      // 3. หาก 404/405 ลองส่งไปที่ /reply-report/add (POST)
+      if (err1?.response?.status === 404 || err1?.response?.status === 405) {
+        try {
+          const res2 = await api.post('/reply-report/add', requestBody, { headers });
+          return res2.data;
+        } catch (err2: any) {
+          throw err2;
+        }
+      }
+      throw err1;
+    }
   }
 };
 

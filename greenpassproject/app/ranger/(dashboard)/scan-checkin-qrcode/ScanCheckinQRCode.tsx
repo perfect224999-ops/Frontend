@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { stampApi } from "@/service/api";
-import { QrCode, CheckCircle2, User, Sparkles, MapPin, RefreshCw, AlertTriangle, Clock, XCircle, Maximize2, Lock, ArrowLeft } from "lucide-react";
+import { QrCode, CheckCircle2, User, Sparkles, MapPin, RefreshCw, AlertTriangle, Clock, XCircle, Maximize2, Lock, ArrowLeft, UserX } from "lucide-react";
 
 export default function ScanCheckinQRCode() {
   const router = useRouter();
@@ -127,14 +127,36 @@ export default function ScanCheckinQRCode() {
 
         setShowSuccessPopup(true);
       } else {
-        const msg = response?.message || "ไม่สามารถมอบสแตมป์ให้ได้เนื่องจากเงื่อนไขระบบ";
-        setErrorMessage(msg);
+        const rawMsg = response?.message || "";
+        let finalMsg = "ไม่สามารถบันทึกตราประทับได้";
+        if (rawMsg.includes("ไม่พบข้อมูล") || response?.status === 404 || response?.statusCode === 404) {
+          // 4.1.1 กรณีที่ระบบค้นหาข้อมูลสมาชิกไม่เจอ
+          finalMsg = "ไม่พบข้อมูลสมาชิก";
+        } else if (rawMsg.includes("ซ้ำ") || rawMsg.includes("2 ชั่วโมง")) {
+          finalMsg = rawMsg;
+        } else if (rawMsg.includes("ไม่สามารถบันทึกตราประทับได้") || rawMsg.includes("ไม่สามารถบันทึก") || !rawMsg) {
+          // 5.1.1 กรณีที่บันทึกข้อมูลตราประทับไม่สำเร็จ
+          finalMsg = "ไม่สามารถบันทึกตราประทับได้";
+        } else {
+          finalMsg = rawMsg;
+        }
+        setErrorMessage(finalMsg);
         setShowErrorPopup(true);
       }
     } catch (err: any) {
       console.error("Error scan checkin:", err);
-      const msg = err?.response?.data?.message || "ไม่พบข้อมูลนักท่องเที่ยวในฐานข้อมูล หรือสแกนซ้ำภายใน 2 ชั่วโมง";
-      setErrorMessage(msg);
+      const rawMsg = err?.response?.data?.message || err?.message || "";
+      let finalMsg = "ไม่สามารถบันทึกตราประทับได้";
+      if (err?.response?.status === 404 || rawMsg.includes("ไม่พบข้อมูล") || rawMsg.includes("not found")) {
+        // 4.1.1 กรณีที่ระบบค้นหาข้อมูลสมาชิกไม่เจอ
+        finalMsg = "ไม่พบข้อมูลสมาชิก";
+      } else if (rawMsg.includes("ซ้ำ") || rawMsg.includes("2 ชั่วโมง")) {
+        finalMsg = rawMsg;
+      } else if (rawMsg.includes("ไม่สามารถบันทึกตราประทับได้")) {
+        // 5.1.1 กรณีที่บันทึกข้อมูลตราประทับไม่สำเร็จ
+        finalMsg = "ไม่สามารถบันทึกตราประทับได้";
+      }
+      setErrorMessage(finalMsg);
       setShowErrorPopup(true);
     }
   };
@@ -151,6 +173,8 @@ export default function ScanCheckinQRCode() {
     setIsScanning(true);
   };
 
+  const isMemberNotFoundError = errorMessage.includes("ไม่พบข้อมูลสมาชิก") || errorMessage.includes("ไม่พบข้อมูลนักท่องเที่ยว");
+  const isStampFailedError = errorMessage.includes("ไม่สามารถบันทึกตราประทับได้") || errorMessage.includes("ไม่สามารถบันทึก");
   const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว") || errorMessage.includes("2 ชั่วโมง");
 
   if (!canIssueStamp) {
@@ -259,7 +283,7 @@ export default function ScanCheckinQRCode() {
               <span className="px-3.5 py-1 bg-emerald-50 text-emerald-800 font-extrabold text-xs rounded-full border border-emerald-200 uppercase tracking-wider inline-flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-emerald-600" /> มอบสแตมป์สำเร็จ
               </span>
-              <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">ทำการมอบสแตมป์เรียบร้อยแล้ว</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">ทำการมอบสแตมป์เรียบร้อย</h3>
             </div>
 
             {/* Tourist Details Box */}
@@ -317,43 +341,78 @@ export default function ScanCheckinQRCode() {
         </div>
       )}
 
-      {/* POPUP MODAL 2: ERROR / DUPLICATE SCAN WARNING POPUP */}
+      {/* POPUP MODAL 2: ERROR / DUPLICATE SCAN / ALTERNATE FLOW POPUP */}
       {showErrorPopup && (
         <div className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-amber-200 space-y-6 animate-scale-up">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-slate-200 space-y-6 animate-scale-up">
             
             {/* Warning Icon Badge */}
             <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-inner border-2 ${
-              isDuplicateError ? "bg-amber-100 text-amber-600 border-amber-300" : "bg-rose-100 text-rose-600 border-rose-300"
+              isDuplicateError 
+                ? "bg-amber-100 text-amber-600 border-amber-300" 
+                : isMemberNotFoundError
+                ? "bg-rose-100 text-rose-600 border-rose-300"
+                : "bg-rose-100 text-rose-600 border-rose-300"
             }`}>
-              {isDuplicateError ? <Clock className="w-11 h-11" /> : <XCircle className="w-11 h-11" />}
+              {isDuplicateError ? (
+                <Clock className="w-11 h-11" />
+              ) : isMemberNotFoundError ? (
+                <UserX className="w-11 h-11" />
+              ) : (
+                <XCircle className="w-11 h-11" />
+              )}
             </div>
 
-            {/* Title Badge */}
+            {/* Title Badge & Heading */}
             <div className="space-y-1.5">
               <span className={`px-3 py-1 font-extrabold text-xs rounded-full border uppercase tracking-wider inline-flex items-center gap-1.5 ${
-                isDuplicateError ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-rose-50 text-rose-800 border-rose-200"
+                isDuplicateError 
+                  ? "bg-amber-50 text-amber-800 border-amber-200" 
+                  : isMemberNotFoundError
+                  ? "bg-rose-50 text-rose-800 border-rose-200"
+                  : "bg-rose-50 text-rose-800 border-rose-200"
               }`}>
-                <AlertTriangle className="w-4 h-4" /> 
-                {isDuplicateError ? "ไม่อนุญาตให้สแกนซ้ำภายใน 2 ชั่วโมง" : "สแกนไม่สำเร็จ"}
+                {isDuplicateError ? (
+                  <>
+                    <Clock className="w-4 h-4" /> ไม่อนุญาตให้สแกนซ้ำภายใน 2 ชั่วโมง
+                  </>
+                ) : isMemberNotFoundError ? (
+                  <>
+                    <UserX className="w-4 h-4" /> ค้นหาข้อมูลสมาชิกไม่พบ (Alternate Flow 4.1.1)
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4" /> บันทึกตราประทับไม่สำเร็จ (Alternate Flow 5.1.1)
+                  </>
+                )}
               </span>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">
-                {isDuplicateError ? "พบการสแกนสแตมป์ซ้ำภายใน 2 ชั่วโมง" : "ไม่สามารถมอบสแตมป์ได้"}
+                {isDuplicateError 
+                  ? "พบการสแกนสแตมป์ซ้ำภายใน 2 ชั่วโมง" 
+                  : isMemberNotFoundError
+                  ? "ไม่พบข้อมูลสมาชิก"
+                  : "ไม่สามารถบันทึกตราประทับได้"}
               </h3>
             </div>
 
             {/* Error Details Box */}
             <div className={`rounded-2xl p-5 border text-left space-y-2.5 text-xs sm:text-sm ${
-              isDuplicateError ? "bg-amber-50/80 border-amber-200 text-amber-900" : "bg-rose-50/80 border-rose-200 text-rose-900"
+              isDuplicateError 
+                ? "bg-amber-50/80 border-amber-200 text-amber-900" 
+                : "bg-rose-50/80 border-rose-200 text-rose-900"
             }`}>
               <div className="font-semibold text-sm sm:text-base leading-relaxed flex items-start gap-2">
                 <span className="mt-0.5">•</span>
                 <span>{errorMessage.replace(/\s*\([a-zA-Z0-9_-]+\)/g, "")}</span>
               </div>
-              <p className="text-xs opacity-80 pt-2 border-t border-amber-200/60">
+              <p className={`text-xs opacity-85 pt-2 border-t ${
+                isDuplicateError ? "border-amber-200/60" : "border-rose-200/60"
+              }`}>
                 {isDuplicateError 
                   ? "ระบบเปิดใช้งานเงื่อนไขความปลอดภัย: นักท่องเที่ยว 1 คน สามารถสแกนรับสแตมป์ได้ 1 ครั้ง ต่อ 1 อุทยานในระยะเวลา 2 ชั่วโมงเท่านั้น" 
-                  : "กรุณาตรวจสอบ QR Code หรือข้อมูลนักท่องเที่ยวในระบบใหม่อีกครั้ง"}
+                  : isMemberNotFoundError
+                  ? "ระบบค้นหาข้อมูลสมาชิกในฐานข้อมูลไม่พบ กรุณาตรวจสอบ QR Code หรือสถานะบัญชีสมาชิกใหม่อีกครั้ง"
+                  : "ระบบไม่สามารถบันทึกข้อมูลการมอบตราประทับลงฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง"}
               </p>
             </div>
 

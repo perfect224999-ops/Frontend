@@ -30,68 +30,32 @@ interface PeriodStats {
   history: HistoryItem[];
 }
 
-function generateParkStats(parkId: number) {
-  const baseSeed = ((parkId * 37) + 19) % 80;
-  const factor = 1 + (parkId % 5) * 0.35;
+const MONTH_LABELS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const YEARS_LIST = ["ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"];
 
-  const thai2026 = Math.round((90 + baseSeed * 1.5) * factor);
-  const foreigner2026 = Math.round((180 + baseSeed * 2.2) * factor);
-  const total2026 = thai2026 + foreigner2026;
+const createEmptyMonthlyHistory = (): HistoryItem[] =>
+  MONTH_LABELS.map(label => ({ label, thai: 0, foreigner: 0 }));
 
-  const monthLabels = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-  const history2026 = monthLabels.map((label, idx) => {
-    const t = Math.max(3, Math.round((thai2026 / 12) + (Math.sin(idx + parkId) * 4)));
-    const f = Math.max(5, Math.round((foreigner2026 / 12) + (Math.cos(idx + parkId) * 7)));
-    return { label, thai: t, foreigner: f };
-  });
+const createEmptyPeriodStats = (): PeriodStats => ({
+  thai: 0,
+  foreigner: 0,
+  total: 0,
+  history: createEmptyMonthlyHistory()
+});
 
-  const thai2025 = Math.round(thai2026 * 0.85);
-  const foreigner2025 = Math.round(foreigner2026 * 0.85);
-  const history2025 = monthLabels.map((label, idx) => ({
-    label,
-    thai: Math.max(2, Math.round((thai2025 / 12) + (Math.sin(idx) * 3))),
-    foreigner: Math.max(4, Math.round((foreigner2025 / 12) + (Math.cos(idx) * 5)))
-  }));
+const createInitialMonthlyByYear = (): Record<string, PeriodStats> => ({
+  "ปี 2026": createEmptyPeriodStats(),
+  "ปี 2025": createEmptyPeriodStats(),
+  "ปี 2024": createEmptyPeriodStats(),
+  "ปี 2023": createEmptyPeriodStats()
+});
 
-  const thai2024 = Math.round(thai2026 * 0.7);
-  const foreigner2024 = Math.round(foreigner2026 * 0.7);
-  const history2024 = monthLabels.map((label, idx) => ({
-    label,
-    thai: Math.max(2, Math.round((thai2024 / 12) + (Math.sin(idx) * 2))),
-    foreigner: Math.max(3, Math.round((foreigner2024 / 12) + (Math.cos(idx) * 4)))
-  }));
-
-  const thai2023 = Math.round(thai2026 * 0.6);
-  const foreigner2023 = Math.round(foreigner2026 * 0.6);
-  const history2023 = monthLabels.map((label, idx) => ({
-    label,
-    thai: Math.max(1, Math.round((thai2023 / 12) + (Math.sin(idx) * 2))),
-    foreigner: Math.max(2, Math.round((foreigner2023 / 12) + (Math.cos(idx) * 3)))
-  }));
-
-  const monthlyStatsByYear: Record<string, PeriodStats> = {
-    "ปี 2026": { thai: thai2026, foreigner: foreigner2026, total: total2026, history: history2026 },
-    "ปี 2025": { thai: thai2025, foreigner: foreigner2025, total: thai2025 + foreigner2025, history: history2025 },
-    "ปี 2024": { thai: thai2024, foreigner: foreigner2024, total: thai2024 + foreigner2024, history: history2024 },
-    "ปี 2023": { thai: thai2023, foreigner: foreigner2023, total: thai2023 + foreigner2023, history: history2023 }
-  };
-
-  const yearlyThai = thai2023 + thai2024 + thai2025 + thai2026;
-  const yearlyForeigner = foreigner2023 + foreigner2024 + foreigner2025 + foreigner2026;
-  const yearlyStats: PeriodStats = {
-    thai: yearlyThai,
-    foreigner: yearlyForeigner,
-    total: yearlyThai + yearlyForeigner,
-    history: [
-      { label: "ปี 2023", thai: thai2023, foreigner: foreigner2023 },
-      { label: "ปี 2024", thai: thai2024, foreigner: foreigner2024 },
-      { label: "ปี 2025", thai: thai2025, foreigner: foreigner2025 },
-      { label: "ปี 2026", thai: thai2026, foreigner: foreigner2026 },
-    ]
-  };
-
-  return { monthlyStatsByYear, yearlyStats };
-}
+const createInitialYearlyStats = (): PeriodStats => ({
+  thai: 0,
+  foreigner: 0,
+  total: 0,
+  history: YEARS_LIST.map(label => ({ label, thai: 0, foreigner: 0 }))
+});
 
 export default function ViewVisitStatistics() {
   const [filter, setFilter] = useState<"monthly" | "yearly">("monthly");
@@ -99,78 +63,75 @@ export default function ViewVisitStatistics() {
   const [parkName, setParkName] = useState<string>("อุทยานแห่งชาติ");
   const [parkId, setParkId] = useState<number>(1);
 
-  const initialParkStats = generateParkStats(1);
-  const [monthlyStatsByYear, setMonthlyStatsByYear] = useState<Record<string, PeriodStats>>(initialParkStats.monthlyStatsByYear);
-  const [yearlyStats, setYearlyStats] = useState<PeriodStats>(initialParkStats.yearlyStats);
+  const [monthlyStatsByYear, setMonthlyStatsByYear] = useState<Record<string, PeriodStats>>(createInitialMonthlyByYear());
+  const [yearlyStats, setYearlyStats] = useState<PeriodStats>(createInitialYearlyStats());
 
   useEffect(() => {
     async function fetchStats() {
       const storedRanger = typeof window !== "undefined" ? localStorage.getItem("ranger_username") : null;
-      const storedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
-      const storedParkName = typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null;
+      let storedParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
+      let storedParkName = typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null;
 
-      let targetParkId = storedParkId ? Number(storedParkId) : 1;
+      let targetParkId = storedParkId ? Number(storedParkId) : undefined;
       if (storedParkName) {
         setParkName(storedParkName.startsWith("อุทยานแห่งชาติ") ? storedParkName : `อุทยานแห่งชาติ${storedParkName}`);
       }
-      setParkId(targetParkId);
+      if (targetParkId) {
+        setParkId(targetParkId);
+      }
 
-      // Load park-isolated default stats for targetParkId
-      const dynamicParkStats = generateParkStats(targetParkId);
-      setMonthlyStatsByYear(dynamicParkStats.monthlyStatsByYear);
-      setYearlyStats(dynamicParkStats.yearlyStats);
+      // ดึงข้อมูลอุทยานของเจ้าหน้าที่ที่ล็อกอินอยู่
+      if (storedRanger) {
+        try {
+          const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
+          const rObj = rangerRes?.result || rangerRes?.data;
+          if (rObj) {
+            const rParkId = rObj?.park?.parkId || rObj?.parkId;
+            const rParkName = rObj?.park?.name || rObj?.parkName;
+            if (rParkId) {
+              targetParkId = Number(rParkId);
+              setParkId(targetParkId);
+              localStorage.setItem("ranger_park_id", String(rParkId));
+            }
+            if (rParkName) {
+              const clean = rParkName.startsWith("อุทยานแห่งชาติ") ? rParkName : `อุทยานแห่งชาติ${rParkName}`;
+              setParkName(clean);
+              localStorage.setItem("ranger_park_name", rParkName);
+            }
+          }
+        } catch (e) {
+          console.error("Could not fetch ranger profile", e);
+        }
+      }
 
       try {
-        if (storedRanger) {
-          try {
-            const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
-            const rObj = rangerRes?.result || rangerRes?.data;
-            if (rObj) {
-              const rParkId = rObj?.park?.parkId || rObj?.parkId;
-              const rParkName = rObj?.park?.name || rObj?.parkName;
-              if (rParkId) {
-                targetParkId = Number(rParkId);
-                setParkId(targetParkId);
-                const updatedDynamic = generateParkStats(targetParkId);
-                setMonthlyStatsByYear(updatedDynamic.monthlyStatsByYear);
-                setYearlyStats(updatedDynamic.yearlyStats);
-              }
-              if (rParkName) {
-                const clean = rParkName.startsWith("อุทยานแห่งชาติ") ? rParkName : `อุทยานแห่งชาติ${rParkName}`;
-                setParkName(clean);
-              }
-            }
-          } catch (e) {}
-        }
-
+        // ดึงสถิติจากฐานข้อมูลเฉพาะของอุทยานที่เจ้าหน้าที่สังกัด
         const response = await stampApi.getStatistics(targetParkId, storedRanger || undefined);
         if (response && (response.success || response.status) && response.result) {
           const res = response.result;
-          if (res.monthlyStats) {
-            const fallbackHistory = dynamicParkStats.monthlyStatsByYear["ปี 2026"].history;
-            const current2026 = {
-              thai: res.monthlyStats.thai ?? dynamicParkStats.monthlyStatsByYear["ปี 2026"].thai,
-              foreigner: res.monthlyStats.foreigner ?? dynamicParkStats.monthlyStatsByYear["ปี 2026"].foreigner,
-              total: res.monthlyStats.total ?? dynamicParkStats.monthlyStatsByYear["ปี 2026"].total,
-              history: res.monthlyStats.history && res.monthlyStats.history.length > 0 ? res.monthlyStats.history : fallbackHistory
-            };
+
+          if (res.parkName) {
+            setParkName(res.parkName.startsWith("อุทยานแห่งชาติ") ? res.parkName : `อุทยานแห่งชาติ${res.parkName}`);
+          }
+
+          if (res.monthlyStatsByYear && Object.keys(res.monthlyStatsByYear).length > 0) {
             setMonthlyStatsByYear(prev => ({
               ...prev,
-              "ปี 2026": current2026
+              ...res.monthlyStatsByYear
+            }));
+          } else if (res.monthlyStats) {
+            setMonthlyStatsByYear(prev => ({
+              ...prev,
+              "ปี 2026": res.monthlyStats
             }));
           }
 
           if (res.yearlyStats) {
-            setYearlyStats({
-              thai: res.yearlyStats.thai ?? dynamicParkStats.yearlyStats.thai,
-              foreigner: res.yearlyStats.foreigner ?? dynamicParkStats.yearlyStats.foreigner,
-              total: res.yearlyStats.total ?? dynamicParkStats.yearlyStats.total,
-              history: res.yearlyStats.history && res.yearlyStats.history.length > 0 ? res.yearlyStats.history : dynamicParkStats.yearlyStats.history
-            });
+            setYearlyStats(res.yearlyStats);
           }
         }
       } catch (err) {
-        console.log("Using statistics data isolated for park", targetParkId, err);
+        console.error("Error loading visit statistics from database for park", targetParkId, err);
       }
     }
     fetchStats();
@@ -595,7 +556,14 @@ export default function ViewVisitStatistics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
-              {currentHistoryData.map((item, i) => {
+              {currentHistoryData.length === 0 || currentTotalCard === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-10 text-center text-slate-500 font-medium">
+                    ไม่พบข้อมูลสถิติ
+                  </td>
+                </tr>
+              ) : (
+                currentHistoryData.map((item, i) => {
                 const totalRow = item.thai + item.foreigner;
                 return (
                   <tr 
@@ -622,7 +590,7 @@ export default function ViewVisitStatistics() {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
             {/* Table Footer Total Summary */}
             <tfoot>

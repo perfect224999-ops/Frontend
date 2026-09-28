@@ -121,15 +121,23 @@ const getSignatureImageSrc = (sig: string) => {
     return trimmed;
   }
   if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
-    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.2:8081/api/v1";
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return `${baseUrl}${cleanPath}`;
   }
   if (trimmed.startsWith("src/")) {
     return `/${trimmed}`;
   }
-  const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+  const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.2:8081/api/v1";
   return `${baseUrl}/uploads/signatures/${trimmed}`;
+};
+
+const normalizePosition = (pos?: string) => {
+  if (!pos) return "เจ้าหน้าที่อุทยาน";
+  if (pos === "เจ้าหน้าที่ธุรการ" || pos.startsWith("เจ้าหน้าที่รับแจ้งเหตุ")) {
+    return "เจ้าหน้าที่รับแจ้งเหตุ";
+  }
+  return pos;
 };
 
 function RangerDetailContent() {
@@ -232,7 +240,7 @@ function RangerDetailContent() {
                 name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username || u,
                 phone: item.mobilephone || "",
                 email: item.email || "",
-                position: item.position || "เจ้าหน้าที่อุทยาน",
+                position: normalizePosition(item.position),
                 parkName: item.park?.name || "อุทยานแห่งชาติเขาใหญ่",
                 firstName: item.firstname || "",
                 lastName: item.surname || "",
@@ -310,7 +318,7 @@ function RangerDetailContent() {
               name: `${found.firstname || ""} ${found.surname || ""}`.trim() || found.username,
               phone: found.mobilephone || "",
               email: found.email || "",
-              position: found.position || "เจ้าหน้าที่อุทยาน",
+              position: normalizePosition(found.position),
               parkName: found.park?.name || "อุทยานแห่งชาติ",
               firstName: found.firstname || "",
               lastName: found.surname || "",
@@ -415,8 +423,14 @@ function RangerDetailContent() {
 
   if (!ranger) {
     return (
-      <div className="text-center py-14 text-slate-400 font-bold text-xs">
-        ไม่พบข้อมูลบัญชีผู้ใช้งานเจ้าหน้าที่อุทยาน
+      <div className="text-center py-14 text-slate-500 font-bold text-xs space-y-3">
+        <p>ไม่พบข้อมูล Park Ranger กรุณาลองใหม่อีกครั้ง</p>
+        <button
+          onClick={() => router.push("/admin/list-park-ranger")}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold"
+        >
+          กลับหน้ารายชื่อเจ้าหน้าที่
+        </button>
       </div>
     );
   }

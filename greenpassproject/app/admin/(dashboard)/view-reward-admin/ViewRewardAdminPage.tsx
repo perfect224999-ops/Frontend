@@ -16,7 +16,9 @@ import {
   Sparkles,
   Award,
   CheckCircle2,
-  ZoomIn
+  ZoomIn,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 
 interface Reward {
@@ -62,6 +64,9 @@ export default function ViewRewardAdminPage() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Reward | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchRewards = async () => {
     setIsLoading(true);
@@ -100,18 +105,34 @@ export default function ViewRewardAdminPage() {
     fetchRewards();
   }, []);
 
-  const handleDeleteReward = async (id: string) => {
-    if (!window.confirm("คุณต้องการลบรายการของรางวัลนี้ออกจากฐานข้อมูลใช่หรือไม่?")) return;
+  const handleInitiateDelete = (reward: Reward) => {
+    setDeleteTarget(reward);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      const targetId = parseInt(id);
+      const targetId = parseInt(deleteTarget.id);
       if (targetId) {
         await rewardApi.deleteReward(targetId);
       }
-      localStorage.removeItem(`greenpass_reward_img_${id}`);
+      localStorage.removeItem(`greenpass_reward_img_${deleteTarget.id}`);
+      setToastMessage({
+        type: "success",
+        text: `ลบของรางวัล "${deleteTarget.rewardTitle}" ออกจากระบบเรียบร้อยแล้ว`
+      });
+      setDeleteTarget(null);
       await fetchRewards();
     } catch (e) {
       console.error("Failed to delete reward from database:", e);
-      alert("เกิดข้อผิดพลาดในการลบข้อมูลออกจากฐานข้อมูล");
+      setToastMessage({
+        type: "error",
+        text: "ลบของรางวัลไม่สำเร็จกรุณาลองใหม่อีกครั้ง"
+      });
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -152,6 +173,31 @@ export default function ViewRewardAdminPage() {
           </div>
         </div>
 
+        {/* Toast Alert Notification */}
+        {toastMessage && (
+          <div className={`p-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-300 border ${
+            toastMessage.type === "success" 
+              ? "bg-emerald-50 border-emerald-300 text-emerald-900" 
+              : "bg-rose-50 border-rose-300 text-rose-900"
+          }`}>
+            <div className="flex items-center gap-2.5">
+              {toastMessage.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              )}
+              <span>{toastMessage.text}</span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setToastMessage(null)} 
+              className="p-1 hover:opacity-75 transition-opacity text-slate-500 hover:text-slate-800 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Rewards Showcase List */}
         <div className="space-y-8">
           {isLoading ? (
@@ -164,7 +210,7 @@ export default function ViewRewardAdminPage() {
               <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-md">
                 <Gift className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-bold text-slate-800">ยังไม่มีรายการของรางวัลในระบบ</h3>
+              <h3 className="text-base font-bold text-slate-800">ไม่พบข้อมูลรางวัล</h3>
               <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
                 เริ่มต้นสร้างรายการของรางวัลลงฐานข้อมูลได้โดยกดปุ่มเพิ่มด้านบน
               </p>
@@ -256,8 +302,9 @@ export default function ViewRewardAdminPage() {
                           </button>
 
                           <button
-                            onClick={() => handleDeleteReward(reward.id)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                            type="button"
+                            onClick={() => handleInitiateDelete(reward)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>ลบ</span>
@@ -338,6 +385,73 @@ export default function ViewRewardAdminPage() {
             <div className="p-4 bg-slate-900 border-t border-slate-800 text-center">
               <p className="text-xs text-slate-400 font-medium">กดปุ่ม X หรือกดภายนอกกรอบเพื่อปิดหน้าต่างรูปภาพ</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal (Mockup แจ้งเตือนยืนยันการลบของรางวัล) */}
+      {deleteTarget && (
+        <div 
+          onClick={() => !isDeleting && setDeleteTarget(null)}
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-sm bg-white rounded-3xl p-6 sm:p-7 text-center border border-slate-200 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200"
+          >
+            {/* Top Close Button */}
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={() => setDeleteTarget(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Warning Icon Badge */}
+            <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-md">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            {/* Modal Heading & Explanation */}
+            <div className="space-y-2">
+              <h4 className="text-base font-extrabold text-slate-900">ยืนยันการลบของรางวัล</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                คุณแน่ใจหรือไม่ว่าต้องการลบรายการของรางวัลนี้ออกจากระบบ? การดำเนินการนี้ไม่สามารถยกเลิกหรือกู้คืนได้
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteTarget(null)}
+                className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="w-1/2 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>กำลังลบ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>ยืนยันการลบ</span>
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}

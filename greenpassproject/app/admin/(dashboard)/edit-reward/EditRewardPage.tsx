@@ -168,18 +168,22 @@ function EditRewardContent() {
       }, 600);
     } catch (err: any) {
       console.error("Failed to update reward in database:", err);
-      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล");
+      setError("ไม่สามารถแก้ไขข้อมูลรางวัลได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }
   };
 
-
-
   if (!currentReward) {
     return (
-      <div className="text-center py-14 text-slate-400 font-bold text-xs">
-        ไม่พบข้อมูลของรางวัลดังกล่าว
+      <div className="text-center py-14 text-slate-500 font-bold text-xs space-y-3">
+        <p>ไม่พบข้อมูลรางวัล</p>
+        <button
+          onClick={() => router.push("/admin/view-reward-admin")}
+          className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold"
+        >
+          กลับหน้ารายการของรางวัล
+        </button>
       </div>
     );
   }

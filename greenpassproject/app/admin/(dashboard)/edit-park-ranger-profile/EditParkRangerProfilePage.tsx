@@ -38,6 +38,7 @@ import {
 interface Ranger {
   id: string;
   employeeId: string;
+  username?: string;
   password?: string;
   name: string;
   firstName: string;
@@ -190,18 +191,18 @@ function EditProfileContent() {
     function handleClickOutside(event: MouseEvent) {
       if (parkDropdownRef.current && !parkDropdownRef.current.contains(event.target as Node)) {
         setIsParkDropdownOpen(false);
-        setParkSearchQuery(parkName);
+        setParkSearchQuery("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [parkName]);
+  }, []);
 
   const handleSelectPark = (selected: string) => {
     setParkName(selected);
-    setParkSearchQuery(selected);
+    setParkSearchQuery("");
     setIsParkDropdownOpen(false);
   };
 
@@ -226,14 +227,14 @@ function EditProfileContent() {
       return trimmed;
     }
     if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
-      const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+      const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.2:8081/api/v1";
       const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
       return `${baseUrl}${cleanPath}`;
     }
     if (trimmed.startsWith("src/")) {
       return `/${trimmed}`;
     }
-    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.3:8081/api/v1";
+    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.2:8081/api/v1";
     return `${baseUrl}/uploads/signatures/${trimmed}`;
   };
 
@@ -438,12 +439,16 @@ function EditProfileContent() {
 
       // Populate form fields
       setCurrentRanger(foundRanger);
-      setEmployeeId(foundRanger.employeeId || `PR${foundRanger.id}`);
-      setPassword(foundRanger.password || "pass1234");
+      setEmployeeId((foundRanger.employeeId || foundRanger.id || "").toUpperCase());
+      setPassword(foundRanger.password || "Pass1234");
       setFirstName(foundRanger.firstName || foundRanger.name.split(" ")[0] || "");
       setLastName(foundRanger.lastName || foundRanger.name.split(" ")[1] || "");
       setBirthDate(foundRanger.birthDate || "");
-      setPosition(foundRanger.position || "เจ้าหน้าที่อุทยาน");
+      const rawPos = foundRanger.position || "เจ้าหน้าที่อุทยาน";
+      const normalizedPos = (rawPos === "เจ้าหน้าที่ธุรการ" || rawPos.startsWith("เจ้าหน้าที่รับแจ้งเหตุ"))
+        ? "เจ้าหน้าที่รับแจ้งเหตุ"
+        : rawPos;
+      setPosition(normalizedPos);
       const initialPark = foundRanger.parkName || "อุทยานแห่งชาติเขาใหญ่";
       setParkName(initialPark);
       setParkSearchQuery(initialPark);
@@ -593,17 +598,18 @@ function EditProfileContent() {
 
     const validationError = validateParkRangerForm();
     if (validationError) {
-      setError(validationError);
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 
     setIsLoading(true);
     try {
-      const targetUsername = (currentRanger.employeeId || currentRanger.id || employeeId).toLowerCase();
+      const cleanEmpId = employeeId.trim().toUpperCase();
+      const targetUsername = currentRanger.username || currentRanger.employeeId || currentRanger.id || cleanEmpId;
 
       try {
         await rangerApi.updateRanger(targetUsername, {
-          employeeId,
+          employeeId: cleanEmpId,
           password: password.trim().slice(0, 16),
           firstName,
           lastName,
@@ -626,8 +632,10 @@ function EditProfileContent() {
 
       const updatedObj = {
         ...currentRanger,
-        employeeId,
-        password,
+        id: cleanEmpId,
+        employeeId: cleanEmpId,
+        username: cleanEmpId,
+        password: password.trim(),
         name: `${firstName} ${lastName}`,
         firstName,
         lastName,
@@ -647,31 +655,33 @@ function EditProfileContent() {
 
       if (signature) {
         try {
-          localStorage.setItem(`greenpass_ranger_sig_${currentRanger.id}`, signature);
+          localStorage.setItem(`greenpass_ranger_sig_${cleanEmpId}`, signature);
+          localStorage.setItem(`greenpass_ranger_sig_${cleanEmpId.toLowerCase()}`, signature);
         } catch (e) {}
       }
 
       // Update in greenpass_rangers array
       const savedRangers = localStorage.getItem("greenpass_rangers");
       let list: Ranger[] = savedRangers ? JSON.parse(savedRangers) : [];
-      let updatedList = list.map((r) => r.id === currentRanger.id ? updatedObj : r);
-      if (!list.some(r => r.id === currentRanger.id)) {
+      let updatedList = list.map((r) => (r.id === currentRanger.id || r.username === currentRanger.id || r.employeeId === currentRanger.id) ? updatedObj : r);
+      if (!list.some(r => r.id === currentRanger.id || r.username === currentRanger.id || r.employeeId === currentRanger.id)) {
         updatedList = [updatedObj, ...list];
       }
       localStorage.setItem("greenpass_rangers", JSON.stringify(updatedList));
 
       // Update individual storage key
-      localStorage.setItem(`greenpass_ranger_detail_${currentRanger.id}`, JSON.stringify(updatedObj));
+      localStorage.setItem(`greenpass_ranger_detail_${cleanEmpId}`, JSON.stringify(updatedObj));
+      localStorage.setItem(`greenpass_ranger_detail_${cleanEmpId.toLowerCase()}`, JSON.stringify(updatedObj));
 
       setSuccess("แก้ไขประวัติเจ้าหน้าที่อุทยานสำเร็จแล้ว!");
 
       setTimeout(() => {
-        router.push(`/admin/view-park-ranger-detail?id=${currentRanger.id}`);
+        router.push(`/admin/view-park-ranger-detail?id=${cleanEmpId}`);
       }, 1000);
 
     } catch (err) {
       console.error("Failed to update park ranger:", err);
-      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+      setError("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }
@@ -742,8 +752,8 @@ function EditProfileContent() {
                 <input 
                   type="text" 
                   value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
+                  onChange={(e) => setEmployeeId(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all uppercase"
                   disabled={isLoading}
                 />
               </div>
@@ -859,7 +869,7 @@ function EditProfileContent() {
                     <option value="เจ้าหน้าที่ประชาสัมพันธ์">เจ้าหน้าที่ประชาสัมพันธ์</option>
                     <option value="หัวหน้าอุทยาน">หัวหน้าอุทยาน</option>
                     <option value="เจ้าหน้าที่พิทักษ์ป่า">เจ้าหน้าที่พิทักษ์ป่า</option>
-                    <option value="เจ้าหน้าที่ธุรการ">เจ้าหน้าที่ธุรการ</option>
+                    <option value="เจ้าหน้าที่รับแจ้งเหตุ">เจ้าหน้าที่รับแจ้งเหตุ</option>
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
@@ -881,7 +891,6 @@ function EditProfileContent() {
                         if (!isParkDropdownOpen) setIsParkDropdownOpen(true);
                       }}
                       onFocus={() => {
-                        setParkSearchQuery(parkName);
                         setIsParkDropdownOpen(true);
                       }}
                       placeholder="พิมพ์ค้นหา หรือเลือกอุทยานแห่งชาติ..."
@@ -889,15 +898,16 @@ function EditProfileContent() {
                       disabled={isLoading}
                     />
                     <div className="absolute right-2.5 flex items-center gap-1 text-slate-400">
-                      {isParkDropdownOpen && parkSearchQuery && (
+                      {(parkName || parkSearchQuery) && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            setParkName("");
                             setParkSearchQuery("");
                           }}
                           className="p-1 hover:text-slate-600 rounded-full hover:bg-slate-200/60 transition-colors"
-                          title="ล้างคำค้นหา"
+                          title="ล้างข้อมูลอุทยาน"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -906,11 +916,12 @@ function EditProfileContent() {
                         type="button"
                         onClick={() => {
                           if (!isParkDropdownOpen) {
-                            setParkSearchQuery(parkName);
+                            setParkSearchQuery("");
                           }
                           setIsParkDropdownOpen(!isParkDropdownOpen);
                         }}
                         className="p-1 hover:text-emerald-700 rounded-full transition-colors"
+                        title={isParkDropdownOpen ? "ปิดรายการ" : "เปิดรายการอุทยาน"}
                       >
                         {isParkDropdownOpen ? (
                           <ChevronUp className="w-4 h-4 text-emerald-600" />
@@ -927,7 +938,7 @@ function EditProfileContent() {
                       <div className="p-2 border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium text-slate-500 flex items-center justify-between">
                         <span className="flex items-center gap-1">
                           <Search className="w-3 h-3 text-emerald-600" />
-                          ผลการค้นหา
+                          {parkSearchQuery.trim() ? "ผลการค้นหา" : "รายชื่ออุทยานทั้งหมด"}
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono">
                           {filteredParks.length} แห่ง

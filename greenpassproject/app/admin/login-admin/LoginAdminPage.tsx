@@ -29,40 +29,21 @@ export default function LoginAdminPage() {
     setError("");
 
     const usernameRegex = /^[a-zA-Z0-9]+$/;
-
-    if (!username) {
-      setError("ชื่อผู้ใช้ต้องไม่เป็นค่าว่าง");
-      return;
-    }
-    if (username.length < 4 || username.length > 50) {
-      setError("ชื่อผู้ใช้ต้องมีความยาว 4 - 50 ตัวอักษร");
-      return;
-    }
-    if (username.includes(" ")) {
-      setError("ชื่อผู้ใช้ต้องไม่มีเว้นวรรคหรือช่องว่าง");
-      return;
-    }
-    if (!usernameRegex.test(username)) {
-      setError("ชื่อผู้ใช้ต้องเป็นตัวอักษรภาษาอังกฤษหรือตัวเลขเท่านั้น");
-      return;
-    }
-
     const passwordRegex = /^[a-zA-Z0-9!#_.]+$/;
 
-    if (!password) {
-      setError("รหัสผ่านต้องไม่เป็นค่าว่าง");
-      return;
-    }
-    if (password.length < 8 || password.length > 32) {
-      setError("รหัสผ่านต้องมีความยาว 8 - 32 ตัวอักษร");
-      return;
-    }
-    if (password.includes(" ")) {
-      setError("รหัสผ่านต้องไม่มีเว้นวรรคหรือช่องว่าง");
-      return;
-    }
-    if (!passwordRegex.test(password)) {
-      setError("รหัสผ่านต้องเป็นอักษรภาษาอังกฤษ ตัวเลข หรืออักขระพิเศษ !#_. เท่านั้น");
+    if (
+      !username ||
+      username.length < 4 ||
+      username.length > 50 ||
+      username.includes(" ") ||
+      !usernameRegex.test(username) ||
+      !password ||
+      password.length < 8 ||
+      password.length > 32 ||
+      password.includes(" ") ||
+      !passwordRegex.test(password)
+    ) {
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 
@@ -75,16 +56,12 @@ export default function LoginAdminPage() {
         localStorage.setItem("admin_role", "SUPER_ADMIN");
         router.push("/admin/add-reward");
       } else {
-        setError(response.message || "เข้าสู่ระบบไม่สำเร็จ");
+        setError("ไม่พบข้อมูลผู้ใช้");
         setIsLoading(false);
       }
     } catch (err: any) {
       console.error(err);
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError("ชื่อผู้ใช้งานหรือรหัสผ่านแอดมินไม่ถูกต้อง หรือไม่พบข้อมูลผู้ใช้");
-      }
+      setError("ไม่พบข้อมูลผู้ใช้");
       setIsLoading(false);
     }
   };
@@ -213,17 +190,6 @@ export default function LoginAdminPage() {
 
           </form>
 
-        </div>
-
-        {/* Link back to Park Ranger Login */}
-        <div className="text-center">
-          <button
-            onClick={() => router.push("/ranger/login-park-ranger")}
-            className="inline-flex items-center gap-1.5 text-xs text-emerald-300 hover:text-emerald-200 font-semibold transition-all hover:underline cursor-pointer group"
-          >
-            <span>เข้าสู่ระบบสำหรับเจ้าหน้าที่อุทยาน (Park Ranger)</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
         </div>
 
       </div>

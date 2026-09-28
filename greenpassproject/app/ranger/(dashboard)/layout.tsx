@@ -161,53 +161,65 @@ export default function RangerDashboardLayout({
     return false;
   };
 
-  // 🚨 ตรวจจับและดึงข้อมูลเหตุฉุกเฉินร้ายแรงแบบเรียลไทม์เฉพาะอุทยานที่ล็อกอินอยู่
+  // 🚨 ตรวจจับและดึงข้อมูลเหตุฉุกเฉินร้ายแรงแบบเรียลไทม์ (ทำงานทุกหน้าย่อยใน Dashboard แม้ไม่ได้เปิดหน้ารายงาน)
   useEffect(() => {
+    let isMountedLocal = true;
+    let isChecking = false;
+    let timeoutId: any = null;
+
     const checkEmergencyState = async () => {
+      if (!isMountedLocal || isChecking) return;
+
       const activeParkId = currentParkId || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null);
       const activeParkName = parkName || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null);
+      const rangerUsername = rangerUser || (typeof window !== "undefined" ? (localStorage.getItem("ranger_username") || localStorage.getItem("username")) : null);
 
-      if (!activeParkId && !activeParkName) return;
+      const ackList: string[] = typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
+        : [];
 
-      // 1. เช็คจาก LocalStorage เดิมก่อน โดยต้องตรวจสอบว่าตรงกับอุทยานปัจจุบันหรือไม่
+      // 1. เช็คจาก LocalStorage ก่อน
       const savedEmergency = typeof window !== "undefined" ? localStorage.getItem("greenpass_emergency_alert") : null;
       if (savedEmergency) {
         try {
           const parsed = JSON.parse(savedEmergency);
-          if (parsed && parsed.id) {
-            const isMatch = isReportForCurrentPark(parsed, activeParkId, activeParkName);
-            if (!isMatch) {
-              console.log(`[Emergency Alert] Removing mismatched alert for other park (${parsed.parkId || parsed.location}). Current park is ${activeParkId} (${activeParkName})`);
-              localStorage.removeItem("greenpass_emergency_alert");
-            } else {
-              setActiveEmergencyAlert(parsed);
-              startEmergencySirenSound();
-              return;
-            }
+          if (parsed && parsed.id && !ackList.includes(String(parsed.id))) {
+            setActiveEmergencyAlert(parsed);
+            startEmergencySirenSound();
+            return;
           }
         } catch (e) { }
       }
 
-      // 2. ดึงข้อมูลรายงานจาก API เฉพาะของอุทยานนี้เท่านั้น (ห้ามดึงของอุทยานอื่น!)
+      // 2. ถ้ามีป๊อปอัปฉุกเฉินแสดงอยู่แล้ว ไม่ต้องยิง API ซ้ำ
+      if (activeEmergencyAlert) return;
+
+      // 3. ตรวจสอบจาก Backend API เพื่อให้เด้งแจ้งเตือนทุกหน้าย่อย (ประกาศข่าว, สถิติ, เกี่ยวกับอุทยาน ฯลฯ)
+      if (!rangerUsername && !activeParkId) return;
+
+      isChecking = true;
       try {
         let listData: any[] | null = null;
-        if (activeParkId) {
+        if (rangerUsername) {
+          const res = await reportApi.getReportsForRanger(rangerUsername);
+          listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
+            ? (res.result || res.data || res)
+            : null;
+        }
+
+        if ((!Array.isArray(listData) || listData.length === 0) && activeParkId) {
           const res = await reportApi.getReportsByParkId(Number(activeParkId));
           listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
             ? (res.result || res.data || res)
             : null;
         }
 
-        if (Array.isArray(listData)) {
-          const ackList: string[] = typeof window !== "undefined"
-            ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
-            : [];
-
+        if (isMountedLocal && Array.isArray(listData)) {
           const unackEmergency = listData.find((r: any) => {
             const rId = String(r.reportId || "");
+            if (!rId || ackList.includes(rId)) return false;
 
-            // 🚨 ตรวจสอบว่าตรงกับอุทยานปัจจุบันนี้เท่านั้น
-            if (!isReportForCurrentPark(r, activeParkId, activeParkName)) {
+            if (activeParkId && r.parkId && String(r.parkId) !== String(activeParkId)) {
               return false;
             }
 
@@ -224,11 +236,12 @@ export default function RangerDashboardLayout({
               titleDesc.includes("ฉุกเฉิน") ||
               r.isEmergency === true;
 
-            const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน";
-            return isSevere && isPending && rId && !ackList.includes(rId);
+            const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน" || !r.status;
+            return isSevere && isPending;
           });
 
-          if (unackEmergency) {
+          if (unackEmergency && isMountedLocal) {
+            console.log("🚨 [Global Emergency Alert] Found unacknowledged emergency report on route", pathname, unackEmergency);
             const emergencyEventData = {
               id: String(unackEmergency.reportId),
               parkId: String(activeParkId || unackEmergency.parkId || ""),
@@ -236,7 +249,7 @@ export default function RangerDashboardLayout({
                 ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}`
                 : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
               location: unackEmergency.parkName || unackEmergency.park?.name || activeParkName || "พื้นที่อุทยานแห่งชาติ",
-              time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+              time: unackEmergency.reportTime || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
               reporter: unackEmergency.username || unackEmergency.user?.username || "ผู้ใช้งาน GreenPass"
             };
 
@@ -248,131 +261,207 @@ export default function RangerDashboardLayout({
           }
         }
       } catch (e) {
-        // ละเว้นข้อผิดพลาดจากการดึงเบื้องหลัง
+      } finally {
+        isChecking = false;
       }
     };
 
-    // ตรวจสอบสถานะเหตุฉุกเฉิน
+    // ตรวจสอบทันทีเมื่อเปิดหน้าจอ หรือเมื่อเปลี่ยนหน้าย่อย (pathname เปลี่ยน)
     checkEmergencyState();
 
-    const handleCustomTrigger = (e: any) => {
-      if (e.detail) {
-        const activeParkId = currentParkId || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null);
-        const activeParkName = parkName || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null);
+    // ตรวจสอบเป็นระยะแบบ Sequential (รอให้รอบก่อนหน้าเสร็จก่อน แล้วเว้น 4.5 วินาที จึงตรวจรอบถัดไป) ป้องกัน Request ซ้อนกัน
+    const runSequentialCheck = async () => {
+      await checkEmergencyState();
+      if (isMountedLocal) {
+        timeoutId = setTimeout(runSequentialCheck, 4500);
+      }
+    };
+    timeoutId = setTimeout(runSequentialCheck, 4500);
 
-        if (!isReportForCurrentPark(e.detail, activeParkId, activeParkName)) {
-          console.log(`[Emergency Alert] Ignored custom trigger for other park:`, e.detail);
-          return;
-        }
+    const handleCustomTrigger = (e: any) => {
+      if (e.detail && typeof window !== "undefined") {
+        const ackList = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
+        if (e.detail.id && ackList.includes(String(e.detail.id))) return;
 
         setActiveEmergencyAlert(e.detail);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("greenpass_emergency_alert", JSON.stringify(e.detail));
-        }
+        localStorage.setItem("greenpass_emergency_alert", JSON.stringify(e.detail));
         startEmergencySirenSound();
       }
     };
 
+    const handleWindowFocus = () => {
+      checkEmergencyState();
+    };
+
     if (typeof window !== "undefined") {
       window.addEventListener("greenpass_emergency_trigger", handleCustomTrigger);
+      window.addEventListener("focus", handleWindowFocus);
+      document.addEventListener("visibilitychange", handleWindowFocus);
     }
 
     return () => {
+      isMountedLocal = false;
+      if (timeoutId) clearTimeout(timeoutId);
       if (typeof window !== "undefined") {
         window.removeEventListener("greenpass_emergency_trigger", handleCustomTrigger);
+        window.removeEventListener("focus", handleWindowFocus);
+        document.removeEventListener("visibilitychange", handleWindowFocus);
       }
     };
-  }, [currentParkId, parkName]);
+  }, [pathname, currentParkId, parkName, rangerUser]);
 
-  // ----------------------------------------------------
-  // 📡 Real-time WebSocket Listener via @stomp/stompjs & SockJS
+// ----------------------------------------------------
+  // 📡 Real-time WebSocket STOMP Listener
+  // ทำงานแบบ Event-driven 100% ไม่มีการยิง API ซ้ำๆ (คลูดาวน์)
   // ----------------------------------------------------
   useEffect(() => {
     const activeParkId = currentParkId || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null);
     const activeParkName = parkName || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null);
-
-    if (!activeParkId) return;
+    const activeRangerUser = rangerUser || (typeof window !== "undefined" ? (localStorage.getItem("ranger_username") || localStorage.getItem("username")) : null);
 
     let stompClient: Client | null = null;
 
     try {
-      const getWsUrl = () => `${getBaseURL()}/ws-greenpass`;
+      // เชื่อมต่อไปยัง WebSocket Port 8081 ตาม hostname ปัจจุบัน (http://<hostname>:8081/ws-greenpass)
+      const wsUrl = `${getBaseURL().replace('/api/v1', '')}/ws-greenpass`;
 
       stompClient = new Client({
-        webSocketFactory: () => new SockJS(getWsUrl()),
-        debug: () => { }, // ปิด log debug ใน console
-        reconnectDelay: 5000,
+        webSocketFactory: () => new SockJS(wsUrl),
+        reconnectDelay: 4000,
+        heartbeatIncoming: 10000,
+        heartbeatOutgoing: 10000,
+        debug: (msg) => {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("[STOMP]", msg);
+          }
+        },
         onConnect: () => {
-          console.log(`📡 WebSocket Connected specifically for Park ID: ${activeParkId}`);
+          console.log(`📡 [WebSocket STOMP Connected] Park ID: ${activeParkId || "All"}, Ranger: ${activeRangerUser || "Unknown"}`);
 
-          // 🚨 สมัครรับการแจ้งเตือนเฉพาะอุทยานของเจ้าหน้าที่คนนี้เท่านั้น (ห้ามฟังอุทยานอื่น!)
-          stompClient?.subscribe(`/topic/park/${activeParkId}/notifications`, (message: any) => {
-            if (message.body) {
-              try {
-                const notification = JSON.parse(message.body);
-                const report = notification.report || {};
-                const title = notification.title || "";
-                const messageText = notification.message || report.description || "";
-                const typeName = report.typeName || report.type?.typeName || notification.typeName || notification.reportType || "";
-                const typeId = report.typeId || report.type?.typeId || notification.typeId || report.type_id;
+          const processPayload = (item: any) => {
+            if (!item || typeof item !== "object") return;
 
-                console.log(`📡 [WebSocket] Received Notification for Park ${activeParkId}:`, notification);
+            const report = item.report || item.reportItem || item;
+            const replyReportId = item.replyReportId || item.reply_report_id || item.notificationId || item.id;
+            const progressText = item.progress || item.message || report.description || report.name || "";
+            const title = item.title || report.name || "แจ้งเตือนรายงานเหตุการณ์";
+            const reporterName = report.user?.username || report.username || item.username || item.parkRangerUsername || item.park_ranger_username || "ผู้ใช้งาน GreenPass";
 
-                // 🔍 ตรวจสอบว่าตรงกับอุทยานปัจจุบันนี้จริงหรือไม่
-                const notifParkObj = {
-                  parkId: report.parkId || report.park?.parkId || notification.parkId,
-                  parkName: report.parkName || report.park?.name || notification.parkName || notification.location
-                };
-                if (notifParkObj.parkId && !isReportForCurrentPark(notifParkObj, activeParkId, activeParkName)) {
-                  console.log(`Ignoring notification for other park (${notifParkObj.parkId}), current park is ${activeParkId}`);
-                  return;
-                }
+            const typeName = String(report.typeName || report.type?.typeName || item.typeName || item.reportType || item.category || "");
+            const typeId = report.typeId || report.type?.typeId || item.typeId || item.type_id;
 
-                // 🔍 ตรวจสอบว่าเป็นรายงานร้ายแรง / ฉุกเฉินหรือไม่
-                const isEmergency =
-                  typeId === 2 ||
-                  String(typeId) === "2" ||
-                  notification.isEmergency === true ||
-                  typeName.includes("ร้ายแรง") ||
-                  typeName.includes("ฉุกเฉิน") ||
-                  title.includes("ร้ายแรง") ||
-                  title.includes("ฉุกเฉิน") ||
-                  title.includes("แจ้งเตือนเหตุฉุกเฉิน") ||
-                  messageText.includes("ร้ายแรง") ||
-                  messageText.includes("ฉุกเฉิน");
+            // ตรวจสอบอุทยาน: หากข้อความมี parkId ระบุ และไม่ตรงกับอุทยานที่ล็อกอินอยู่ ให้ข้าม
+            const reportParkId = report.parkId || report.park?.parkId || item.parkId || item.park?.parkId;
+            const reportParkName = report.parkName || report.park?.name || item.parkName || item.park?.name;
 
-                if (isEmergency) {
-                  console.log(`🚨 [WebSocket] Emergency alert triggered for Park ${activeParkId}!`);
-                  const alertData = {
-                    id: String(report.reportId || notification.notificationId || Date.now()),
-                    parkId: String(activeParkId),
-                    details: messageText || report.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน",
-                    location: report.parkName || report.park?.name || activeParkName || "พื้นที่อุทยานแห่งชาติ",
-                    time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-                    reporter: report.user?.username || notification.username || "ผู้ใช้งาน GreenPass"
-                  };
-
-                  setActiveEmergencyAlert(alertData);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("greenpass_emergency_alert", JSON.stringify(alertData));
-                  }
-                  startEmergencySirenSound(); // เปิดเสียงไซเรนวนลูป
-                } else {
-                  console.log("ℹ️ [WebSocket] Received normal report (no modal alarm needed):", notification);
-                }
-
-                // 🔄 สั่งให้ตารางรายงาน (ListReportMember) อัปเดตโหลดข้อมูลใหม่ในพื้นหลังทันที
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: notification }));
-                }
-              } catch (e) {
-                console.error("Error parsing WebSocket message:", e);
-              }
+            if (activeParkId && reportParkId && String(reportParkId) !== String(activeParkId)) {
+              console.log(`[WS] Ignoring message for other park (${reportParkId}), current park is ${activeParkId}`);
+              return;
             }
+
+            // ตรวจสอบความฉุกเฉิน / ร้ายแรง
+            const isEmergency = Boolean(
+              typeId === 2 ||
+              String(typeId) === "2" ||
+              item.isEmergency === true ||
+              report.isEmergency === true ||
+              typeName.includes("ร้ายแรง") ||
+              typeName.includes("ฉุกเฉิน") ||
+              title.includes("ร้ายแรง") ||
+              title.includes("ฉุกเฉิน") ||
+              title.includes("แจ้งเตือนเหตุฉุกเฉิน") ||
+              progressText.includes("ร้ายแรง") ||
+              progressText.includes("ฉุกเฉิน") ||
+              String(report.name || "").includes("ร้ายแรง") ||
+              String(report.name || "").includes("ฉุกเฉิน") ||
+              String(report.description || "").includes("ร้ายแรง") ||
+              String(report.description || "").includes("ฉุกเฉิน") ||
+              String(item.severity || "").toLowerCase().includes("emergency") ||
+              String(item.severity || "").toLowerCase().includes("severe") ||
+              String(report.category || "").includes("ร้ายแรง") ||
+              String(report.category || "").includes("ฉุกเฉิน")
+            );
+
+            const alertId = String(report.reportId || item.reportId || replyReportId || Date.now());
+            const ackList: string[] = typeof window !== "undefined"
+              ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
+              : [];
+
+            if (isEmergency && !ackList.includes(alertId)) {
+              console.log(`🚨 [WebSocket Real-Time] Emergency alert triggered for Park ${activeParkId || "All"}! ID: ${alertId}`);
+              const alertData = {
+                id: alertId,
+                parkId: String(activeParkId || reportParkId || ""),
+                details: progressText || report.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน",
+                location: reportParkName || activeParkName || "พื้นที่อุทยานแห่งชาติ",
+                time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+                reporter: reporterName
+              };
+
+              setActiveEmergencyAlert(alertData);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("greenpass_emergency_alert", JSON.stringify(alertData));
+              }
+              startEmergencySirenSound();
+            } else {
+              console.log("ℹ️ [WebSocket Real-Time] Received update:", item);
+            }
+
+            // ส่ง Custom Event ให้หน้าตารางรายงาน และหน้ารายละเอียดอัปเดตข้อมูลทันทีแบบไม่ต้องรีหน้า
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: item }));
+              window.dispatchEvent(new CustomEvent("greenpass_reply_report_received", { detail: item }));
+            }
+          };
+
+          const handleIncomingMessage = (message: any) => {
+            if (!message || !message.body) return;
+            try {
+              const raw = JSON.parse(message.body);
+              console.log("📡 [WebSocket Message Received]:", raw);
+              const data = raw.result || raw.data || raw;
+              const items = Array.isArray(data) ? data : [data];
+              for (const it of items) {
+                processPayload(it);
+              }
+            } catch (e) {
+              console.error("Error parsing WebSocket message:", e);
+            }
+          };
+
+          // สมัครรับข้อความทุก Topic ที่เกี่ยวข้อง ทั้งแบบเฉพาะอุทยาน และแบบรวม
+          const topicsToSubscribe = new Set<string>();
+          if (activeParkId) {
+            topicsToSubscribe.add(`/topic/park/${activeParkId}/notifications`);
+            topicsToSubscribe.add(`/topic/park/${activeParkId}/reports`);
+            topicsToSubscribe.add(`/topic/park/${activeParkId}/reply-reports`);
+            topicsToSubscribe.add(`/topic/park/${activeParkId}`);
+          }
+          if (activeRangerUser) {
+            topicsToSubscribe.add(`/topic/ranger/${activeRangerUser}/notifications`);
+            topicsToSubscribe.add(`/topic/ranger/${activeRangerUser}/reports`);
+            topicsToSubscribe.add(`/topic/ranger/${activeRangerUser}`);
+          }
+          topicsToSubscribe.add("/topic/notifications");
+          topicsToSubscribe.add("/topic/reports");
+          topicsToSubscribe.add("/topic/reply-reports");
+          topicsToSubscribe.add("/topic/emergency");
+          topicsToSubscribe.add("/topic/emergency-reports");
+          topicsToSubscribe.add("/topic/report");
+          topicsToSubscribe.add("/topic/reply-report");
+          topicsToSubscribe.add("/topic/notification");
+          topicsToSubscribe.add("/queue/notifications");
+          topicsToSubscribe.add("/queue/reports");
+
+          topicsToSubscribe.forEach((t) => {
+            stompClient?.subscribe(t, handleIncomingMessage);
           });
         },
         onStompError: (frame) => {
           console.warn("WebSocket STOMP Error:", frame.headers["message"]);
+        },
+        onWebSocketClose: () => {
+          console.log("📡 [WebSocket] Disconnected. Will auto-reconnect...");
         }
       });
 
@@ -386,7 +475,7 @@ export default function RangerDashboardLayout({
         stompClient.deactivate();
       }
     };
-  }, [currentParkId, parkName]);
+  }, [currentParkId, parkName, rangerUser]);
 
   const handleAcknowledgeEmergency = () => {
     stopEmergencySirenSound();
@@ -611,7 +700,7 @@ export default function RangerDashboardLayout({
 
           {/* โปรไฟล์ & ออกจากระบบ */}
           <div className="flex items-center gap-3">
-            {rangerUser && (
+            {isMounted && rangerUser && (
               <div className="text-right text-xs hidden sm:block">
                 <span className="font-bold text-white block">{rangerUser}</span>
                 {parkName && (

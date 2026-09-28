@@ -3,24 +3,24 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { rangerApi, parkApi } from "../../../../service/api";
-import { 
-  getProvincesList, 
-  getDistrictsByProvince, 
+import {
+  getProvincesList,
+  getDistrictsByProvince,
   getSubDistrictsByDistrict,
-  getZipcodesBySubdistrict 
+  getZipcodesBySubdistrict
 } from "../../../../data/thaiLocationData";
-import { 
-  UserPlus, 
-  IdCard, 
-  User, 
-  Calendar, 
-  Briefcase, 
-  Trees, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  ArrowLeft, 
-  Check, 
+import {
+  UserPlus,
+  IdCard,
+  User,
+  Calendar,
+  Briefcase,
+  Trees,
+  MapPin,
+  Phone,
+  Mail,
+  ArrowLeft,
+  Check,
   ChevronDown,
   ChevronUp,
   Search,
@@ -37,7 +37,7 @@ import {
 
 export default function AddParkRangerPage() {
   const router = useRouter();
-  
+
   // Form states
   const [employeeId, setEmployeeId] = useState("PR01");
   const [password, setPassword] = useState("Pass1234");
@@ -46,8 +46,8 @@ export default function AddParkRangerPage() {
   const [lastName, setLastName] = useState("ดงศักดิ์");
   const [birthDate, setBirthDate] = useState("2004-10-15");
   const [position, setPosition] = useState("เจ้าหน้าที่ประชาสัมพันธ์");
-  const [parkName, setParkName] = useState("อุทยานแห่งชาติแก่งกระจาน");
-  const [parkSearchQuery, setParkSearchQuery] = useState("อุทยานแห่งชาติแก่งกระจาน");
+  const [parkName, setParkName] = useState("");
+  const [parkSearchQuery, setParkSearchQuery] = useState("");
   const [isParkDropdownOpen, setIsParkDropdownOpen] = useState(false);
   const parkDropdownRef = useRef<HTMLDivElement>(null);
   const [startDate, setStartDate] = useState("2023-10-15");
@@ -127,7 +127,7 @@ export default function AddParkRangerPage() {
   const [dbParks, setDbParks] = useState<Array<{ parkId: number; name: string }>>([]);
 
   useEffect(() => {
-    async function loadParks() {
+    async function loadInitialData() {
       try {
         const res = await parkApi.searchParks("");
         const list = res?.result || res?.data || (Array.isArray(res) ? res : []);
@@ -141,8 +141,29 @@ export default function AddParkRangerPage() {
       } catch (err) {
         console.error("Failed to fetch parks from database:", err);
       }
+
+      try {
+        const rangerRes = await rangerApi.getAllRangers();
+        const rList = rangerRes?.result || rangerRes?.data || (Array.isArray(rangerRes) ? rangerRes : []);
+        if (Array.isArray(rList) && rList.length > 0) {
+          let maxPr = 0;
+          rList.forEach((item: any) => {
+            const u = (item.username || "").toLowerCase();
+            const m = u.match(/^pr(\d+)$/);
+            if (m) {
+              const n = parseInt(m[1], 10);
+              if (n > maxPr) maxPr = n;
+            }
+          });
+          if (maxPr > 0) {
+            setEmployeeId(`PR${String(maxPr + 1).padStart(2, "0")}`);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to calculate next employeeId:", err);
+      }
     }
-    loadParks();
+    loadInitialData();
   }, []);
 
   const allParkOptions = useMemo(() => {
@@ -161,7 +182,7 @@ export default function AddParkRangerPage() {
   const filteredParks = useMemo(() => {
     const q = parkSearchQuery.trim().toLowerCase();
     if (!q) return allParkOptions;
-    return allParkOptions.filter((name) => 
+    return allParkOptions.filter((name) =>
       name.toLowerCase().includes(q) ||
       name.replace(/อุทยานแห่งชาติ/g, "").trim().toLowerCase().includes(q)
     );
@@ -171,18 +192,18 @@ export default function AddParkRangerPage() {
     function handleClickOutside(event: MouseEvent) {
       if (parkDropdownRef.current && !parkDropdownRef.current.contains(event.target as Node)) {
         setIsParkDropdownOpen(false);
-        setParkSearchQuery(parkName);
+        setParkSearchQuery("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [parkName]);
+  }, []);
 
   const handleSelectPark = (selected: string) => {
     setParkName(selected);
-    setParkSearchQuery(selected);
+    setParkSearchQuery("");
     setIsParkDropdownOpen(false);
   };
 
@@ -278,6 +299,10 @@ export default function AddParkRangerPage() {
       return "นามสกุลต้องเป็นตัวอักษรภาษาไทยหรือภาษาอังกฤษเท่านั้น (ห้ามมีอักขระพิเศษ)";
     }
 
+    if (!parkName || parkName.trim() === "") {
+      return "กรุณาเลือกอุทยานที่สังกัด";
+    }
+
     if (!province || province.trim() === "") {
       return "กรุณาเลือกจังหวัด";
     }
@@ -340,7 +365,7 @@ export default function AddParkRangerPage() {
 
     const validationError = validateParkRangerForm();
     if (validationError) {
-      setError(validationError);
+      setError("กรุณากรอกข้อมูลให้ถูกต้อง");
       return;
     }
 
@@ -355,7 +380,7 @@ export default function AddParkRangerPage() {
     const selectedParkObj = dbParks.find(p => p.name === parkName);
     const parkIdNum = selectedParkObj ? selectedParkObj.parkId : (fallbackParkMap[parkName] || 1);
     const genderInt = gender === "หญิง" ? 2 : 1;
-    const cleanUsername = employeeId.trim().toLowerCase();
+    const cleanUsername = employeeId.trim().toUpperCase();
     const cleanPhone = phone.replace(/[^0-9]/g, "").slice(0, 10);
     const cleanEmail = email.trim().slice(0, 50);
 
@@ -369,7 +394,7 @@ export default function AddParkRangerPage() {
         firstName: firstName.trim().slice(0, 50),
         lastName: lastName.trim().slice(0, 50),
         birthDate,
-        position: position.trim().slice(0, 25),
+        position: position.trim().slice(0, 50),
         parkName,
         parkId: parkIdNum,
         startDate,
@@ -401,10 +426,12 @@ export default function AddParkRangerPage() {
         "รายงานความคืบหน้าของเหตุการณ์"
       ];
 
+      const createdTimestamp = Date.now();
+
       const newRanger = {
-        id: String(Date.now()),
-        employeeId,
-        username: employeeId.toLowerCase(),
+        id: cleanUsername,
+        employeeId: cleanUsername,
+        username: cleanUsername,
         password: password.trim(),
         name: `${firstName} ${lastName}`,
         firstName,
@@ -418,8 +445,8 @@ export default function AddParkRangerPage() {
         province,
         zipcode,
         gender,
-        phone,
-        email,
+        phone: cleanPhone,
+        email: cleanEmail,
         signature: signature.trim() || "src/sig1.png",
         role: position,
         roles: defaultRoles,
@@ -427,25 +454,42 @@ export default function AddParkRangerPage() {
         canAnnouncement: true,
         canEditParkDetails: true,
         canProgressReport: true,
-        status: "Active"
+        status: "Active",
+        createdAt: createdTimestamp,
+        createdTimestamp: createdTimestamp
       };
 
       if (signature) {
         try {
           localStorage.setItem(`greenpass_ranger_sig_${cleanUsername}`, signature);
-        } catch (e) {}
+          localStorage.setItem(`greenpass_ranger_sig_${cleanUsername.toLowerCase()}`, signature);
+        } catch (e) { }
       }
 
       try {
         localStorage.setItem(`greenpass_ranger_roles_${cleanUsername}`, JSON.stringify(defaultRoles));
-        localStorage.setItem(`greenpass_ranger_roles_${employeeId.toLowerCase()}`, JSON.stringify(defaultRoles));
-      } catch (e) {}
+        localStorage.setItem(`greenpass_ranger_roles_${cleanUsername.toLowerCase()}`, JSON.stringify(defaultRoles));
+        const upperClean = cleanUsername.toUpperCase();
+        localStorage.setItem(`greenpass_ranger_created_${upperClean}`, String(createdTimestamp));
+        localStorage.setItem(`greenpass_ranger_created_${upperClean.toLowerCase()}`, String(createdTimestamp));
+
+        // บันทึกลำดับเจ้าหน้าที่ที่เพิ่มล่าสุด: คนล่าสุดจะถูกวางไว้ลำดับแรกสุดเสมอ (index 0)
+        const recentOrderRaw = localStorage.getItem("greenpass_ranger_recent_order");
+        let recentOrder: string[] = [];
+        if (recentOrderRaw) {
+          try {
+            recentOrder = JSON.parse(recentOrderRaw);
+          } catch (e) { }
+        }
+        recentOrder = [upperClean, ...recentOrder.filter((u: string) => String(u).toUpperCase() !== upperClean)];
+        localStorage.setItem("greenpass_ranger_recent_order", JSON.stringify(recentOrder));
+      } catch (e) { }
 
       // ใส่ไว้ที่ลำดับแรกสุดเสมอ (คนล่าสุดอยู่บนสุด)
-      list.unshift(newRanger);
-      localStorage.setItem("greenpass_rangers", JSON.stringify(list));
+      const filteredList = list.filter((r: any) => (r.username || r.id || "").toLowerCase() !== cleanUsername.toLowerCase());
+      filteredList.unshift(newRanger);
+      localStorage.setItem("greenpass_rangers", JSON.stringify(filteredList));
       setSuccess("เพิ่มข้อมูลเจ้าหน้าที่อุทยานสำเร็จแล้ว!");
-
 
       setTimeout(() => {
         router.push("/admin/list-park-ranger");
@@ -453,8 +497,7 @@ export default function AddParkRangerPage() {
 
     } catch (err: any) {
       console.error("Failed to add ranger to database:", err);
-      const errMsg = err.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล";
-      setError(errMsg);
+      setError("ไม่สามารถบันทึกข้อมูลเจ้าหน้าที่อุทยานได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsLoading(false);
     }
@@ -462,10 +505,10 @@ export default function AddParkRangerPage() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto font-sans relative py-4 my-2 px-2 sm:px-4">
-      
+
       {/* Container หลัก สีขาว */}
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl shadow-slate-200/50 text-slate-800">
-        
+
         {/* Header Banner */}
         <div className="flex items-center gap-3.5 pb-5 border-b border-slate-200/80">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20">
@@ -497,7 +540,7 @@ export default function AddParkRangerPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           {/* Section 1: ข้อมูลพื้นฐาน */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
@@ -506,20 +549,20 @@ export default function AddParkRangerPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
+
               {/* รหัสพนักงาน */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                   <IdCard className="w-3.5 h-3.5 text-emerald-600" />
                   <span>รหัสพนักงาน</span>
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
+                  onChange={(e) => setEmployeeId(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all uppercase"
                   disabled={isLoading}
-                  placeholder="เช่น PR01 หรือ ranger01"
+                  placeholder="เช่น PR01 หรือ PR19"
                 />
               </div>
 
@@ -530,8 +573,8 @@ export default function AddParkRangerPage() {
                   <span>รหัสผ่าน</span>
                 </label>
                 <div className="relative">
-                  <input 
-                    type={showPassword ? "text" : "password"} 
+                  <input
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all pr-10"
@@ -579,8 +622,8 @@ export default function AddParkRangerPage() {
                   <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                   <span>วัน/เดือน/ปีเกิด</span>
                 </label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
@@ -594,8 +637,8 @@ export default function AddParkRangerPage() {
                   <User className="w-3.5 h-3.5 text-emerald-600" />
                   <span>ชื่อ</span>
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
@@ -609,8 +652,8 @@ export default function AddParkRangerPage() {
                   <User className="w-3.5 h-3.5 text-emerald-600" />
                   <span>นามสกุล</span>
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
@@ -634,7 +677,7 @@ export default function AddParkRangerPage() {
                     <option value="เจ้าหน้าที่ประชาสัมพันธ์">เจ้าหน้าที่ประชาสัมพันธ์</option>
                     <option value="หัวหน้าอุทยาน">หัวหน้าอุทยาน</option>
                     <option value="เจ้าหน้าที่พิทักษ์ป่า">เจ้าหน้าที่พิทักษ์ป่า</option>
-                    <option value="เจ้าหน้าที่ธุรการ">เจ้าหน้าที่ธุรการ</option>
+                    <option value="เจ้าหน้าที่รับแจ้งเหตุ">เจ้าหน้าที่รับแจ้งเหตุ</option>
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
@@ -656,7 +699,6 @@ export default function AddParkRangerPage() {
                         if (!isParkDropdownOpen) setIsParkDropdownOpen(true);
                       }}
                       onFocus={() => {
-                        setParkSearchQuery(parkName);
                         setIsParkDropdownOpen(true);
                       }}
                       placeholder="พิมพ์ค้นหา หรือเลือกอุทยานแห่งชาติ..."
@@ -664,15 +706,16 @@ export default function AddParkRangerPage() {
                       disabled={isLoading}
                     />
                     <div className="absolute right-2.5 flex items-center gap-1 text-slate-400">
-                      {isParkDropdownOpen && parkSearchQuery && (
+                      {(parkName || parkSearchQuery) && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            setParkName("");
                             setParkSearchQuery("");
                           }}
                           className="p-1 hover:text-slate-600 rounded-full hover:bg-slate-200/60 transition-colors"
-                          title="ล้างคำค้นหา"
+                          title="ล้างข้อมูลอุทยาน"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -681,11 +724,12 @@ export default function AddParkRangerPage() {
                         type="button"
                         onClick={() => {
                           if (!isParkDropdownOpen) {
-                            setParkSearchQuery(parkName);
+                            setParkSearchQuery("");
                           }
                           setIsParkDropdownOpen(!isParkDropdownOpen);
                         }}
                         className="p-1 hover:text-emerald-700 rounded-full transition-colors"
+                        title={isParkDropdownOpen ? "ปิดรายการ" : "เปิดรายการอุทยาน"}
                       >
                         {isParkDropdownOpen ? (
                           <ChevronUp className="w-4 h-4 text-emerald-600" />
@@ -702,7 +746,7 @@ export default function AddParkRangerPage() {
                       <div className="p-2 border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium text-slate-500 flex items-center justify-between">
                         <span className="flex items-center gap-1">
                           <Search className="w-3 h-3 text-emerald-600" />
-                          ผลการค้นหา
+                          {parkSearchQuery.trim() ? "ผลการค้นหา" : "รายชื่ออุทยานทั้งหมด"}
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono">
                           {filteredParks.length} แห่ง
@@ -718,11 +762,10 @@ export default function AddParkRangerPage() {
                                 key={pName}
                                 type="button"
                                 onClick={() => handleSelectPark(pName)}
-                                className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition-colors ${
-                                  isSelected 
-                                    ? "bg-emerald-50/90 text-emerald-800 font-bold" 
+                                className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between transition-colors ${isSelected
+                                    ? "bg-emerald-50/90 text-emerald-800 font-bold"
                                     : "text-slate-700 hover:bg-slate-50 hover:text-emerald-700 font-medium"
-                                }`}
+                                  }`}
                               >
                                 <span className="truncate pr-2">{pName}</span>
                                 {isSelected && (
@@ -748,8 +791,8 @@ export default function AddParkRangerPage() {
                   <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                   <span>วันที่เริ่มปฏิบัติงาน</span>
                 </label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all cursor-pointer"
@@ -773,10 +816,10 @@ export default function AddParkRangerPage() {
                   <div className="relative rounded-2xl border border-emerald-200 bg-emerald-50/20 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
                       <div className="w-28 h-16 bg-white rounded-xl border border-slate-200 flex items-center justify-center p-1.5 overflow-hidden shadow-sm">
-                        <img 
-                          src={signature} 
-                          alt="Signature Preview" 
-                          className="max-w-full max-h-full object-contain" 
+                        <img
+                          src={signature}
+                          alt="Signature Preview"
+                          className="max-w-full max-h-full object-contain"
                         />
                       </div>
                       <div>
@@ -831,7 +874,7 @@ export default function AddParkRangerPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              
+
               {/* จังหวัด (77 จังหวัดทั่วไทย) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
@@ -896,7 +939,7 @@ export default function AddParkRangerPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">รหัสไปรษณีย์ <span className="text-red-500">*</span></label>
                 <div className="relative">
-                  <select 
+                  <select
                     value={zipcode}
                     onChange={(e) => setZipcode(e.target.value)}
                     className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all appearance-none cursor-pointer pr-10 font-mono"
@@ -922,15 +965,15 @@ export default function AddParkRangerPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
+
               {/* เบอร์มือถือ */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5 text-emerald-600" />
                   <span>เบอร์มือถือ</span>
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   maxLength={10}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
@@ -946,8 +989,8 @@ export default function AddParkRangerPage() {
                   <Mail className="w-3.5 h-3.5 text-emerald-600" />
                   <span>อีเมล</span>
                 </label>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-50 text-slate-900 rounded-xl px-3.5 py-2.5 text-xs font-semibold border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
@@ -960,7 +1003,7 @@ export default function AddParkRangerPage() {
 
           {/* Buttons */}
           <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-200">
-            <button 
+            <button
               type="button"
               onClick={() => router.push("/admin/list-park-ranger")}
               className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2"
@@ -969,7 +1012,7 @@ export default function AddParkRangerPage() {
               <ArrowLeft className="w-3.5 h-3.5" />
               ย้อนกลับ
             </button>
-            <button 
+            <button
               type="submit"
               disabled={isLoading}
               className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 flex items-center gap-2"

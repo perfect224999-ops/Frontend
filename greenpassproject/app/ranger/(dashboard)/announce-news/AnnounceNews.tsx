@@ -104,13 +104,13 @@ export default function AnnounceNews() {
 
     if (!cleanTitle || cleanTitle.length < 2 || cleanTitle.length > 250 ||
         !cleanContent || cleanContent.length < 4 || cleanContent.length > 2000) {
-      setError("กรุณากรอกหัวข้อประกาศ (2-250 ตัวอักษร) และเนื้อหาประกาศ (4-2000 ตัวอักษร) ให้ถูกต้องและครบถ้วน");
+      setError("กรุณากรอกข้อมูลให้ถูกต้องและครบถ้วน");
       return;
     }
 
     setIsLoading(true);
     try {
-      const username = localStorage.getItem("ranger_username") || "pr01";
+      const username = localStorage.getItem("ranger_username") || "PR01";
       const isoDate = new Date().toISOString().split("T")[0];
 
       const apiTitle = cleanTitle.length > 250 ? cleanTitle.substring(0, 250) : cleanTitle;

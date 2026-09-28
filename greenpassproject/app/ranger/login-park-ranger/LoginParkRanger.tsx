@@ -245,17 +245,6 @@ export default function LoginParkRanger() {
 
         </div>
 
-        {/* Link back to Admin Login */}
-        <div className="text-center">
-          <button
-            onClick={() => router.push("/admin/login-admin")}
-            className="inline-flex items-center gap-1.5 text-xs text-emerald-300 hover:text-emerald-200 font-semibold transition-all hover:underline cursor-pointer group"
-          >
-            <span>เข้าสู่ระบบฝั่งผู้ดูแลระบบ (Admin)</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
-
       </div>
 
     </div>

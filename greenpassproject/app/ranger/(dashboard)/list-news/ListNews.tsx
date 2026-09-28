@@ -95,6 +95,7 @@ export default function ListNews() {
   const [parkName, setParkName] = useState("อุทยานแห่งชาติ");
   const [parkId, setParkId] = useState<number>(1);
   const [deleteSuccess, setDeleteSuccess] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -183,11 +184,11 @@ export default function ListNews() {
     if (!selectedDeleteId) return;
     try {
       if (!isNaN(Number(selectedDeleteId))) {
-        await announcementApi.deleteAnnouncement(selectedDeleteId);
+        const res = await announcementApi.deleteAnnouncement(selectedDeleteId);
+        if (res && res.success === false) {
+          throw new Error("Delete failed");
+        }
       }
-    } catch (error) {
-      console.warn("API delete announcement notice:", error);
-    } finally {
       const updated = news.filter((item) => String(item.id) !== String(selectedDeleteId));
       setNews(updated);
       try {
@@ -202,6 +203,12 @@ export default function ListNews() {
       setSelectedDeleteId(null);
       setDeleteSuccess("ลบรายการประกาศข่าวสารเรียบร้อยแล้ว!");
       setTimeout(() => setDeleteSuccess(""), 3000);
+    } catch (error) {
+      console.warn("API delete announcement notice:", error);
+      setShowDeleteModal(false);
+      setSelectedDeleteId(null);
+      setDeleteError("ลบกิจกรรมไม่สำเร็จกรุณาลองใหม่อีกครั้ง");
+      setTimeout(() => setDeleteError(""), 3500);
     }
   };
 
@@ -278,6 +285,16 @@ export default function ListNews() {
           </div>
         )}
 
+        {/* Delete Error Alert */}
+        {deleteError && (
+          <div className="p-4 bg-red-50 border border-red-300 text-red-800 font-bold rounded-2xl text-xs flex items-center justify-between shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span>{deleteError}</span>
+            </div>
+          </div>
+        )}
+
         {/* Controls Bar: Category Filters */}
         <div className="space-y-4">
           <div className="bg-slate-50 p-2 sm:p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 shadow-inner">
@@ -315,7 +332,7 @@ export default function ListNews() {
                 <Newspaper className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-800">ไม่พบข้อมูลประกาศข่าวสาร</h3>
+                <h3 className="text-base font-bold text-slate-800">ไม่มีข้อมูลข่าวสาร</h3>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
                   {searchQuery ? "ไม่พบข่าวสารที่ตรงกับคำค้นหาของคุณ ลองค้นหาด้วยคำอื่น" : "ยังไม่มีประกาศข่าวสารในหมวดหมู่นี้"}
                 </p>
