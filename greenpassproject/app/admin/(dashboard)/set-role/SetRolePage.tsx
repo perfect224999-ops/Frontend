@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { rangerApi } from "../../../../service/api";
+import { rangerApi } from "@/service/api";
 import { 
   ShieldCheck, 
   Check, 
@@ -194,8 +194,8 @@ function SetRoleContent() {
       };
 
       let updateRes: any = null;
-      if (typeof rangerApi.setRole === "function") {
-        updateRes = await rangerApi.setRole(username, rolePayload);
+      if (typeof (rangerApi as any).setRole === "function") {
+        updateRes = await (rangerApi as any).setRole(username, rolePayload);
       } else {
         updateRes = await rangerApi.updateRanger(username, rolePayload);
       }

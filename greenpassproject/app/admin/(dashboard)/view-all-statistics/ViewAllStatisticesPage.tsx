@@ -361,9 +361,8 @@ export default function ViewAllStatisticesPage() {
             </div>
           </div>
           {loading && (
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-              <span>กำลังดึงข้อมูลล่าสุดจากฐานข้อมูล...</span>
+            <div className="flex items-center justify-center p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600">
+              <Loader2 className="w-4 h-4 animate-spin" />
             </div>
           )}
         </div>

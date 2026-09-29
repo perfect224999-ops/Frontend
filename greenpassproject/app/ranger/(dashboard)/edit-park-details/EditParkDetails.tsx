@@ -479,7 +479,7 @@ export default function EditParkDetails() {
                   <Upload className="w-8 h-8" />
                 </div>
                 <p className="text-sm sm:text-base font-bold text-slate-800">คลิกเพื่ออัปโหลดรูปภาพ หรือลากไฟล์มาวางที่นี่</p>
-                <p className="text-xs text-slate-500 mt-1">รองรับไฟล์ JPG, PNG, WEBP (ระบบจะจัดเก็บลงฐานข้อมูลและแคชแบบเดียวกับข่าวสารและของรางวัล)</p>
+                <p className="text-xs text-slate-500 mt-1">รองรับไฟล์ JPG, PNG, WEBP</p>
                 <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
               </label>
             )}
