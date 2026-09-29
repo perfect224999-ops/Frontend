@@ -325,7 +325,7 @@ export default function RangerDashboardLayout({
     { name: "กล้องสแกน", href: "/ranger/scan-checkin-qrcode", icon: QrCode, role: "สแกนแสตมป์" },
     { name: "เกี่ยวกับอุทยาน", href: "/ranger/view-park-detail", icon: Trees },
     { name: "ประกาศข่าวสาร", href: "/ranger/announce-news", icon: Megaphone, role: "ประกาศข่าวสาร" },
-    { name: "ประกาศข่าวสารจากอุทยาน", href: "/ranger/list-news", icon: Newspaper },
+    { name: "ประกาศข่าวสารจากอุทยาน", href: "/ranger/list-news", icon: Newspaper, role: "ประกาศข่าวสาร" },
     { name: "รายงาน", href: "/ranger/list-report-member", icon: ClipboardList, role: "รายงานความคืบหน้าของเหตุการณ์" },
     { name: "สถิติ", href: "/ranger/view-visit-statistics", icon: BarChart3 }
   ];
@@ -345,7 +345,7 @@ export default function RangerDashboardLayout({
     if (pathname === "/ranger/scan-checkin-qrcode" && !rangerRoles.includes("สแกนแสตมป์")) {
       isAccessDenied = true;
       missingRoleName = "สแกนแสตมป์";
-    } else if ((pathname === "/ranger/announce-news" || pathname === "/ranger/edit-news-details") && !rangerRoles.includes("ประกาศข่าวสาร")) {
+    } else if ((pathname === "/ranger/announce-news" || pathname === "/ranger/list-news" || pathname === "/ranger/edit-news-details") && !rangerRoles.includes("ประกาศข่าวสาร")) {
       isAccessDenied = true;
       missingRoleName = "ประกาศข่าวสาร";
     } else if (pathname === "/ranger/edit-park-details" && !rangerRoles.includes("แก้ไขรายละเอียด")) {

@@ -22,7 +22,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   BookmarkCheck,
-  Image as ImageIcon,
   Sparkles,
   Maximize2,
   X
@@ -786,24 +785,6 @@ export default function ViewParkDetail() {
           
           {/* Park Photo Showcase Card */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200/90 overflow-hidden group">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <ImageIcon className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-xs font-bold text-slate-800">รูปภาพทัศนียภาพอุทยาน</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400">ภาพหน้าปก</span>
-                <button
-                  type="button"
-                  onClick={() => setShowImageModal(true)}
-                  className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
-                  title="ดูรูปขนาดเต็ม"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">ดูขนาดเต็ม</span>
-                </button>
-              </div>
-            </div>
             
             <div 
               onClick={() => setShowImageModal(true)}

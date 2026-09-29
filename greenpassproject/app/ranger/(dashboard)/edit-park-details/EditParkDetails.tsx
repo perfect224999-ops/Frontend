@@ -533,7 +533,7 @@ export default function EditParkDetails() {
 
         <div className="space-y-1.5">
           <label className="block text-sm font-bold text-slate-800" htmlFor="edit-status">
-            สถานะเปิดทำการ <span className="text-emerald-600 text-xs font-semibold">(คำนวณตามเวลาและระบบ)</span>
+            สถานะเปิดทำการ
           </label>
           <div className="relative">
             <div className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-sm sm:text-base font-black transition-all ${
