@@ -24,7 +24,7 @@ export const formatParkImageUrl = (img?: string | null): string => {
   if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
     return trimmed;
   }
-  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://172.20.10.5:8081/api/v1";
+  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://localhost:8081/api/v1";
   if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return `${baseUrl}${cleanPath}`;
@@ -282,12 +282,16 @@ export default function EditParkDetails() {
       if (selectedFile) {
         try {
           const uploadRes = await fileUploadApi.upload(selectedFile, "park");
-          const uploadedName = uploadRes?.result?.fileUrl || uploadRes?.data?.fileUrl || uploadRes?.result?.fileName || uploadRes?.data?.fileName || uploadRes?.result?.image || uploadRes?.data?.image;
-          if (uploadedName) {
-            finalImage = uploadedName;
+          const rawName = uploadRes?.result?.fileName || uploadRes?.data?.fileName || uploadRes?.result?.image || uploadRes?.data?.image || uploadRes?.result?.fileUrl || uploadRes?.data?.fileUrl;
+          if (rawName) {
+            finalImage = rawName.includes("/") ? rawName.substring(rawName.lastIndexOf("/") + 1) : rawName;
           }
         } catch (uploadErr) {
           console.warn("Direct upload error, backend will extract base64 to uploads/park/ directly:", uploadErr);
+        }
+      } else if (cleanImage) {
+        if (!cleanImage.startsWith("data:") && !cleanImage.startsWith("blob:") && !cleanImage.startsWith("http://") && !cleanImage.startsWith("https://")) {
+          finalImage = cleanImage.includes("/") ? cleanImage.substring(cleanImage.lastIndexOf("/") + 1) : cleanImage;
         }
       }
 
