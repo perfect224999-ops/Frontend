@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Volume2, Siren, AlertTriangle, CheckCircle } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { getBaseURL, reportApi } from "@/service/api";
@@ -16,10 +17,31 @@ export interface EmergencyAlertData {
 }
 
 export default function GlobalEmergencyAlert() {
+  const pathname = usePathname();
   const [activeEmergencyAlert, setActiveEmergencyAlert] = useState<EmergencyAlertData | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sirenTimerRef = useRef<any>(null);
   const sirenToggleRef = useRef<boolean>(false);
+
+  // ----------------------------------------------------
+  // 🔐 ตรวจสอบสถานะการเข้าสู่ระบบและหน้าล็อกอิน
+  // ----------------------------------------------------
+  const isUserAuthenticated = () => {
+    if (typeof window === "undefined") return false;
+    return Boolean(
+      localStorage.getItem("ranger_username") ||
+      localStorage.getItem("admin_username") ||
+      localStorage.getItem("username")
+    );
+  };
+
+  const isLoginPage = (currentPath?: string) => {
+    if (typeof window === "undefined") return false;
+    const p = currentPath || pathname || (typeof window !== "undefined" ? window.location.pathname : "") || "";
+    if (p === "/" && !isUserAuthenticated()) return true;
+    const loginKeywords = ["login", "login-park-ranger", "login-admin"];
+    return loginKeywords.some((kw) => p.toLowerCase().includes(kw));
+  };
 
   // ----------------------------------------------------
   // 🔊 ระบบจำลองเสียงไซเรนเตือนภัยฉุกเฉินระดับสูง (High-Low Dual-Tone Siren)
@@ -88,6 +110,25 @@ export default function GlobalEmergencyAlert() {
   // ----------------------------------------------------
   const triggerAlert = (data: EmergencyAlertData) => {
     if (!data || !data.id) return;
+
+    // 🛑 1. ไม่แจ้งเตือนเด็ดขาดหากอยู่หน้า Login หรือยังไม่ได้เข้าสู่ระบบ
+    if (isLoginPage(pathname) || !isUserAuthenticated()) {
+      return;
+    }
+
+    // 🛑 2. กรองอุทยาน: หากเป็นเจ้าหน้าที่ (Ranger) ให้แจ้งเตือนเฉพาะอุทยานของตนเองเท่านั้น
+    const isAdmin = typeof window !== "undefined" && Boolean(localStorage.getItem("admin_username"));
+    const rangerParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
+
+    if (!isAdmin) {
+      if (!rangerParkId) return; // หากยังไม่มีการระบุ ranger_park_id จะไม่แจ้งเตือน
+      if (data.parkId && String(data.parkId) !== String(rangerParkId)) {
+        console.log(`[Alert Filter] ข้ามการแจ้งเตือนอุทยาน ${data.parkId} เนื่องจากเจ้าหน้าที่สังกัดอุทยาน ${rangerParkId}`);
+        return;
+      }
+    }
+
+    // 🛑 3. ตรวจสอบว่าเคยยืนยันรับทราบ (Acknowledge) ไปแล้วหรือไม่
     const ackList: string[] = typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
       : [];
@@ -131,11 +172,23 @@ export default function GlobalEmergencyAlert() {
   };
 
   // ----------------------------------------------------
+  // 🛑 ปิดเสียงและปิดแจ้งเตือนทันทีเมื่อเปลี่ยนหน้ามาที่ Login หรือออกจากระบบ
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (isLoginPage(pathname) || !isUserAuthenticated()) {
+      stopEmergencySirenSound();
+      setActiveEmergencyAlert(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("greenpass_emergency_alert");
+      }
+    }
+  }, [pathname]);
+
+  // ----------------------------------------------------
   // 📡 Real-time Listeners: Cross-Tab, Custom Events, WebSocket STOMP
   // ----------------------------------------------------
   useEffect(() => {
     let isMounted = true;
-    let isChecking = false;
 
     // ปลดล็อค AudioContext ทันทีเมื่อผู้ใช้คลิกหรือกดแป้นพิมพ์
     const unlockAudio = () => {
@@ -148,14 +201,30 @@ export default function GlobalEmergencyAlert() {
       window.addEventListener("keydown", unlockAudio, { once: true });
     }
 
-    // 1. ตรวจสอบจาก LocalStorage ตอนโหลดหน้าจอ
+    // 1. ตรวจสอบจาก LocalStorage (เฉพาะกรณีที่ผู้ใช้ล็อกอินอยู่ และเป็นอุทยานเดียวกัน)
     const checkLocalStorageAlert = () => {
       if (typeof window === "undefined") return;
+      if (isLoginPage(pathname) || !isUserAuthenticated()) {
+        localStorage.removeItem("greenpass_emergency_alert");
+        stopEmergencySirenSound();
+        setActiveEmergencyAlert(null);
+        return;
+      }
+
       const saved = localStorage.getItem("greenpass_emergency_alert");
       if (saved) {
         try {
           const parsed: EmergencyAlertData = JSON.parse(saved);
           const ackList: string[] = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
+          const isAdmin = Boolean(localStorage.getItem("admin_username"));
+          const rangerParkId = localStorage.getItem("ranger_park_id");
+
+          // ตรวจสอบอุทยาน
+          if (!isAdmin && rangerParkId && parsed.parkId && String(parsed.parkId) !== String(rangerParkId)) {
+            localStorage.removeItem("greenpass_emergency_alert");
+            return;
+          }
+
           if (parsed && parsed.id && !ackList.includes(String(parsed.id))) {
             setActiveEmergencyAlert(parsed);
             startEmergencySirenSound();
@@ -166,113 +235,14 @@ export default function GlobalEmergencyAlert() {
 
     checkLocalStorageAlert();
 
-    // 2. ฟังก์ชันตรวจสอบรายงานฉุกเฉินที่ยังไม่ได้กดรับทราบจาก Backend (เรียกตอนโหลดและตอนสลับแท็บ)
-    const checkBackendReports = async () => {
-      if (!isMounted || isChecking || activeEmergencyAlert) return;
-      isChecking = true;
-
-      try {
-        const activeParkId = typeof window !== "undefined"
-          ? (localStorage.getItem("ranger_park_id") || localStorage.getItem("admin_park_id") || localStorage.getItem("park_id"))
-          : null;
-        const activeParkName = typeof window !== "undefined"
-          ? (localStorage.getItem("ranger_park_name") || localStorage.getItem("park_name"))
-          : null;
-        const rangerUsername = typeof window !== "undefined"
-          ? (localStorage.getItem("ranger_username") || localStorage.getItem("username"))
-          : null;
-
-        const ackList: string[] = typeof window !== "undefined"
-          ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
-          : [];
-
-        let listData: any[] | null = null;
-
-        if (rangerUsername) {
-          try {
-            const res = await reportApi.getReportsForRanger(rangerUsername);
-            listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
-              ? (res.result || res.data || res)
-              : null;
-          } catch (e) {}
-        }
-
-        if ((!Array.isArray(listData) || listData.length === 0) && activeParkId) {
-          try {
-            const res = await reportApi.getReportsByParkId(Number(activeParkId));
-            listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
-              ? (res.result || res.data || res)
-              : null;
-          } catch (e) {}
-        }
-
-        if (!Array.isArray(listData) || listData.length === 0) {
-          try {
-            const res = await reportApi.getAllReports();
-            listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
-              ? (res.result || res.data || res)
-              : null;
-          } catch (e) {}
-        }
-
-        if (isMounted && Array.isArray(listData) && listData.length > 0) {
-          const unackEmergency = listData.find((r: any) => {
-            const rId = String(r.reportId || r.id || "");
-            if (!rId || ackList.includes(rId)) return false;
-
-            if (activeParkId && r.parkId && String(r.parkId) !== String(activeParkId)) {
-              return false;
-            }
-
-            const tName = String(r.typeName || r.type?.typeName || r.category || "");
-            const tId = r.typeId || r.type?.typeId;
-            const titleDesc = `${r.name || ""} ${r.description || ""}`;
-
-            const isSevere =
-              tId === 2 ||
-              String(tId) === "2" ||
-              tName.includes("ร้ายแรง") ||
-              tName.includes("ฉุกเฉิน") ||
-              titleDesc.includes("ร้ายแรง") ||
-              titleDesc.includes("ฉุกเฉิน") ||
-              r.isEmergency === true;
-
-            const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน" || !r.status;
-            return isSevere && isPending;
-          });
-
-          if (unackEmergency && isMounted) {
-            console.log("🚨 [Global Emergency Alert] Found unacknowledged emergency report:", unackEmergency);
-            const emergencyData: EmergencyAlertData = {
-              id: String(unackEmergency.reportId || unackEmergency.id),
-              parkId: String(activeParkId || unackEmergency.parkId || ""),
-              details: unackEmergency.description
-                ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}`
-                : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
-              location: unackEmergency.parkName || unackEmergency.park?.name || activeParkName || "พื้นที่อุทยานแห่งชาติ",
-              time: unackEmergency.reportTime || new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
-              reporter: unackEmergency.username || unackEmergency.user?.username || "ผู้ใช้งาน GreenPass"
-            };
-
-            triggerAlert(emergencyData);
-          }
-        }
-      } catch (err) {
-      } finally {
-        isChecking = false;
-      }
-    };
-
-    checkBackendReports();
-
-    // 3. Custom Event Trigger (รับ Event จากหน้าย่อย เช่น Ranger layout, ListReportMember ฯลฯ)
+    // 2. Custom Event Trigger (รับ Event จากหน้าย่อย เช่น Ranger layout)
     const handleCustomTrigger = (e: any) => {
       if (e.detail) {
         triggerAlert(e.detail);
       }
     };
 
-    // 4. Cross-Tab Storage Event (เมื่อแท็บหนึ่งได้รับหรือปิด อีกแท็บจะตอบสนองทันที)
+    // 3. Cross-Tab Storage Event (เมื่อแท็บหนึ่งได้รับหรือปิด อีกแท็บจะตอบสนองทันที)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "greenpass_emergency_alert") {
         if (e.newValue) {
@@ -287,7 +257,7 @@ export default function GlobalEmergencyAlert() {
       }
     };
 
-    // 5. BroadcastChannel สำหรับการสื่อสารข้ามแท็บ
+    // 4. BroadcastChannel สำหรับการสื่อสารข้ามแท็บ
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("greenpass_emergency_channel");
@@ -301,10 +271,9 @@ export default function GlobalEmergencyAlert() {
       };
     } catch (e) {}
 
-    // 6. ตรวจสอบทันทีเมื่อผู้ใช้คลิกกลับเข้ามาที่แท็บนี้
+    // 5. ตรวจสอบเมื่อผู้ใช้คลิกกลับเข้ามาที่แท็บนี้
     const handleWindowFocus = () => {
       checkLocalStorageAlert();
-      checkBackendReports();
     };
 
     if (typeof window !== "undefined") {
@@ -314,7 +283,7 @@ export default function GlobalEmergencyAlert() {
       document.addEventListener("visibilitychange", handleWindowFocus);
     }
 
-    // 7. เชื่อมต่อ WebSocket STOMP แบบถาวร (Persistent Real-Time Connection)
+    // 6. เชื่อมต่อ WebSocket STOMP แบบ Real-Time (Event-driven 100%)
     let stompClient: Client | null = null;
     try {
       const wsUrl = `${getBaseURL()}/ws-greenpass`;
@@ -336,13 +305,12 @@ export default function GlobalEmergencyAlert() {
 
           const processIncoming = async (rawPayload: any) => {
             if (!rawPayload || typeof rawPayload !== "object") return;
+            if (isLoginPage(pathname) || !isUserAuthenticated()) return;
 
             let report = rawPayload.report || rawPayload.reportItem || rawPayload;
             const targetReportId = report.reportId || rawPayload.reportId || rawPayload.id;
 
-            // 🚨 หัวใจสำคัญของการเด้ง Real-time:
-            // ข้อความ STOMP จาก Backend (เช่น /topic/reply-reports) จะส่งเฉพาะ ID สั้นๆ
-            // หากยังไม่มี typeName/typeId ในตัวข้อความ ให้ดึงรายละเอียดตัวเต็มในเสี้ยววินาทีทันที!
+            // หากข้อความมีเฉพาะ ID ให้ดึงข้อมูลตัวเต็มเพื่อตรวจสอบความร้ายแรงและอุทยาน
             if (targetReportId && (!report.typeName && !report.type?.typeName && !report.typeId && !report.type?.typeId)) {
               try {
                 const res = await reportApi.getReportById(Number(targetReportId));
@@ -362,8 +330,17 @@ export default function GlobalEmergencyAlert() {
             const typeName = String(report.typeName || report.type?.typeName || rawPayload.typeName || rawPayload.reportType || rawPayload.category || "");
             const typeId = report.typeId || report.type?.typeId || rawPayload.typeId || rawPayload.type_id;
 
-            const reportParkId = report.parkId || report.park?.parkId || rawPayload.parkId || rawPayload.park?.parkId || "";
+            const reportParkId = String(report.parkId || report.park?.parkId || rawPayload.parkId || rawPayload.park?.parkId || "");
             const reportParkName = report.parkName || report.park?.name || rawPayload.parkName || rawPayload.park?.name || "";
+
+            // 🛑 กรองอุทยาน: หากเป็นเจ้าหน้าที่ (Ranger) และเหตุการณ์เกิดขึ้นที่อุทยานอื่น ให้ข้ามไป ไม่ส่งเสียงและไม่แจ้งเตือน
+            const isAdmin = Boolean(localStorage.getItem("admin_username"));
+            const curRangerParkId = localStorage.getItem("ranger_park_id");
+
+            if (!isAdmin && curRangerParkId && reportParkId && reportParkId !== String(curRangerParkId)) {
+              console.log(`[WS STOMP Filter] Ignored message for park ${reportParkId}, current ranger park is ${curRangerParkId}`);
+              return;
+            }
 
             // ตรวจสอบความฉุกเฉิน / ร้ายแรง
             const isEmergency = Boolean(
@@ -394,7 +371,7 @@ export default function GlobalEmergencyAlert() {
               const alertId = String(report.reportId || rawPayload.reportId || replyReportId || Date.now());
               const alertData: EmergencyAlertData = {
                 id: alertId,
-                parkId: String(reportParkId || activeParkId || ""),
+                parkId: String(reportParkId || curRangerParkId || activeParkId || ""),
                 details: report.description ? `${report.name ? report.name + ": " : ""}${report.description}` : (report.name || progressText || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
                 location: reportParkName || "พื้นที่อุทยานแห่งชาติ",
                 time: report.reportTime || new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
@@ -440,7 +417,7 @@ export default function GlobalEmergencyAlert() {
           topics.add("/queue/notifications");
           topics.add("/queue/reports");
 
-          // สมัครรับทุกอุทยานยอดนิยม (1-10) และอุทยานที่ล็อกอินอยู่
+          // สมัครรับอุทยาน
           for (let p = 1; p <= 10; p++) {
             topics.add(`/topic/park/${p}/notifications`);
             topics.add(`/topic/park/${p}/reports`);
@@ -482,9 +459,9 @@ export default function GlobalEmergencyAlert() {
       if (bc) bc.close();
       if (stompClient) stompClient.deactivate();
     };
-  }, []); // 🚀 รันครั้งเดียวคงสถานะเชื่อมต่อตลอดเวลา ไม่ตัดการเชื่อมต่อตอนเปลี่ยนหน้า
+  }, [pathname]);
 
-  if (!activeEmergencyAlert) return null;
+  if (!activeEmergencyAlert || isLoginPage(pathname) || !isUserAuthenticated()) return null;
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in font-sans">

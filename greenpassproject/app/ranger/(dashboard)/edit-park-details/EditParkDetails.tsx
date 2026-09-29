@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { parkApi, rangerApi } from "@/service/api";
+import { parkApi, rangerApi, fileUploadApi, getBaseURL } from "@/service/api";
 import { 
   Trees, 
   Calendar, 
@@ -16,6 +16,27 @@ import {
   MapPin,
   CheckCircle2
 } from "lucide-react";
+
+export const formatParkImageUrl = (img?: string | null): string => {
+  if (!img) return "";
+  const trimmed = img.trim();
+  if (!trimmed || trimmed === "-" || trimmed === "null" || trimmed === "undefined") return "";
+  if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
+    return trimmed;
+  }
+  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://172.20.10.5:8081/api/v1";
+  if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
+    const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${baseUrl}${cleanPath}`;
+  }
+  if (!trimmed.includes("/")) {
+    return `${baseUrl}/uploads/park/${trimmed}`;
+  }
+  if (trimmed.startsWith("/")) {
+    return `${baseUrl}${trimmed}`;
+  }
+  return `${baseUrl}/${trimmed}`;
+};
 
 export const calculateOperatingStatus = (isTempClosed: boolean, open: string, close: string): string => {
   if (isTempClosed) {
@@ -64,6 +85,7 @@ export default function EditParkDetails() {
   const [eventNote, setEventNote] = useState("");
   const [status, setStatus] = useState("เปิดตามปกติ");
   const [image, setImage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSeasonalPark, setIsSeasonalPark] = useState(false);
   const [isTemporaryClosed, setIsTemporaryClosed] = useState(false);
   const [seasonOpenDate, setSeasonOpenDate] = useState("2026-01-01");
@@ -129,6 +151,7 @@ export default function EditParkDetails() {
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       try {
         const compressed = await compressImage(file);
         setImage(compressed);
@@ -200,7 +223,7 @@ export default function EditParkDetails() {
           setLocation(loc);
           setEventNote(dbPark.eventNote || "เปิดให้บริการตามปกติ");
           setStatus(dbPark.status || "เปิดตามปกติ");
-          setImage(cachedLocalImg || dbPark.image || "");
+          setImage(cachedLocalImg || (dbPark.image ? formatParkImageUrl(dbPark.image) : ""));
           const savedLocal = typeof window !== "undefined" ? localStorage.getItem("greenpass_park_saved_data") : null;
           let parsedSaved: any = null;
           if (savedLocal) {
@@ -253,6 +276,21 @@ export default function EditParkDetails() {
 
     setIsLoading(true);
     try {
+      let finalImage = cleanImage;
+
+      // 🛑 เมื่อมีการแก้ไขรูปภาพใหม่ ให้อัปโหลดจัดเก็บลงในโฟลเดอร์ park บนเซิร์ฟเวอร์
+      if (selectedFile) {
+        try {
+          const uploadRes = await fileUploadApi.upload(selectedFile, "park");
+          const uploadedName = uploadRes?.result?.fileUrl || uploadRes?.data?.fileUrl || uploadRes?.result?.fileName || uploadRes?.data?.fileName || uploadRes?.result?.image || uploadRes?.data?.image;
+          if (uploadedName) {
+            finalImage = uploadedName;
+          }
+        } catch (uploadErr) {
+          console.warn("Direct upload error, backend will extract base64 to uploads/park/ directly:", uploadErr);
+        }
+      }
+
       const payload = {
         parkId: currentParkId,
         id: currentParkId,
@@ -264,19 +302,21 @@ export default function EditParkDetails() {
         closeTime: closeTime.length === 5 ? `${closeTime}:00` : closeTime,
         eventNote: cleanEventNote || "เปิดให้บริการตามปกติ",
         status: status || "เปิดตามปกติ",
-        image: cleanImage,
+        image: finalImage,
         isSeasonalPark: Boolean(isSeasonalPark),
         isTemporaryClosed: Boolean(isTemporaryClosed),
         seasonOpenDate: seasonOpenDate || "2026-01-01",
         seasonCloseDate: seasonCloseDate || "2026-12-31"
       };
 
-      await parkApi.updatePark(payload);
+      const updateRes = await parkApi.updatePark(payload);
+      const serverUpdatedImage = updateRes?.result?.image || updateRes?.data?.image;
 
       // Store in localStorage cache like news, reports, rewards
       if (typeof window !== "undefined") {
-        if (cleanImage) {
-          localStorage.setItem(`greenpass_park_img_${currentParkId}`, cleanImage);
+        const storedImg = serverUpdatedImage || finalImage;
+        if (storedImg) {
+          localStorage.setItem(`greenpass_park_img_${currentParkId}`, storedImg);
         } else {
           localStorage.removeItem(`greenpass_park_img_${currentParkId}`);
         }
@@ -292,7 +332,7 @@ export default function EditParkDetails() {
           openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openTime} น. - ${closeTime} น.`,
           eventNote: cleanEventNote,
           status,
-          image: cleanImage,
+          image: storedImg,
           isSeasonalPark: Boolean(isSeasonalPark),
           isTemporaryClosed: Boolean(isTemporaryClosed),
           seasonOpenDate: seasonOpenDate || "2026-01-01",
@@ -301,7 +341,7 @@ export default function EditParkDetails() {
         localStorage.setItem("greenpass_park_saved_data", JSON.stringify(savedData));
       }
 
-      setSuccess("บันทึกข้อมูลและอัปโหลดรูปภาพอุทยานลงฐานข้อมูลสำเร็จเรียบร้อยแล้ว!");
+      setSuccess("บันทึกข้อมูลและจัดเก็บรูปภาพลงโฟลเดอร์ park สำเร็จเรียบร้อยแล้ว!");
       setTimeout(() => {
         router.push("/ranger/view-park-detail");
       }, 1000);
@@ -393,13 +433,28 @@ export default function EditParkDetails() {
             )}
           </label>
 
-          <div className="w-full min-h-[220px] max-h-[460px] bg-slate-900/5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-3xl transition-all flex flex-col items-center justify-center relative overflow-hidden group p-3">
+          <div className="w-full min-h-[300px] max-h-[520px] bg-slate-950/5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-3xl transition-all flex flex-col items-center justify-center relative overflow-hidden group p-3">
             {image ? (
-              <div className="relative w-full h-full flex flex-col items-center justify-center">
+              <div className="relative w-full h-full min-h-[300px] max-h-[500px] flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-slate-950">
+                {/* Ambient blurred backdrop for uncropped aspect ratios */}
+                <div 
+                  className="absolute inset-0 bg-cover bg-center blur-xl opacity-30 scale-110 pointer-events-none"
+                  style={{ backgroundImage: `url(${formatParkImageUrl(image)})` }}
+                />
+
                 <img 
-                  src={image} 
+                  src={formatParkImageUrl(image)} 
                   alt="Park Cover Preview" 
-                  className="w-full h-auto max-h-[400px] object-cover rounded-2xl shadow-md mx-auto" 
+                  className="relative z-10 w-full h-auto max-h-[480px] object-contain rounded-2xl shadow-md mx-auto p-2" 
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.dataset.triedGeneral && target.src.includes("/uploads/park/")) {
+                      target.dataset.triedGeneral = "true";
+                      target.src = target.src.replace("/uploads/park/", "/uploads/general/");
+                      return;
+                    }
+                    target.src = "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
+                  }}
                 />
                 <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-3 backdrop-blur-[2px]">
                   <label className="inline-flex items-center gap-2 px-5 py-3 bg-white text-slate-900 font-bold text-sm rounded-xl cursor-pointer shadow-lg hover:bg-slate-100 transition-all hover:scale-105 active:scale-95">
@@ -409,7 +464,10 @@ export default function EditParkDetails() {
                   </label>
                   <button
                     type="button"
-                    onClick={() => setImage("")}
+                    onClick={() => {
+                      setImage("");
+                      setSelectedFile(null);
+                    }}
                     className="inline-flex items-center gap-2 px-5 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm rounded-xl cursor-pointer shadow-lg transition-all hover:scale-105 active:scale-95"
                   >
                     <Trash2 className="w-4 h-4" />

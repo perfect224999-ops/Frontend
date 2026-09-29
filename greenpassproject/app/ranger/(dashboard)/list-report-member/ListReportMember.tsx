@@ -148,54 +148,6 @@ export default function ListReportMember() {
           : null;
 
         if (Array.isArray(listData)) {
-          // 🚨 ตรวจหาป๊อปอัปแจ้งเตือนเหตุฉุกเฉินร้ายแรงที่ยังไม่ได้ยืนยันรับทราบ เฉพาะของอุทยานนี้
-          if (typeof window !== "undefined") {
-            try {
-              const ackList: string[] = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
-              const unackEmergency = listData.find((r: any) => {
-                const rId = String(r.reportId || "");
-                const reportParkId = r.parkId || r.park?.parkId;
-                const reportParkName = r.parkName || r.park?.name;
-
-                // 🚨 ตรวจสอบว่ารายงานนี้เป็นของอุทยานปัจจุบันนี้เท่านั้น
-                if (parkId && reportParkId && String(reportParkId) !== String(parkId)) {
-                  return false;
-                }
-                if (currentParkName && reportParkName) {
-                  const cleanCur = currentParkName.trim().replace("อุทยานแห่งชาติ", "");
-                  const cleanRep = reportParkName.trim().replace("อุทยานแห่งชาติ", "");
-                  if (!cleanRep.includes(cleanCur) && !cleanCur.includes(cleanRep)) {
-                    return false;
-                  }
-                }
-
-                const tName = String(r.typeName || r.type?.typeName || r.category || "");
-                const tId = r.typeId || r.type?.typeId;
-                const isSevere = tId === 2 || String(tId) === "2" || tName.includes("ร้ายแรง") || tName.includes("ฉุกเฉิน");
-                const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน";
-                return isSevere && isPending && rId && !ackList.includes(rId);
-              });
-
-              if (unackEmergency) {
-                const emergencyEventData = {
-                  id: String(unackEmergency.reportId),
-                  parkId: String(unackEmergency.parkId || unackEmergency.park?.parkId || parkId || ""),
-                  details: unackEmergency.description
-                    ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}`
-                    : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
-                  location: unackEmergency.parkName || unackEmergency.park?.name || currentParkName || "พื้นที่อุทยานแห่งชาติ",
-                  time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-                  reporter: unackEmergency.username || unackEmergency.user?.username || "ผู้ใช้งาน GreenPass"
-                };
-
-                localStorage.setItem("greenpass_emergency_alert", JSON.stringify(emergencyEventData));
-                window.dispatchEvent(new CustomEvent("greenpass_emergency_trigger", { detail: emergencyEventData }));
-              }
-            } catch (e) {
-              console.error("Error checking unacknowledged emergency reports:", e);
-            }
-          }
-
           const mapped: ReportItem[] = listData.map((r: any, idx: number) => {
             let dateStr = r.reportDate || "";
             if (dateStr.includes("-")) {

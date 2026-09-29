@@ -23,9 +23,11 @@ import {
   CheckCircle2,
   BookmarkCheck,
   Image as ImageIcon,
-  Sparkles
+  Sparkles,
+  Maximize2,
+  X
 } from "lucide-react";
-import { parkApi, rangerApi } from "@/service/api";
+import { parkApi, rangerApi, getBaseURL } from "@/service/api";
 
 interface ParkDetailState {
   parkId: number;
@@ -161,12 +163,40 @@ export const checkIsCurrentSeason = (openDateStr?: string, closeDateStr?: string
   };
 };
 
+export const formatParkImageUrl = (img?: string | null): string => {
+  if (!img) return "";
+  const trimmed = img.trim();
+  if (!trimmed || trimmed === "-" || trimmed === "null" || trimmed === "undefined") return "";
+  if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
+    return trimmed;
+  }
+  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://172.20.10.5:8081/api/v1";
+  if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
+    const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${baseUrl}${cleanPath}`;
+  }
+  if (!trimmed.includes("/")) {
+    return `${baseUrl}/uploads/park/${trimmed}`;
+  }
+  if (trimmed.startsWith("/")) {
+    return `${baseUrl}${trimmed}`;
+  }
+  return `${baseUrl}/${trimmed}`;
+};
+
 const getParkImage = (parkId: number, fallbackImg?: string) => {
   if (typeof window !== "undefined" && parkId) {
     const customLocal = localStorage.getItem(`greenpass_park_img_${parkId}`);
-    if (customLocal) return customLocal;
+    if (customLocal) {
+      const formatted = formatParkImageUrl(customLocal);
+      if (formatted) return formatted;
+    }
   }
-  return fallbackImg || "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
+  if (fallbackImg) {
+    const formatted = formatParkImageUrl(fallbackImg);
+    if (formatted) return formatted;
+  }
+  return "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
 };
 
 export const computeEffectiveStatus = (isTempClosed?: boolean, open?: string, close?: string) => {
@@ -244,6 +274,7 @@ export default function ViewParkDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canEditDetails, setCanEditDetails] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     const savedRoles = localStorage.getItem("ranger_roles");
@@ -458,9 +489,19 @@ export default function ViewParkDetail() {
         
         {/* Background Park Cover Image with Gradient Overlay */}
         {displayImage && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 opacity-60 scale-105"
-            style={{ backgroundImage: `url(${displayImage})` }}
+          <img 
+            src={displayImage}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 opacity-60 scale-105"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.dataset.triedGeneral && target.src.includes("/uploads/park/")) {
+                target.dataset.triedGeneral = "true";
+                target.src = target.src.replace("/uploads/park/", "/uploads/general/");
+                return;
+              }
+              target.src = "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
+            }}
           />
         )}
         
@@ -744,26 +785,59 @@ export default function ViewParkDetail() {
         <div className="space-y-6">
           
           {/* Park Photo Showcase Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200/90 overflow-hidden group">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <ImageIcon className="w-4 h-4 text-emerald-600" />
                 <h3 className="text-xs font-bold text-slate-800">รูปภาพทัศนียภาพอุทยาน</h3>
               </div>
-              <span className="text-[10px] font-bold text-slate-400">ภาพหน้าปก</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400">ภาพหน้าปก</span>
+                <button
+                  type="button"
+                  onClick={() => setShowImageModal(true)}
+                  className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
+                  title="ดูรูปขนาดเต็ม"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">ดูขนาดเต็ม</span>
+                </button>
+              </div>
             </div>
             
-            <div className="relative h-48 bg-slate-900 group overflow-hidden">
+            <div 
+              onClick={() => setShowImageModal(true)}
+              className="relative w-full h-80 sm:h-96 md:h-[400px] bg-slate-950 cursor-pointer overflow-hidden flex items-center justify-center group"
+            >
+              {/* Blurred Ambient Backdrop so wide/tall photos fill the frame naturally without harsh blank bars */}
+              <div 
+                className="absolute inset-0 bg-cover bg-center blur-xl opacity-35 scale-110 pointer-events-none"
+                style={{ backgroundImage: `url(${displayImage})` }}
+              />
+
+              {/* Main Image with object-contain - 100% visible, no crop */}
               <img 
                 src={displayImage} 
                 alt={parkData.parkName}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="relative z-10 w-full h-full object-contain p-2 group-hover:scale-[1.02] transition-transform duration-500 drop-shadow-lg"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
+                  const target = e.currentTarget;
+                  if (!target.dataset.triedGeneral && target.src.includes("/uploads/park/")) {
+                    target.dataset.triedGeneral = "true";
+                    target.src = target.src.replace("/uploads/park/", "/uploads/general/");
+                    return;
+                  }
+                  target.src = "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">
-                <p className="text-xs font-bold text-white drop-shadow-md">{parkData.parkName}</p>
+
+              {/* Bottom Overlay with Caption & Zoom Prompt */}
+              <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex items-end justify-between p-4 pointer-events-none">
+                <p className="text-xs font-bold text-white drop-shadow-md truncate max-w-[65%]">{parkData.parkName}</p>
+                <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-full backdrop-blur-sm shadow-sm flex items-center gap-1">
+                  <Maximize2 className="w-3 h-3" />
+                  <span>คลิกขยายรูป</span>
+                </span>
               </div>
             </div>
           </div>
@@ -842,6 +916,47 @@ export default function ViewParkDetail() {
         </div>
 
       </div>
+
+      {/* Full-screen Image Preview Modal */}
+      {showImageModal && (
+        <div 
+          onClick={() => setShowImageModal(false)}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 animate-fadeIn"
+        >
+          <div className="w-full max-w-5xl flex items-center justify-between text-white pb-3 border-b border-white/10 mb-4">
+            <div className="flex items-center space-x-2">
+              <ImageIcon className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-bold">{parkData.parkName} - ภาพหน้าปกอุทยานขนาดเต็ม</span>
+            </div>
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative max-w-5xl max-h-[82vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black/40 border border-white/10 shadow-2xl"
+          >
+            <img
+              src={displayImage}
+              alt={parkData.parkName}
+              className="max-w-full max-h-[82vh] object-contain rounded-2xl"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.dataset.triedGeneral && target.src.includes("/uploads/park/")) {
+                  target.dataset.triedGeneral = "true";
+                  target.src = target.src.replace("/uploads/park/", "/uploads/general/");
+                  return;
+                }
+                target.src = "https://images.unsplash.com/photo-1544735716-392fe2489ffa";
+              }}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

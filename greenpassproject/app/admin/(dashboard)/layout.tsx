@@ -36,6 +36,7 @@ export default function AdminDashboardLayout({
   const handleLogout = () => {
     localStorage.removeItem("admin_username");
     localStorage.removeItem("admin_role");
+    localStorage.removeItem("greenpass_emergency_alert");
     router.push("/admin/login-admin");
   };
 

@@ -218,6 +218,21 @@ export const parkApi = {
   }
 };
 
+// fileUploadApi สำหรับอัปโหลดไฟล์รูปภาพแยกตามหมวดหมู่ (เช่น park, announcements, reports, rewards)
+export const fileUploadApi = {
+  upload: async (file: File | Blob, category: string = 'park') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', category);
+    const response = await api.post('/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  }
+};
+
 // reportApi สำหรับจัดการรายงาน/เรื่องร้องเรียน
 export const reportApi = {
   getMyReports: async (username: string) => {
