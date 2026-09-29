@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
+import GlobalEmergencyAlert from "./components/GlobalEmergencyAlert";
 
 const promptFont = Prompt({
   weight: ["300", "400", "500", "600", "700"],
@@ -24,7 +25,10 @@ export default function RootLayout({
       lang="th"
       className={`${promptFont.variable} font-sans h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {children}
+        <GlobalEmergencyAlert />
+      </body>
     </html>
   );
 }

@@ -17,25 +17,8 @@ import {
   LogOut,
   Info,
   Newspaper,
-  Megaphone,
-  Siren,
-  AlertTriangle,
-  CheckCircle,
-  Volume2,
-  BellRing
+  Megaphone
 } from "lucide-react";
-
-interface NotificationPayload {
-  notificationId?: number;
-  title: string;
-  message: string;
-  report?: {
-    reportId: number;
-    name: string;
-    description: string;
-    image?: string;
-  };
-}
 
 export default function RangerDashboardLayout({
   children,
@@ -68,248 +51,6 @@ export default function RangerDashboardLayout({
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [rangerRoles, setRangerRoles] = useState<string[]>([]);
 
-  // สถานะ Pop-up Notification จาก Mobile / WebSocket
-  const [popupNotification, setPopupNotification] = useState<NotificationPayload | null>(null);
-
-  // สถานะรายงานเหตุฉุกเฉินและการร้องเตือนภัย
-  const [activeEmergencyAlert, setActiveEmergencyAlert] = useState<{
-    id: string;
-    parkId?: string;
-    details: string;
-    location: string;
-    time: string;
-    reporter: string;
-  } | null>(null);
-
-  const audioContextRef = React.useRef<AudioContext | null>(null);
-  const sirenTimerRef = React.useRef<any>(null);
-
-  // สังเคราะห์เสียงไซเรนฉุกเฉิน (Loud Dual-Tone Oscillator Alarm)
-  const startEmergencySirenSound = () => {
-    try {
-      if (!audioContextRef.current) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        audioContextRef.current = new AudioCtx();
-      }
-      const ctx = audioContextRef.current;
-      if (ctx.state === "suspended") {
-        ctx.resume();
-      }
-
-      if (sirenTimerRef.current) clearInterval(sirenTimerRef.current);
-
-      let toggle = false;
-      const playSirenPulse = () => {
-        if (!audioContextRef.current) return;
-        try {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-
-          const freq = toggle ? 1150 : 750;
-          toggle = !toggle;
-
-          osc.type = "sawtooth";
-          osc.frequency.setValueAtTime(freq, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(toggle ? 1350 : 650, ctx.currentTime + 0.35);
-
-          gain.gain.setValueAtTime(0.5, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.38);
-
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-
-          osc.start();
-          osc.stop(ctx.currentTime + 0.4);
-        } catch (e) { }
-      };
-
-      playSirenPulse();
-      sirenTimerRef.current = setInterval(playSirenPulse, 420);
-    } catch (e) {
-      console.warn("Could not play synthesized audio alarm", e);
-    }
-  };
-
-  const stopEmergencySirenSound = () => {
-    if (sirenTimerRef.current) {
-      clearInterval(sirenTimerRef.current);
-      sirenTimerRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => { });
-      audioContextRef.current = null;
-    }
-  };
-
-  // ฟังก์ชันตรวจสอบว่ารายงานนี้ตรงกับอุทยานที่ล็อกอินอยู่หรือไม่
-  const isReportForCurrentPark = (reportObj: any, activeParkId: string | null, activeParkName: string | null) => {
-    if (!activeParkId && !activeParkName) return false;
-
-    const reportParkId = reportObj.parkId || reportObj.park?.parkId;
-    const reportParkName = reportObj.parkName || reportObj.park?.name || reportObj.location;
-
-    if (activeParkId && reportParkId) {
-      return String(reportParkId) === String(activeParkId);
-    }
-
-    if (activeParkName && reportParkName) {
-      const cleanCur = activeParkName.trim().replace("อุทยานแห่งชาติ", "");
-      const cleanRep = reportParkName.trim().replace("อุทยานแห่งชาติ", "");
-      return cleanRep.includes(cleanCur) || cleanCur.includes(cleanRep);
-    }
-
-    return false;
-  };
-
-  // 🚨 ตรวจจับและดึงข้อมูลเหตุฉุกเฉินร้ายแรงแบบเรียลไทม์ (ทำงานทุกหน้าย่อยใน Dashboard แม้ไม่ได้เปิดหน้ารายงาน)
-  useEffect(() => {
-    let isMountedLocal = true;
-    let isChecking = false;
-    let timeoutId: any = null;
-
-    const checkEmergencyState = async () => {
-      if (!isMountedLocal || isChecking) return;
-
-      const activeParkId = currentParkId || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null);
-      const activeParkName = parkName || (typeof window !== "undefined" ? localStorage.getItem("ranger_park_name") : null);
-      const rangerUsername = rangerUser || (typeof window !== "undefined" ? (localStorage.getItem("ranger_username") || localStorage.getItem("username")) : null);
-
-      const ackList: string[] = typeof window !== "undefined"
-        ? JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]")
-        : [];
-
-      // 1. เช็คจาก LocalStorage ก่อน
-      const savedEmergency = typeof window !== "undefined" ? localStorage.getItem("greenpass_emergency_alert") : null;
-      if (savedEmergency) {
-        try {
-          const parsed = JSON.parse(savedEmergency);
-          if (parsed && parsed.id && !ackList.includes(String(parsed.id))) {
-            setActiveEmergencyAlert(parsed);
-            startEmergencySirenSound();
-            return;
-          }
-        } catch (e) { }
-      }
-
-      // 2. ถ้ามีป๊อปอัปฉุกเฉินแสดงอยู่แล้ว ไม่ต้องยิง API ซ้ำ
-      if (activeEmergencyAlert) return;
-
-      // 3. ตรวจสอบจาก Backend API เพื่อให้เด้งแจ้งเตือนทุกหน้าย่อย (ประกาศข่าว, สถิติ, เกี่ยวกับอุทยาน ฯลฯ)
-      if (!rangerUsername && !activeParkId) return;
-
-      isChecking = true;
-      try {
-        let listData: any[] | null = null;
-        if (rangerUsername) {
-          const res = await reportApi.getReportsForRanger(rangerUsername);
-          listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
-            ? (res.result || res.data || res)
-            : null;
-        }
-
-        if ((!Array.isArray(listData) || listData.length === 0) && activeParkId) {
-          const res = await reportApi.getReportsByParkId(Number(activeParkId));
-          listData = res && (res.success || Array.isArray(res.result) || Array.isArray(res.data) || Array.isArray(res))
-            ? (res.result || res.data || res)
-            : null;
-        }
-
-        if (isMountedLocal && Array.isArray(listData)) {
-          const unackEmergency = listData.find((r: any) => {
-            const rId = String(r.reportId || "");
-            if (!rId || ackList.includes(rId)) return false;
-
-            if (activeParkId && r.parkId && String(r.parkId) !== String(activeParkId)) {
-              return false;
-            }
-
-            const tName = String(r.typeName || r.type?.typeName || r.category || "");
-            const tId = r.typeId || r.type?.typeId;
-            const titleDesc = `${r.name || ""} ${r.description || ""}`;
-
-            const isSevere =
-              tId === 2 ||
-              String(tId) === "2" ||
-              tName.includes("ร้ายแรง") ||
-              tName.includes("ฉุกเฉิน") ||
-              titleDesc.includes("ร้ายแรง") ||
-              titleDesc.includes("ฉุกเฉิน") ||
-              r.isEmergency === true;
-
-            const isPending = r.status === "Pending" || r.status === "แจ้งรายงาน" || !r.status;
-            return isSevere && isPending;
-          });
-
-          if (unackEmergency && isMountedLocal) {
-            console.log("🚨 [Global Emergency Alert] Found unacknowledged emergency report on route", pathname, unackEmergency);
-            const emergencyEventData = {
-              id: String(unackEmergency.reportId),
-              parkId: String(activeParkId || unackEmergency.parkId || ""),
-              details: unackEmergency.description
-                ? `${unackEmergency.name ? unackEmergency.name + ": " : ""}${unackEmergency.description}`
-                : (unackEmergency.name || "พบเหตุการณ์ร้ายแรง/ฉุกเฉินในพื้นที่อุทยาน"),
-              location: unackEmergency.parkName || unackEmergency.park?.name || activeParkName || "พื้นที่อุทยานแห่งชาติ",
-              time: unackEmergency.reportTime || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-              reporter: unackEmergency.username || unackEmergency.user?.username || "ผู้ใช้งาน GreenPass"
-            };
-
-            setActiveEmergencyAlert(emergencyEventData);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("greenpass_emergency_alert", JSON.stringify(emergencyEventData));
-            }
-            startEmergencySirenSound();
-          }
-        }
-      } catch (e) {
-      } finally {
-        isChecking = false;
-      }
-    };
-
-    // ตรวจสอบทันทีเมื่อเปิดหน้าจอ หรือเมื่อเปลี่ยนหน้าย่อย (pathname เปลี่ยน)
-    checkEmergencyState();
-
-    // ตรวจสอบเป็นระยะแบบ Sequential (รอให้รอบก่อนหน้าเสร็จก่อน แล้วเว้น 4.5 วินาที จึงตรวจรอบถัดไป) ป้องกัน Request ซ้อนกัน
-    const runSequentialCheck = async () => {
-      await checkEmergencyState();
-      if (isMountedLocal) {
-        timeoutId = setTimeout(runSequentialCheck, 4500);
-      }
-    };
-    timeoutId = setTimeout(runSequentialCheck, 4500);
-
-    const handleCustomTrigger = (e: any) => {
-      if (e.detail && typeof window !== "undefined") {
-        const ackList = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
-        if (e.detail.id && ackList.includes(String(e.detail.id))) return;
-
-        setActiveEmergencyAlert(e.detail);
-        localStorage.setItem("greenpass_emergency_alert", JSON.stringify(e.detail));
-        startEmergencySirenSound();
-      }
-    };
-
-    const handleWindowFocus = () => {
-      checkEmergencyState();
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("greenpass_emergency_trigger", handleCustomTrigger);
-      window.addEventListener("focus", handleWindowFocus);
-      document.addEventListener("visibilitychange", handleWindowFocus);
-    }
-
-    return () => {
-      isMountedLocal = false;
-      if (timeoutId) clearTimeout(timeoutId);
-      if (typeof window !== "undefined") {
-        window.removeEventListener("greenpass_emergency_trigger", handleCustomTrigger);
-        window.removeEventListener("focus", handleWindowFocus);
-        document.removeEventListener("visibilitychange", handleWindowFocus);
-      }
-    };
-  }, [pathname, currentParkId, parkName, rangerUser]);
-
 // ----------------------------------------------------
   // 📡 Real-time WebSocket STOMP Listener
   // ทำงานแบบ Event-driven 100% ไม่มีการยิง API ซ้ำๆ (คลูดาวน์)
@@ -322,8 +63,8 @@ export default function RangerDashboardLayout({
     let stompClient: Client | null = null;
 
     try {
-      // เชื่อมต่อไปยัง WebSocket Port 8081 ตาม hostname ปัจจุบัน (http://<hostname>:8081/ws-greenpass)
-      const wsUrl = `${getBaseURL().replace('/api/v1', '')}/ws-greenpass`;
+      // เชื่อมต่อไปยัง WebSocket Port 8081 (/api/v1/ws-greenpass)
+      const wsUrl = `${getBaseURL()}/ws-greenpass`;
 
       stompClient = new Client({
         webSocketFactory: () => new SockJS(wsUrl),
@@ -338,10 +79,20 @@ export default function RangerDashboardLayout({
         onConnect: () => {
           console.log(`📡 [WebSocket STOMP Connected] Park ID: ${activeParkId || "All"}, Ranger: ${activeRangerUser || "Unknown"}`);
 
-          const processPayload = (item: any) => {
+          const processPayload = async (item: any) => {
             if (!item || typeof item !== "object") return;
 
-            const report = item.report || item.reportItem || item;
+            let report = item.report || item.reportItem || item;
+            const targetReportId = report.reportId || item.reportId || item.id;
+
+            if (targetReportId && (!report.typeName && !report.type?.typeName && !report.typeId && !report.type?.typeId)) {
+              try {
+                const res = await reportApi.getReportById(Number(targetReportId));
+                if (res && (res.result || res.data)) {
+                  report = res.result || res.data;
+                }
+              } catch (e) {}
+            }
             const replyReportId = item.replyReportId || item.reply_report_id || item.notificationId || item.id;
             const progressText = item.progress || item.message || report.description || report.name || "";
             const title = item.title || report.name || "แจ้งเตือนรายงานเหตุการณ์";
@@ -398,11 +149,10 @@ export default function RangerDashboardLayout({
                 reporter: reporterName
               };
 
-              setActiveEmergencyAlert(alertData);
               if (typeof window !== "undefined") {
                 localStorage.setItem("greenpass_emergency_alert", JSON.stringify(alertData));
+                window.dispatchEvent(new CustomEvent("greenpass_emergency_trigger", { detail: alertData }));
               }
-              startEmergencySirenSound();
             } else {
               console.log("ℹ️ [WebSocket Real-Time] Received update:", item);
             }
@@ -476,24 +226,6 @@ export default function RangerDashboardLayout({
       }
     };
   }, [currentParkId, parkName, rangerUser]);
-
-  const handleAcknowledgeEmergency = () => {
-    stopEmergencySirenSound();
-    if (activeEmergencyAlert?.id && typeof window !== "undefined") {
-      try {
-        const ackList = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
-        if (!ackList.includes(activeEmergencyAlert.id)) {
-          ackList.push(activeEmergencyAlert.id);
-          localStorage.setItem("greenpass_ack_reports", JSON.stringify(ackList));
-        }
-      } catch (e) { }
-    }
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("greenpass_emergency_alert");
-      localStorage.removeItem("greenpass_member_reports");
-    }
-    setActiveEmergencyAlert(null);
-  };
 
   useEffect(() => {
     const loadRangerInfo = async () => {
@@ -758,79 +490,7 @@ export default function RangerDashboardLayout({
         )}
       </main>
 
-      {/* 🚨 HIGH-VISIBILITY EMERGENCY ALARM MODAL OVERLAY WITH SIREN SOUND */}
-      {activeEmergencyAlert && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in font-sans">
-          <div className="relative w-full max-w-lg bg-gradient-to-b from-rose-950 via-slate-900 to-rose-950 text-white rounded-3xl p-6 sm:p-8 border-2 border-rose-500 shadow-[0_0_80px_rgba(225,29,72,0.6)] space-y-6 text-center overflow-hidden animate-bounce-subtle">
-
-            {/* Pulsing Red Warning Light Accent */}
-            <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-rose-600/30 rounded-full blur-3xl animate-ping" />
-            <div className="absolute top-0 right-0 p-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/40 text-[10px] font-black uppercase tracking-widest animate-pulse">
-                <Volume2 className="w-3.5 h-3.5 text-rose-400 animate-bounce" />
-                SIREN ALARM ACTIVE
-              </span>
-            </div>
-
-            {/* Siren Icon Header */}
-            <div className="relative z-10 space-y-3">
-              <div className="w-20 h-20 rounded-full bg-rose-600/30 border-2 border-rose-500/80 mx-auto flex items-center justify-center text-rose-400 shadow-xl shadow-rose-600/40 ring-8 ring-rose-600/20 animate-pulse">
-                <Siren className="w-10 h-10 text-rose-400 animate-spin-slow" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-                  <AlertTriangle className="w-6 h-6 text-rose-400" />
-                  แจ้งเตือนเหตุฉุกเฉินด่วนที่สุด!
-                </h2>
-                <p className="text-xs text-rose-200/90 font-medium mt-1">
-                  มีผู้ใช้งานส่งรายงานเหตุการณ์ฉุกเฉินเข้ามาในพื้นที่อุทยาน
-                </p>
-              </div>
-            </div>
-
-            {/* Incident Details Card */}
-            <div className="relative z-10 bg-slate-900/90 rounded-2xl p-4 border border-rose-500/40 text-left space-y-2.5 shadow-inner backdrop-blur-sm text-xs">
-              <div className="flex justify-between items-center border-b border-rose-900/50 pb-2">
-                <span className="text-[11px] font-bold text-rose-400">ประเภทเหตุการณ์:</span>
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] tracking-wider uppercase shadow-xs">
-                  🚨 เหตุฉุกเฉินเร่งด่วน
-                </span>
-              </div>
-              <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-400 block">รายละเอียดเหตุการณ์:</span>
-                <p className="text-sm font-extrabold text-white leading-snug">
-                  {activeEmergencyAlert.details || "พบผู้ได้รับบาดเจ็บ / ต้องการความช่วยเหลือด่วนในพื้นที่อุทยาน"}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px]">
-                <div>
-                  <span className="text-slate-400 block font-semibold">สถานที่ / พิกัด:</span>
-                  <span className="font-bold text-emerald-300">{activeEmergencyAlert.location || "พื้นที่อุทยานแห่งชาติ"}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block font-semibold">เวลาแจ้งเหตุ:</span>
-                  <span className="font-bold text-amber-300">{activeEmergencyAlert.time || "เมื่อสักครู่"}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Acknowledge & Stop Alarm Button */}
-            <div className="relative z-10 pt-2">
-              <button
-                onClick={handleAcknowledgeEmergency}
-                className="w-full py-4 px-6 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 text-white rounded-2xl font-black text-sm sm:text-base tracking-wide shadow-xl shadow-rose-900/60 border border-rose-400/50 transition-all duration-200 hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-5 h-5 text-emerald-300" />
-                <span>รับทราบและยืนยันการรับรู้เหตุฉุกเฉิน</span>
-              </button>
-              <p className="text-[10px] text-slate-400 mt-2">
-                * เสียงร้องสัญญาณเตือนภัยจะหยุดทำงานเมื่อเจ้าหน้าที่กดปุ่มยืนยันรับรู้
-              </p>
-            </div>
-
-          </div>
-        </div>
-      )}
+      
 
     </div>
   );
