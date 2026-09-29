@@ -161,8 +161,13 @@ function SetRoleContent() {
 
     setError("");
     setSuccess("");
+
+    // Alternate Flow 3.1: กรณีที่ผู้ดูแลระบบไม่ได้เลือก Role ระบบจะแสดงข้อความ “กรุณาเลือก Role 1 รายการ”
     if (!scanStamp && !announceNews && !editDetail && !reportIncident) {
       setError("กรุณาเลือก Role 1 รายการ");
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
       return;
     }
 
@@ -176,13 +181,27 @@ function SetRoleContent() {
 
     try {
       const username = currentRanger.username || currentRanger.employeeId || currentRanger.id;
-      if (username) {
-        await rangerApi.updateRanger(username, {
-          canIssueStamp: scanStamp,
-          canAnnouncement: announceNews,
-          canEditParkDetails: editDetail,
-          canProgressReport: reportIncident
-        });
+      if (!username) {
+        throw new Error("Username not found");
+      }
+
+      // Basic Flow 4 & 5: ระบบรับค่า Role และดำเนินการบันทึกลงฐานข้อมูล
+      const rolePayload = {
+        canIssueStamp: scanStamp,
+        canAnnouncement: announceNews,
+        canEditParkDetails: editDetail,
+        canProgressReport: reportIncident
+      };
+
+      let updateRes: any = null;
+      if (typeof rangerApi.setRole === "function") {
+        updateRes = await rangerApi.setRole(username, rolePayload);
+      } else {
+        updateRes = await rangerApi.updateRanger(username, rolePayload);
+      }
+
+      if (updateRes && updateRes.success === false) {
+        throw new Error(updateRes.message || "Failed to update");
       }
 
       // Sync with localStorage
@@ -240,13 +259,23 @@ function SetRoleContent() {
         console.error("Failed to sync roles to localStorage:", e);
       }
 
+      // Basic Flow 6: ระบบแสดงผลการกำหนดสิทธิ์สำเร็จ
       setSuccess("ตั้งค่าบทบาทและสิทธิ์ของเจ้าหน้าที่เรียบร้อยแล้ว!");
       setTimeout(() => {
         router.push(`/admin/view-park-ranger-detail?id=${username}`);
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update ranger permissions:", err);
-      setError("ไม่สามารถบันทึกข้อมูลได้กรุณาลองใหม่อีกครั้ง");
+      // Alternate Flow 5.1.1: กรณีที่ระบบไม่สามารถบันทึกข้อมูลได้ ระบบจะแสดงข้อความ “ไม่สามารถบันทึกข้อมูลได้กรุณาลองใหม่อีกครั้ง”
+      const serverMsg = err?.response?.data?.message || err?.message;
+      if (serverMsg && (serverMsg.includes("กรุณาเลือก Role") || serverMsg.includes("Role 1 รายการ"))) {
+        setError("กรุณาเลือก Role 1 รายการ");
+      } else {
+        setError("ไม่สามารถบันทึกข้อมูลได้กรุณาลองใหม่อีกครั้ง");
+      }
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -406,6 +435,14 @@ function SetRoleContent() {
 
             </div>
           </div>
+
+          {/* Bottom Error Notification if any */}
+          {error && (
+            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-semibold flex items-center gap-2.5 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="flex items-center justify-end gap-3 pt-5 border-t border-slate-200">

@@ -164,6 +164,23 @@ export const rangerApi = {
     const response = await api.post(`/ranger/update?username=${username}`, payload);
     return response.data;
   },
+  setRole: async (username: string, payload: {
+    canIssueStamp: boolean;
+    canAnnouncement: boolean;
+    canEditParkDetails: boolean;
+    canProgressReport: boolean;
+  }) => {
+    try {
+      const response = await api.post(`/ranger/set-role?username=${username}`, payload);
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        const response = await api.post(`/ranger/update?username=${username}`, payload);
+        return response.data;
+      }
+      throw err;
+    }
+  },
   getRangerByUsername: async (username: string) => {
     const response = await api.get(`/ranger/get?username=${username}`);
     return response.data;

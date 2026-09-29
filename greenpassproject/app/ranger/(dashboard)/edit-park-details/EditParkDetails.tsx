@@ -437,19 +437,13 @@ export default function EditParkDetails() {
             )}
           </label>
 
-          <div className="w-full min-h-[300px] max-h-[520px] bg-slate-950/5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-3xl transition-all flex flex-col items-center justify-center relative overflow-hidden group p-3">
+          <div className="w-full bg-slate-950/5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-3xl transition-all flex flex-col items-center justify-center relative overflow-hidden group p-2">
             {image ? (
-              <div className="relative w-full h-full min-h-[300px] max-h-[500px] flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-slate-950">
-                {/* Ambient blurred backdrop for uncropped aspect ratios */}
-                <div 
-                  className="absolute inset-0 bg-cover bg-center blur-xl opacity-30 scale-110 pointer-events-none"
-                  style={{ backgroundImage: `url(${formatParkImageUrl(image)})` }}
-                />
-
+              <div className="relative w-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-slate-900 shadow-sm">
                 <img 
                   src={formatParkImageUrl(image)} 
                   alt="Park Cover Preview" 
-                  className="relative z-10 w-full h-auto max-h-[480px] object-contain rounded-2xl shadow-md mx-auto p-2" 
+                  className="w-full h-auto block rounded-2xl shadow-md mx-auto object-cover" 
                   onError={(e) => {
                     const target = e.currentTarget;
                     if (!target.dataset.triedGeneral && target.src.includes("/uploads/park/")) {

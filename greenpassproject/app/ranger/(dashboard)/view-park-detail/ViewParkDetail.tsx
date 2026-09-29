@@ -807,19 +807,13 @@ export default function ViewParkDetail() {
             
             <div 
               onClick={() => setShowImageModal(true)}
-              className="relative w-full h-80 sm:h-96 md:h-[400px] bg-slate-950 cursor-pointer overflow-hidden flex items-center justify-center group"
+              className="relative w-full bg-slate-900 cursor-pointer overflow-hidden group"
             >
-              {/* Blurred Ambient Backdrop so wide/tall photos fill the frame naturally without harsh blank bars */}
-              <div 
-                className="absolute inset-0 bg-cover bg-center blur-xl opacity-35 scale-110 pointer-events-none"
-                style={{ backgroundImage: `url(${displayImage})` }}
-              />
-
-              {/* Main Image with object-contain - 100% visible, no crop */}
+              {/* Main Image - fits container width and automatically determines height based on natural aspect ratio */}
               <img 
                 src={displayImage} 
                 alt={parkData.parkName}
-                className="relative z-10 w-full h-full object-contain p-2 group-hover:scale-[1.02] transition-transform duration-500 drop-shadow-lg"
+                className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-500"
                 onError={(e) => {
                   const target = e.currentTarget;
                   if (!target.dataset.triedGeneral && target.src.includes("/uploads/park/")) {
@@ -832,7 +826,7 @@ export default function ViewParkDetail() {
               />
 
               {/* Bottom Overlay with Caption & Zoom Prompt */}
-              <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex items-end justify-between p-4 pointer-events-none">
+              <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent flex items-end justify-between p-3.5 pointer-events-none">
                 <p className="text-xs font-bold text-white drop-shadow-md truncate max-w-[65%]">{parkData.parkName}</p>
                 <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-full backdrop-blur-sm shadow-sm flex items-center gap-1">
                   <Maximize2 className="w-3 h-3" />
