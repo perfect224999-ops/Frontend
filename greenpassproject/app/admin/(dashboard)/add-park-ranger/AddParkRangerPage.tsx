@@ -805,7 +805,7 @@ export default function AddParkRangerPage() {
                 <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <FileSignature className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>รูปลายเซ็นเจ้าหน้าที่ (Signature)</span>
+                    <span>รูปลายเซ็นเจ้าหน้าที่</span>
                   </span>
                   <span className="text-[10px] text-slate-400 font-normal">
                     รองรับไฟล์ JPG, PNG, WEBP (พื้นหลังโปร่งใสหรือสีขาว)
@@ -870,7 +870,7 @@ export default function AddParkRangerPage() {
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
               <MapPin className="w-4 h-4 text-emerald-600" />
-              <span>ที่อยู่และพื้นที่ปฏิบัติงาน (เลือกจังหวัด / อำเภอ / ตำบล / รหัสไปรษณีย์)</span>
+              <span>ที่อยู่ (เลือกจังหวัด / อำเภอ / ตำบล / รหัสไปรษณีย์)</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

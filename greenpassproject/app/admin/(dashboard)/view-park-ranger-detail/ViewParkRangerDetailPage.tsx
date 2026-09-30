@@ -577,7 +577,7 @@ function RangerDetailContent() {
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
               <MapPin className="w-4 h-4 text-emerald-600" />
-              <span>ที่อยู่และพื้นที่ปฏิบัติงาน</span>
+              <span>ที่อยู่</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
@@ -685,7 +685,7 @@ function RangerDetailContent() {
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider pb-2 border-b border-slate-200">
               <FileSignature className="w-4 h-4 text-emerald-600" />
-              <span>รูปลายเซ็นเจ้าหน้าที่ (Signature)</span>
+              <span>รูปลายเซ็นเจ้าหน้าที่</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center gap-5">
