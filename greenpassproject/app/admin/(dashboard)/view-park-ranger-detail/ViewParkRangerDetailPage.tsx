@@ -18,7 +18,8 @@ import {
   CheckCircle2, 
   XCircle,
   Users,
-  FileSignature
+  FileSignature,
+  Loader2
 } from "lucide-react";
 
 interface Ranger {
@@ -145,10 +146,15 @@ function RangerDetailContent() {
   const searchParams = useSearchParams();
   const rangerId = searchParams.get("id");
   const [ranger, setRanger] = useState<Ranger | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchRangerData = async () => {
-      if (!rangerId) return;
+      if (!rangerId) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
 
       const cleanRangerId = String(rangerId).trim();
       const lowerRangerId = cleanRangerId.toLowerCase();
@@ -416,10 +422,25 @@ function RangerDetailContent() {
         signature: "src/sig1.png",
         roles: computeRoles({}, cleanRangerId)
       });
+      setLoading(false);
     };
 
     fetchRangerData();
   }, [rangerId]);
+
+  if (loading) {
+    return (
+      <div className="w-full max-w-[1600px] mx-auto font-sans relative py-20 my-4 px-4 flex flex-col items-center justify-center gap-4 bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl shadow-xl min-h-[450px]">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center shadow-inner">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        </div>
+        <div className="text-center space-y-1">
+          <p className="text-base font-bold text-slate-800">กำลังโหลดข้อมูลเจ้าหน้าที่...</p>
+          <p className="text-xs font-medium text-slate-400">กรุณารอสักครู่ ระบบกำลังดึงข้อมูลล่าสุดจากฐานข้อมูล</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!ranger) {
     return (

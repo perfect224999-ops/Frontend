@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { rangerApi, parkApi } from "../../../../service/api";
-import { Search, Filter, ChevronDown, ChevronUp, UserCheck, Plus, ShieldCheck, X, Check, Trees } from "lucide-react";
+import { Search, Filter, ChevronDown, ChevronUp, UserCheck, Plus, ShieldCheck, X, Check, Trees, Loader2 } from "lucide-react";
 
 interface Ranger {
   id: string;
@@ -72,6 +72,7 @@ const normalizePosition = (pos?: string) => {
 export default function ListParkRangerPage() {
   const router = useRouter();
   const [rangers, setRangers] = useState<Ranger[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPark, setSelectedPark] = useState("ทั้งหมด");
   const [allDbParks, setAllDbParks] = useState<string[]>([]);
@@ -81,6 +82,7 @@ export default function ListParkRangerPage() {
 
   useEffect(() => {
     const fetchRangers = async () => {
+      setLoading(true);
       try {
         const response = await rangerApi.getAllRangers();
         const rawList = response?.result || response?.data || (Array.isArray(response) ? response : []);
@@ -214,6 +216,8 @@ export default function ListParkRangerPage() {
       } catch (error) {
         console.error("Failed to load rangers from backend:", error);
         setRangers([]);
+      } finally {
+        setLoading(false);
       }
     };
     fetchRangers();
@@ -491,7 +495,16 @@ export default function ListParkRangerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
-                {filteredRangers.length > 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2.5">
+                        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                        <span className="text-xs font-semibold text-slate-600">กำลังดึงข้อมูลรายชื่อเจ้าหน้าที่...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredRangers.length > 0 ? (
                   filteredRangers.map((ranger, idx) => (
                     <tr key={ranger.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-4 py-3.5 font-bold text-slate-400 whitespace-nowrap text-center">
