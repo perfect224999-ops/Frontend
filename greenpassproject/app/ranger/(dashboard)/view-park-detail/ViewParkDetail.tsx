@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Trees, 
-  Clock, 
-  MapPin, 
-  Edit3, 
-  Compass, 
-  Award, 
-  Globe2, 
-  ShieldCheck, 
+import {
+  Trees,
+  Clock,
+  MapPin,
+  Edit3,
+  Compass,
+  Award,
+  Globe2,
+  ShieldCheck,
   ExternalLink,
   ChevronRight,
   Sun,
@@ -24,7 +24,8 @@ import {
   BookmarkCheck,
   Sparkles,
   Maximize2,
-  X
+  X,
+  Image as ImageIcon
 } from "lucide-react";
 import { parkApi, rangerApi, getBaseURL } from "@/service/api";
 
@@ -281,7 +282,7 @@ export default function ViewParkDetail() {
       try {
         const roles: string[] = JSON.parse(savedRoles);
         setCanEditDetails(roles.includes("แก้ไขรายละเอียด"));
-      } catch (e) {}
+      } catch (e) { }
     }
   }, []);
 
@@ -329,7 +330,7 @@ export default function ViewParkDetail() {
             });
             setIsLoading(false);
           }
-        } catch (e) {}
+        } catch (e) { }
       } else {
         setIsLoading(true);
       }
@@ -346,7 +347,7 @@ export default function ViewParkDetail() {
                 localStorage.setItem("ranger_park_id", String(targetParkId));
               }
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const res = await parkApi.getParkById(targetParkId);
@@ -382,7 +383,7 @@ export default function ViewParkDetail() {
           if (savedParkData) {
             try {
               parsedSaved = JSON.parse(savedParkData);
-            } catch (e) {}
+            } catch (e) { }
           }
           const cachedLocalImg = typeof window !== "undefined" ? localStorage.getItem(`greenpass_park_img_${targetParkId}`) : null;
 
@@ -482,13 +483,13 @@ export default function ViewParkDetail() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto space-y-6 pb-12 font-sans px-2 sm:px-4">
-      
+
       {/* 1. HERO BANNER CARD (Showcases Park Cover Image, ID & Badges) */}
       <div className="relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-2xl border border-emerald-900/40">
-        
+
         {/* Background Park Cover Image with Gradient Overlay */}
         {displayImage && (
-          <img 
+          <img
             src={displayImage}
             alt=""
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 opacity-60 scale-105"
@@ -503,7 +504,7 @@ export default function ViewParkDetail() {
             }}
           />
         )}
-        
+
         {/* Gradients to keep typography crisp and readable */}
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-emerald-950/90 to-slate-900/80 backdrop-blur-[2px]" />
         <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#2ebb5e_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -539,23 +540,21 @@ export default function ViewParkDetail() {
               </span>
 
               {/* isSeasonalPark Badge */}
-              <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-md ${
-                parkData.isSeasonalPark 
-                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40" 
+              <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-md ${parkData.isSeasonalPark
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                   : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-              }`}>
+                }`}>
                 <Calendar className="w-3 h-3" />
                 <span>{parkData.isSeasonalPark ? "🍂 อุทยานเปิดตามฤดูกาล" : "🌿 เปิดให้บริการตลอดทั้งปี"}</span>
               </span>
 
               {/* isTemporaryClosed / Live Operating Hours Badge */}
-              <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-md ${
-                parkData.isTemporaryClosed 
-                  ? "bg-rose-500/25 text-rose-200 border-rose-500/50 shadow-sm animate-pulse" 
-                  : (liveStatus.isOpen 
-                      ? "bg-teal-500/20 text-teal-300 border-teal-500/40" 
-                      : "bg-slate-700/50 text-slate-300 border-slate-600/50")
-              }`}>
+              <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-md ${parkData.isTemporaryClosed
+                  ? "bg-rose-500/25 text-rose-200 border-rose-500/50 shadow-sm animate-pulse"
+                  : (liveStatus.isOpen
+                    ? "bg-teal-500/20 text-teal-300 border-teal-500/40"
+                    : "bg-slate-700/50 text-slate-300 border-slate-600/50")
+                }`}>
                 {parkData.isTemporaryClosed ? (
                   <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
                 ) : (
@@ -566,11 +565,10 @@ export default function ViewParkDetail() {
 
               {/* Status Badge */}
               <span className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white/10 text-white border border-white/20 rounded-full text-[11px] font-semibold backdrop-blur-md">
-                <span className={`w-2 h-2 rounded-full ${
-                  parkData.isTemporaryClosed 
-                    ? "bg-rose-400 animate-pulse" 
+                <span className={`w-2 h-2 rounded-full ${parkData.isTemporaryClosed
+                    ? "bg-rose-400 animate-pulse"
                     : (liveStatus.isOpen ? "bg-emerald-400 animate-pulse" : "bg-amber-400")
-                }`}></span>
+                  }`}></span>
                 <span>สถานะ: {liveStatus.statusText}</span>
               </span>
 
@@ -597,20 +595,18 @@ export default function ViewParkDetail() {
 
       {/* 2. STATS & QUICK HIGHLIGHTS GRID */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${parkData.isSeasonalPark ? "lg:grid-cols-4" : "lg:grid-cols-2"} gap-4`}>
-        
+
         {/* Card 1: Status & Temporary Closed Flag */}
-        <div className={`p-4 sm:p-5 rounded-2xl shadow-sm border flex items-center space-x-3.5 hover:shadow-md transition-all ${
-          parkData.isTemporaryClosed
+        <div className={`p-4 sm:p-5 rounded-2xl shadow-sm border flex items-center space-x-3.5 hover:shadow-md transition-all ${parkData.isTemporaryClosed
             ? "bg-rose-50/70 border-rose-200 hover:border-rose-300"
             : (liveStatus.isOpen
-                ? "bg-white border-emerald-100 hover:border-emerald-300"
-                : "bg-slate-50/80 border-slate-200 hover:border-slate-300")
-        }`}>
-          <div className={`p-3 rounded-xl shrink-0 ${
-            parkData.isTemporaryClosed
+              ? "bg-white border-emerald-100 hover:border-emerald-300"
+              : "bg-slate-50/80 border-slate-200 hover:border-slate-300")
+          }`}>
+          <div className={`p-3 rounded-xl shrink-0 ${parkData.isTemporaryClosed
               ? "bg-rose-100 text-rose-600"
               : (liveStatus.isOpen ? "bg-emerald-50 text-emerald-600" : "bg-slate-200 text-slate-700")
-          }`}>
+            }`}>
             {parkData.isTemporaryClosed ? (
               <AlertTriangle className="w-5 h-5 text-rose-600" />
             ) : (
@@ -620,11 +616,10 @@ export default function ViewParkDetail() {
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-slate-400 tracking-wider">สถานะเปิดทำการ</p>
             <p className="text-sm font-black text-slate-900 flex items-center gap-1.5 mt-0.5 truncate">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                parkData.isTemporaryClosed 
-                  ? "bg-rose-500 animate-pulse" 
+              <span className={`w-2 h-2 rounded-full shrink-0 ${parkData.isTemporaryClosed
+                  ? "bg-rose-500 animate-pulse"
                   : (liveStatus.isOpen ? "bg-emerald-500 animate-pulse" : "bg-amber-500")
-              }`}></span>
+                }`}></span>
               {liveStatus.statusText}
             </p>
             {liveStatus.subtext ? (
@@ -700,17 +695,17 @@ export default function ViewParkDetail() {
 
       {/* 3. MAIN CONTENT CARDS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left 2 Cols: Description, Event Note, Features & Database Schema Matrix */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* Detailed Narrative Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 space-y-4">
             <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
               <div className="w-1.5 h-5 bg-emerald-500 rounded-full"></div>
               <h2 className="text-sm font-extrabold text-slate-900">เกี่ยวกับ{parkData.parkName}</h2>
             </div>
-            
+
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed text-justify font-normal whitespace-pre-line">
               {parkData.description}
             </p>
@@ -782,17 +777,17 @@ export default function ViewParkDetail() {
 
         {/* Right 1 Col: Park Photo Showcase, Hours & Location Details */}
         <div className="space-y-6">
-          
+
           {/* Park Photo Showcase Card */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200/90 overflow-hidden group">
-            
-            <div 
+
+            <div
               onClick={() => setShowImageModal(true)}
               className="relative w-full bg-slate-900 cursor-pointer overflow-hidden group"
             >
               {/* Main Image - fits container width and automatically determines height based on natural aspect ratio */}
-              <img 
-                src={displayImage} 
+              <img
+                src={displayImage}
                 alt={parkData.parkName}
                 className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-500"
                 onError={(e) => {
@@ -868,7 +863,7 @@ export default function ViewParkDetail() {
                 src={getMapEmbedUrl(parkData.location, parkData.parkName, parkData.address)}
               ></iframe>
               <button
-                onClick={openGoogleMaps} 
+                onClick={openGoogleMaps}
                 className="absolute top-2 right-2 bg-slate-900/85 hover:bg-slate-900 text-white text-[10px] font-bold px-2.5 py-1 rounded-md cursor-pointer transition-all flex items-center gap-1 shadow-md backdrop-blur-xs"
               >
                 <span>ขยายแผนที่</span>
@@ -894,7 +889,7 @@ export default function ViewParkDetail() {
 
       {/* Full-screen Image Preview Modal */}
       {showImageModal && (
-        <div 
+        <div
           onClick={() => setShowImageModal(false)}
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 animate-fadeIn"
         >
@@ -911,8 +906,8 @@ export default function ViewParkDetail() {
             </button>
           </div>
 
-          <div 
-            onClick={(e) => e.stopPropagation()} 
+          <div
+            onClick={(e) => e.stopPropagation()}
             className="relative max-w-5xl max-h-[82vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black/40 border border-white/10 shadow-2xl"
           >
             <img
