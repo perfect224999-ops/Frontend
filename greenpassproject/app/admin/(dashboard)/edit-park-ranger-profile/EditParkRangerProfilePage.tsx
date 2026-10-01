@@ -227,14 +227,14 @@ function EditProfileContent() {
       return trimmed;
     }
     if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
-      const baseUrl = getBaseURL ? getBaseURL() : "http://localhost:8081/api/v1";
+      const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.5:8081/api/v1";
       const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
       return `${baseUrl}${cleanPath}`;
     }
     if (trimmed.startsWith("src/")) {
       return `/${trimmed}`;
     }
-    const baseUrl = getBaseURL ? getBaseURL() : "http://localhost:8081/api/v1";
+    const baseUrl = getBaseURL ? getBaseURL() : "http://172.20.10.5:8081/api/v1";
     return `${baseUrl}/uploads/signatures/${trimmed}`;
   };
 

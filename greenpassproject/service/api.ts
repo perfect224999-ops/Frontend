@@ -7,12 +7,10 @@ import axios from 'axios';
 
 // สร้าง axios instance พร้อม config ตั้งต้น
 export const getBaseURL = () => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:8081/api/v1`;
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
   }
-  return 'http://localhost:8081/api/v1';
-  //return 'http://172.20.10.5:8081/api/v1'
+  return 'http://172.20.10.5:8081/api/v1';
 };
 
 const api = axios.create({
