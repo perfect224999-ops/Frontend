@@ -156,273 +156,276 @@ function RangerDetailContent() {
       }
       setLoading(true);
 
-      const cleanRangerId = String(rangerId).trim();
-      const lowerRangerId = cleanRangerId.toLowerCase();
-
-      // Normalize target username for API calls
-      let targetUsername = cleanRangerId;
-      if (lowerRangerId.startsWith("ranger")) {
-        targetUsername = lowerRangerId;
-      } else if (/^\d+$/.test(cleanRangerId) && cleanRangerId.length <= 2) {
-        targetUsername = `ranger${cleanRangerId.padStart(2, "0")}`;
-      } else {
-        // If it's a numeric timestamp ID (from local storage mock), check greenpass_rangers for real username/employeeId
-        try {
-          const saved = localStorage.getItem("greenpass_rangers");
-          if (saved) {
-            const list = JSON.parse(saved);
-            const found = list.find((r: any) => String(r.id) === cleanRangerId);
-            if (found && (found.username || found.employeeId)) {
-              targetUsername = String(found.username || found.employeeId).trim();
-            }
-          }
-        } catch (e) {}
-      }
-
-      // Helper to compute roles list from API item or local storage object
-      const computeRoles = (item: any, fallbackUsername?: string): string[] => {
-        // If boolean flags exist on the object, use them directly (authoritative from DB)
-        const hasFlags = (
-          item.canIssueStamp !== undefined ||
-          item.canAnnouncement !== undefined ||
-          item.canEditParkDetails !== undefined ||
-          item.canProgressReport !== undefined
-        );
-        if (hasFlags) {
-          return [
-            Boolean(item.canIssueStamp) && "สแกนแสตมป์",
-            Boolean(item.canAnnouncement) && "ประกาศข่าวสาร",
-            Boolean(item.canEditParkDetails) && "แก้ไขรายละเอียด",
-            Boolean(item.canProgressReport) && "รายงานความคืบหน้าของเหตุการณ์"
-          ].filter(Boolean) as string[];
-        }
-
-        // If explicit roles array exists and not empty
-        if (Array.isArray(item.roles) && item.roles.length > 0) {
-          return item.roles;
-        }
-
-        // Check local storage dedicated roles key
-        const userKey = (fallbackUsername || targetUsername || cleanRangerId).toLowerCase();
-        try {
-          const savedRoles = localStorage.getItem(`greenpass_ranger_roles_${userKey}`);
-          if (savedRoles) {
-            const parsed = JSON.parse(savedRoles);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              return parsed;
-            }
-          }
-        } catch (e) {}
-
-        // Default: By system design, newly created rangers have all 4 roles enabled
-        return [
-          "สแกนแสตมป์",
-          "ประกาศข่าวสาร",
-          "แก้ไขรายละเอียด",
-          "รายงานความคืบหน้าของเหตุการณ์"
-        ];
-      };
-
-      // 1. Try getRangerByUsername from MySQL DB API (Primary Source of Truth)
       try {
-        const usernamesToTry = [
-          targetUsername,
-          targetUsername.toLowerCase(),
-          targetUsername.toUpperCase(),
-          cleanRangerId,
-          cleanRangerId.toLowerCase()
-        ];
-        const uniqueUsernames = Array.from(new Set(usernamesToTry));
+        const cleanRangerId = String(rangerId).trim();
+        const lowerRangerId = cleanRangerId.toLowerCase();
 
-        for (const u of uniqueUsernames) {
+        // Normalize target username for API calls
+        let targetUsername = cleanRangerId;
+        if (lowerRangerId.startsWith("ranger")) {
+          targetUsername = lowerRangerId;
+        } else if (/^\d+$/.test(cleanRangerId) && cleanRangerId.length <= 2) {
+          targetUsername = `ranger${cleanRangerId.padStart(2, "0")}`;
+        } else {
+          // If it's a numeric timestamp ID (from local storage mock), check greenpass_rangers for real username/employeeId
           try {
-            const res = await rangerApi.getRangerByUsername(u);
-            const item = res?.result || res?.data;
-            if (res && (res.success || res.status) && item) {
-              const activeRoles = computeRoles(item, item.username || u);
+            const saved = localStorage.getItem("greenpass_rangers");
+            if (saved) {
+              const list = JSON.parse(saved);
+              const found = list.find((r: any) => String(r.id) === cleanRangerId);
+              if (found && (found.username || found.employeeId)) {
+                targetUsername = String(found.username || found.employeeId).trim();
+              }
+            }
+          } catch (e) {}
+        }
+
+        // Helper to compute roles list from API item or local storage object
+        const computeRoles = (item: any, fallbackUsername?: string): string[] => {
+          // If boolean flags exist on the object, use them directly (authoritative from DB)
+          const hasFlags = (
+            item.canIssueStamp !== undefined ||
+            item.canAnnouncement !== undefined ||
+            item.canEditParkDetails !== undefined ||
+            item.canProgressReport !== undefined
+          );
+          if (hasFlags) {
+            return [
+              Boolean(item.canIssueStamp) && "สแกนแสตมป์",
+              Boolean(item.canAnnouncement) && "ประกาศข่าวสาร",
+              Boolean(item.canEditParkDetails) && "แก้ไขรายละเอียด",
+              Boolean(item.canProgressReport) && "รายงานความคืบหน้าของเหตุการณ์"
+            ].filter(Boolean) as string[];
+          }
+
+          // If explicit roles array exists and not empty
+          if (Array.isArray(item.roles) && item.roles.length > 0) {
+            return item.roles;
+          }
+
+          // Check local storage dedicated roles key
+          const userKey = (fallbackUsername || targetUsername || cleanRangerId).toLowerCase();
+          try {
+            const savedRoles = localStorage.getItem(`greenpass_ranger_roles_${userKey}`);
+            if (savedRoles) {
+              const parsed = JSON.parse(savedRoles);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+              }
+            }
+          } catch (e) {}
+
+          // Default: By system design, newly created rangers have all 4 roles enabled
+          return [
+            "สแกนแสตมป์",
+            "ประกาศข่าวสาร",
+            "แก้ไขรายละเอียด",
+            "รายงานความคืบหน้าของเหตุการณ์"
+          ];
+        };
+
+        // 1. Try getRangerByUsername from MySQL DB API (Primary Source of Truth)
+        try {
+          const usernamesToTry = [
+            targetUsername,
+            targetUsername.toLowerCase(),
+            targetUsername.toUpperCase(),
+            cleanRangerId,
+            cleanRangerId.toLowerCase()
+          ];
+          const uniqueUsernames = Array.from(new Set(usernamesToTry));
+
+          for (const u of uniqueUsernames) {
+            try {
+              const res = await rangerApi.getRangerByUsername(u);
+              const item = res?.result || res?.data;
+              if (res && (res.success || res.status) && item) {
+                const activeRoles = computeRoles(item, item.username || u);
+                const mappedRanger: Ranger = {
+                  id: item.username || u,
+                  employeeId: (item.username || u).toUpperCase(),
+                  name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username || u,
+                  phone: item.mobilephone || "",
+                  email: item.email || "",
+                  position: normalizePosition(item.position),
+                  parkName: item.park?.name || "อุทยานแห่งชาติเขาใหญ่",
+                  firstName: item.firstname || "",
+                  lastName: item.surname || "",
+                  birthDate: formatThaiDate(item.birthDate),
+                  startDate: formatSlashDate(item.startDate),
+                  district: item.district || "-",
+                  subDistrict: item.subDistrict || "-",
+                  province: item.province || "-",
+                  zipcode: item.zipcode || "",
+                  gender: item.gender === 2 ? "หญิง" : "ชาย",
+                  signature: item.signature || "src/sig1.png",
+                  roles: activeRoles
+                };
+                setRanger(mappedRanger);
+
+                // Keep local storage in sync with DB data
+                try {
+                  const savedRangers = localStorage.getItem("greenpass_rangers");
+                  if (savedRangers) {
+                    const list = JSON.parse(savedRangers);
+                    const updatedList = list.map((r: any) => {
+                      const match =
+                        String(r.username || "").toLowerCase() === String(item.username || u).toLowerCase() ||
+                        String(r.employeeId || "").toLowerCase() === String(item.username || u).toLowerCase() ||
+                        String(r.id || "").toLowerCase() === cleanRangerId.toLowerCase();
+                      if (match) {
+                        return {
+                          ...r,
+                          ...mappedRanger,
+                          roles: activeRoles,
+                          canIssueStamp: Boolean(item.canIssueStamp),
+                          canAnnouncement: Boolean(item.canAnnouncement),
+                          canEditParkDetails: Boolean(item.canEditParkDetails),
+                          canProgressReport: Boolean(item.canProgressReport)
+                        };
+                      }
+                      return r;
+                    });
+                    localStorage.setItem("greenpass_rangers", JSON.stringify(updatedList));
+                  }
+                  localStorage.setItem(`greenpass_ranger_detail_${cleanRangerId}`, JSON.stringify(mappedRanger));
+                  localStorage.setItem(`greenpass_ranger_roles_${String(item.username || u).toLowerCase()}`, JSON.stringify(activeRoles));
+                } catch (e) {}
+
+                return;
+              }
+            } catch (e) {}
+          }
+        } catch (err) {
+          console.warn("Could not fetch ranger by username:", err);
+        }
+
+        // 2. Try getAllRangers from MySQL DB API
+        try {
+          const response = await rangerApi.getAllRangers();
+          const rawList = response?.result || response?.data || (Array.isArray(response) ? response : []);
+          if (Array.isArray(rawList)) {
+            const found = rawList.find((item: any) => {
+              const u = String(item.username || "").toLowerCase();
+              const emp = String(item.employeeId || "").toLowerCase();
+              const i = String(item.id || "").toLowerCase();
+              return (
+                u === lowerRangerId ||
+                emp === lowerRangerId ||
+                i === lowerRangerId ||
+                u === targetUsername.toLowerCase() ||
+                emp === targetUsername.toLowerCase()
+              );
+            });
+            if (found) {
+              const activeRoles = computeRoles(found, found.username);
               const mappedRanger: Ranger = {
-                id: item.username || u,
-                employeeId: (item.username || u).toUpperCase(),
-                name: `${item.firstname || ""} ${item.surname || ""}`.trim() || item.username || u,
-                phone: item.mobilephone || "",
-                email: item.email || "",
-                position: normalizePosition(item.position),
-                parkName: item.park?.name || "อุทยานแห่งชาติเขาใหญ่",
-                firstName: item.firstname || "",
-                lastName: item.surname || "",
-                birthDate: formatThaiDate(item.birthDate),
-                startDate: formatSlashDate(item.startDate),
-                district: item.district || "-",
-                subDistrict: item.subDistrict || "-",
-                province: item.province || "-",
-                zipcode: item.zipcode || "",
-                gender: item.gender === 2 ? "หญิง" : "ชาย",
-                signature: item.signature || "src/sig1.png",
+                id: found.username,
+                employeeId: found.username.toUpperCase(),
+                name: `${found.firstname || ""} ${found.surname || ""}`.trim() || found.username,
+                phone: found.mobilephone || "",
+                email: found.email || "",
+                position: normalizePosition(found.position),
+                parkName: found.park?.name || "อุทยานแห่งชาติ",
+                firstName: found.firstname || "",
+                lastName: found.surname || "",
+                birthDate: formatThaiDate(found.birthDate),
+                startDate: formatSlashDate(found.startDate),
+                district: found.district || "-",
+                subDistrict: found.subDistrict || "-",
+                province: found.province || "-",
+                zipcode: found.zipcode || "",
+                gender: found.gender === 2 ? "หญิง" : "ชาย",
+                signature: found.signature || "src/sig1.png",
                 roles: activeRoles
               };
               setRanger(mappedRanger);
 
-              // Keep local storage in sync with DB data
               try {
-                const savedRangers = localStorage.getItem("greenpass_rangers");
-                if (savedRangers) {
-                  const list = JSON.parse(savedRangers);
-                  const updatedList = list.map((r: any) => {
-                    const match =
-                      String(r.username || "").toLowerCase() === String(item.username || u).toLowerCase() ||
-                      String(r.employeeId || "").toLowerCase() === String(item.username || u).toLowerCase() ||
-                      String(r.id || "").toLowerCase() === cleanRangerId.toLowerCase();
-                    if (match) {
-                      return {
-                        ...r,
-                        ...mappedRanger,
-                        roles: activeRoles,
-                        canIssueStamp: Boolean(item.canIssueStamp),
-                        canAnnouncement: Boolean(item.canAnnouncement),
-                        canEditParkDetails: Boolean(item.canEditParkDetails),
-                        canProgressReport: Boolean(item.canProgressReport)
-                      };
-                    }
-                    return r;
-                  });
-                  localStorage.setItem("greenpass_rangers", JSON.stringify(updatedList));
-                }
                 localStorage.setItem(`greenpass_ranger_detail_${cleanRangerId}`, JSON.stringify(mappedRanger));
-                localStorage.setItem(`greenpass_ranger_roles_${String(item.username || u).toLowerCase()}`, JSON.stringify(activeRoles));
+                localStorage.setItem(`greenpass_ranger_roles_${String(found.username).toLowerCase()}`, JSON.stringify(activeRoles));
               } catch (e) {}
 
               return;
             }
-          } catch (e) {}
-        }
-      } catch (err) {
-        console.warn("Could not fetch ranger by username:", err);
-      }
+          }
+        } catch (e) {}
 
-      // 2. Try getAllRangers from MySQL DB API
-      try {
-        const response = await rangerApi.getAllRangers();
-        const rawList = response?.result || response?.data || (Array.isArray(response) ? response : []);
-        if (Array.isArray(rawList)) {
-          const found = rawList.find((item: any) => {
-            const u = String(item.username || "").toLowerCase();
-            const emp = String(item.employeeId || "").toLowerCase();
-            const i = String(item.id || "").toLowerCase();
-            return (
-              u === lowerRangerId ||
-              emp === lowerRangerId ||
-              i === lowerRangerId ||
-              u === targetUsername.toLowerCase() ||
-              emp === targetUsername.toLowerCase()
+        // 3. Check local storage "greenpass_rangers" list (Fallback for offline/local mocks)
+        const savedRangers = localStorage.getItem("greenpass_rangers");
+        if (savedRangers) {
+          try {
+            const list: Ranger[] = JSON.parse(savedRangers);
+            const found = list.find((r: any) => 
+              String(r.id).toLowerCase() === lowerRangerId ||
+              String(r.username || "").toLowerCase() === lowerRangerId ||
+              String(r.employeeId || "").toLowerCase() === lowerRangerId ||
+              `pr${r.id}`.toLowerCase() === lowerRangerId ||
+              String(r.username || "").toLowerCase() === targetUsername.toLowerCase()
             );
-          });
-          if (found) {
-            const activeRoles = computeRoles(found, found.username);
-            const mappedRanger: Ranger = {
-              id: found.username,
-              employeeId: found.username.toUpperCase(),
-              name: `${found.firstname || ""} ${found.surname || ""}`.trim() || found.username,
-              phone: found.mobilephone || "",
-              email: found.email || "",
-              position: normalizePosition(found.position),
-              parkName: found.park?.name || "อุทยานแห่งชาติ",
-              firstName: found.firstname || "",
-              lastName: found.surname || "",
-              birthDate: formatThaiDate(found.birthDate),
-              startDate: formatSlashDate(found.startDate),
-              district: found.district || "-",
-              subDistrict: found.subDistrict || "-",
-              province: found.province || "-",
-              zipcode: found.zipcode || "",
-              gender: found.gender === 2 ? "หญิง" : "ชาย",
-              signature: found.signature || "src/sig1.png",
-              roles: activeRoles
-            };
-            setRanger(mappedRanger);
-
-            try {
-              localStorage.setItem(`greenpass_ranger_detail_${cleanRangerId}`, JSON.stringify(mappedRanger));
-              localStorage.setItem(`greenpass_ranger_roles_${String(found.username).toLowerCase()}`, JSON.stringify(activeRoles));
-            } catch (e) {}
-
-            return;
+            if (found) {
+              const activeRoles = computeRoles(found, found.username || found.employeeId);
+              setRanger({
+                ...found,
+                roles: activeRoles
+              });
+              return;
+            }
+          } catch (e) {
+            console.error(e);
           }
         }
-      } catch (e) {}
 
-      // 3. Check local storage "greenpass_rangers" list (Fallback for offline/local mocks)
-      const savedRangers = localStorage.getItem("greenpass_rangers");
-      if (savedRangers) {
-        try {
-          const list: Ranger[] = JSON.parse(savedRangers);
-          const found = list.find((r: any) => 
-            String(r.id).toLowerCase() === lowerRangerId ||
-            String(r.username || "").toLowerCase() === lowerRangerId ||
-            String(r.employeeId || "").toLowerCase() === lowerRangerId ||
-            `pr${r.id}`.toLowerCase() === lowerRangerId ||
-            String(r.username || "").toLowerCase() === targetUsername.toLowerCase()
-          );
-          if (found) {
-            const activeRoles = computeRoles(found, found.username || found.employeeId);
+        // 4. Check local storage individual key "greenpass_ranger_detail_" + rangerId
+        const savedIndividual = localStorage.getItem(`greenpass_ranger_detail_${cleanRangerId}`);
+        if (savedIndividual) {
+          try {
+            const parsed = JSON.parse(savedIndividual);
+            const activeRoles = computeRoles(parsed, parsed.username || cleanRangerId);
             setRanger({
-              ...found,
+              ...parsed,
               roles: activeRoles
             });
             return;
-          }
-        } catch (e) {
-          console.error(e);
+          } catch (e) {}
         }
-      }
 
-      // 4. Check local storage individual key "greenpass_ranger_detail_" + rangerId
-      const savedIndividual = localStorage.getItem(`greenpass_ranger_detail_${cleanRangerId}`);
-      if (savedIndividual) {
-        try {
-          const parsed = JSON.parse(savedIndividual);
-          const activeRoles = computeRoles(parsed, parsed.username || cleanRangerId);
-          setRanger({
-            ...parsed,
-            roles: activeRoles
-          });
+        // 5. Check DEFAULT_RANGERS
+        const defFound = DEFAULT_RANGERS.find(r => 
+          r.id.toLowerCase() === lowerRangerId || 
+          r.id.toLowerCase() === targetUsername.toLowerCase() || 
+          `pr${r.id}`.toLowerCase() === lowerRangerId ||
+          `pr${r.id}`.toLowerCase() === targetUsername.toLowerCase()
+        );
+        if (defFound) {
+          setRanger(defFound);
           return;
-        } catch (e) {}
-      }
+        }
 
-      // 5. Check DEFAULT_RANGERS
-      const defFound = DEFAULT_RANGERS.find(r => 
-        r.id.toLowerCase() === lowerRangerId || 
-        r.id.toLowerCase() === targetUsername.toLowerCase() || 
-        `pr${r.id}`.toLowerCase() === lowerRangerId ||
-        `pr${r.id}`.toLowerCase() === targetUsername.toLowerCase()
-      );
-      if (defFound) {
-        setRanger(defFound);
-        return;
+        // 6. Fallback so page NEVER renders empty
+        setRanger({
+          id: cleanRangerId,
+          employeeId: cleanRangerId.length <= 4 ? `PR${cleanRangerId.replace(/^pr/i, "")}` : cleanRangerId.toUpperCase(),
+          name: "สมชาย ใจดี",
+          firstName: "สมชาย",
+          lastName: "ใจดี",
+          birthDate: "15 ต.ค. 2547",
+          position: "หัวหน้าอุทยาน",
+          parkName: "อุทยานแห่งชาติเขาใหญ่",
+          startDate: "15/10/2566",
+          district: "ปากช่อง",
+          subDistrict: "ปากช่อง",
+          province: "นครราชสีมา",
+          zipcode: "30130",
+          gender: "ชาย",
+          phone: "065-5249531",
+          email: "ranger@greenpass.th",
+          signature: "src/sig1.png",
+          roles: computeRoles({}, cleanRangerId)
+        });
+      } finally {
+        setLoading(false);
       }
-
-      // 6. Fallback so page NEVER renders empty
-      setRanger({
-        id: cleanRangerId,
-        employeeId: cleanRangerId.length <= 4 ? `PR${cleanRangerId.replace(/^pr/i, "")}` : cleanRangerId.toUpperCase(),
-        name: "สมชาย ใจดี",
-        firstName: "สมชาย",
-        lastName: "ใจดี",
-        birthDate: "15 ต.ค. 2547",
-        position: "หัวหน้าอุทยาน",
-        parkName: "อุทยานแห่งชาติเขาใหญ่",
-        startDate: "15/10/2566",
-        district: "ปากช่อง",
-        subDistrict: "ปากช่อง",
-        province: "นครราชสีมา",
-        zipcode: "30130",
-        gender: "ชาย",
-        phone: "065-5249531",
-        email: "ranger@greenpass.th",
-        signature: "src/sig1.png",
-        roles: computeRoles({}, cleanRangerId)
-      });
-      setLoading(false);
     };
 
     fetchRangerData();

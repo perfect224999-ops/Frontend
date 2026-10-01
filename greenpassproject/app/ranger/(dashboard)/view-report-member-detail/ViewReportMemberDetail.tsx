@@ -28,6 +28,9 @@ import {
   AlertTriangle 
 } from "lucide-react";
 
+// ==========================================
+// 1. Interface & Types (โครงสร้างข้อมูลของรายงาน)
+// ==========================================
 interface MemberReport {
   id: string;
   reportDate: string;
@@ -48,6 +51,13 @@ interface MemberReport {
   isSevere?: boolean;
 }
 
+// ==========================================
+// 2. Helper Functions (ฟังก์ชันช่วยเหลือ)
+// ==========================================
+
+/**
+ * ดึงวันที่ปัจจุบันในรูปแบบ พ.ศ. (เช่น "02/10/2569")
+ */
 const getTodayThaiDate = () => {
   const now = new Date();
   const day = String(now.getDate()).padStart(2, "0");
@@ -56,6 +66,9 @@ const getTodayThaiDate = () => {
   return `${day}/${month}/${year}`;
 };
 
+/**
+ * จัดการแปลง URL รูปภาพที่ได้จาก Backend หรือ Local ให้เป็น Full Path ที่ใช้งานได้
+ */
 const resolveReportImageUrl = (img?: string | null) => {
   if (!img || img === "-" || img === "null" || img === "undefined" || img.trim() === "") {
     return null;
@@ -115,30 +128,39 @@ const INITIAL_REPORTS: MemberReport[] = [
   }
 ];
 
+// ==========================================
+// 3. Main Component (คอมโพเนนต์หลัก)
+// ==========================================
 function ViewReportMemberDetailContent() {
+  // --- Hooks สำหรับการนำทางและการอ่าน URL Parameter ---
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reportId = searchParams.get("id");
+  const reportId = searchParams.get("id"); // อ่าน ID ของรายงานจาก Query Parameter (?id=...)
 
+  // --- State สำหรับเก็บข้อมูลรายงาน ---
   const [reports, setReports] = useState<MemberReport[]>([]);
-  const [currentReport, setCurrentReport] = useState<MemberReport | null>(null);
+  const [currentReport, setCurrentReport] = useState<MemberReport | null>(null); // รายงานชิ้นที่กำลังเลือกดู
 
-  const [status, setStatus] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [completedDate, setCompletedDate] = useState("");
-  const [progressText, setProgressText] = useState("");
-  const [progressImage, setProgressImage] = useState<string | null>(null);
-  const [replyHistory, setReplyHistory] = useState<any[]>([]);
+  // --- State สำหรับฟอร์มอัปเดตความคืบหน้า ---
+  const [status, setStatus] = useState("");                     // สถานะปัจจุบัน (แจ้งรายงาน / กำลังดำเนินการ / ดำเนินการแก้ไขสำเร็จ)
+  const [startDate, setStartDate] = useState("");               // วันที่เริ่มดำเนินการ
+  const [completedDate, setCompletedDate] = useState("");       // วันที่ดำเนินการเสร็จสิ้น
+  const [progressText, setProgressText] = useState("");         // ข้อความบันทึกความคืบหน้า (Note/Reply)
+  const [progressImage, setProgressImage] = useState<string | null>(null); // รูปภาพความคืบหน้าที่อัปโหลด
+  const [replyHistory, setReplyHistory] = useState<any[]>([]);  // ประวัติการตอบกลับ/อัปเดตสถานะย้อนหลัง
   
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [canProgressReport, setCanProgressReport] = useState(true);
-  const [selectedZoomImage, setSelectedZoomImage] = useState<string | null>(null);
+  // --- State ควบคุม UI และการแสดงผล ---
+  const [error, setError] = useState("");                         // ข้อความ Error
+  const [success, setSuccess] = useState("");                     // ข้อความแจ้งบันทึกสำเร็จ
+  const [isLoading, setIsLoading] = useState(false);              // ตัวระบุว่ากำลังบันทึก/ดึงข้อมูลอยู่หรือไม่
+  const [canProgressReport, setCanProgressReport] = useState(true);// สิทธิ์ของเจ้าหน้าที่ในการอัปเดตรายงาน
+  const [selectedZoomImage, setSelectedZoomImage] = useState<string | null>(null); // รูปภาพที่คลิกเปิดดูแบบขยายใหญ่
 
+  // --- State ข้อมูลเจ้าหน้าที่ที่เข้าสู่ระบบปัจจุบัน ---
   const [currentLoggedInUsername, setCurrentLoggedInUsername] = useState<string>("");
   const [currentLoggedInName, setCurrentLoggedInName] = useState<string>("");
 
+  // 🔹 Effect: ดึงข้อมูลเจ้าหน้าที่ที่ล็อกอินจาก localStorage ตอนโหลดหน้าครั้งแรก
   useEffect(() => {
     if (typeof window !== "undefined") {
       const u = localStorage.getItem("ranger_username") || localStorage.getItem("username") || "";
@@ -148,6 +170,10 @@ function ViewReportMemberDetailContent() {
     }
   }, []);
 
+  /**
+   * 🔹 ฟังก์ชันจัดการอัปโหลดรูปภาพความคืบหน้า
+   * แปลงไฟล์รูปภาพเป็น Base64 Data URL และตรวจขนาดไม่ให้เกิน 10MB
+   */
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -162,6 +188,7 @@ function ViewReportMemberDetailContent() {
     reader.readAsDataURL(file);
   };
 
+  // 🔹 Effect: ตรวจสอบสิทธิ์การใช้งานจาก ranger_roles ใน localStorage
   useEffect(() => {
     const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
     if (savedRoles) {
@@ -174,10 +201,12 @@ function ViewReportMemberDetailContent() {
     }
   }, []);
 
+  // 🔹 Effect: โหลดข้อมูลรายละเอียดรายงานจาก Backend API (หรือ LocalStorage Fallback)
   useEffect(() => {
     async function loadReport() {
       if (reportId && !isNaN(Number(reportId))) {
         try {
+          // ดึงข้อมูลรายงานจาก Backend ตาม ID
           const res = await reportApi.getReportById(Number(reportId));
           const data = res && res.success ? (res.result || res.data) : null;
           if (data) {
@@ -187,6 +216,7 @@ function ViewReportMemberDetailContent() {
               dateStr = `${d}/${m}/${Number(y) + 543}`;
             }
 
+            // แปลงสถานะจาก Backend (Pending/InProgress/Completed) เป็นภาษาไทย
             const currentStatusStr = data.status === "Pending" ? "แจ้งรายงาน" : data.status === "InProgress" ? "กำลังดำเนินการ" : data.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : data.status || "แจ้งรายงาน";
             const isCompleted = currentStatusStr === "ดำเนินการแก้ไขสำเร็จ";
             const isInProgress = currentStatusStr === "กำลังดำเนินการ" || isCompleted;
@@ -209,7 +239,7 @@ function ViewReportMemberDetailContent() {
               assignedRangerUsername = data.parkRangerUsername || null;
             }
 
-            // ดึงประวัติ ReplyReport
+            // ดึงประวัติการตอบกลับ / อัปเดตงาน (ReplyReport)
             try {
               const replyRes = await replyReportApi.getReplyReports(Number(reportId));
               const logs = Array.isArray(replyRes)
@@ -226,7 +256,7 @@ function ViewReportMemberDetailContent() {
                 if (lastProg && !lastProg.startsWith("Status updated to")) {
                   setProgressText(lastProg);
                 }
-                // หากใน Report ยังไม่มี rangerUsername ให้ตรวจสอบจากประวัติ Reply
+                // หากใน Report ยังไม่มี rangerUsername ให้ตรวจสอบจากประวัติ Reply ย้อนหลัง
                 if (!assignedRangerUsername) {
                   for (const l of logs) {
                     const rUser = l.parkRangerUsername || l.park_ranger_username || l.username;
@@ -277,6 +307,7 @@ function ViewReportMemberDetailContent() {
         }
       }
 
+      // ถ้าดึงจาก API ไม่สำเร็จ ให้ใช้ข้อมูลจาก localStorage หรือ Mock Data
       const saved = localStorage.getItem("greenpass_member_reports");
       let allReports: MemberReport[] = [];
       if (saved) {
@@ -317,6 +348,7 @@ function ViewReportMemberDetailContent() {
     }
     loadReport();
 
+    // 🔹 ฟัง Event อัปเดตข้อมูลสดแบบ Real-time (เมื่อมีการตอบกลับใหม่เข้ามา)
     const handleLiveReply = (e: any) => {
       const incoming = e.detail;
       const incomingReportId = incoming?.report?.reportId || incoming?.reportId || incoming?.report_id;
@@ -344,6 +376,10 @@ function ViewReportMemberDetailContent() {
   const isAssignedToMe = true;
   const isUnassigned = !currentReport?.rangerUsername || currentReport.ranger === "ยังไม่มีผู้รับผิดชอบ";
 
+  /**
+   * 🔹 ฟังก์ชันจัดการเมื่อเปลี่ยนตัวเลือกสถานะใน Dropdown
+   * พร้อมเช็คเงื่อนไขห้ามข้ามขั้นตอน (ต้องเปลี่ยนเป็น 'กำลังดำเนินการ' ก่อน 'ดำเนินการแก้ไขสำเร็จ')
+   */
   const handleStatusChange = (newStatus: string) => {
     if (!canProgressReport) return;
 
@@ -379,6 +415,9 @@ function ViewReportMemberDetailContent() {
     }
   };
 
+  /**
+   * 🔹 ฟังก์ชันบันทึกการอัปเดตสถานะและข้อความความคืบหน้าไปยัง Backend API
+   */
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canProgressReport) return;
@@ -418,6 +457,7 @@ function ViewReportMemberDetailContent() {
     setIsLoading(true);
     try {
       if (reportId && !isNaN(Number(reportId))) {
+        // ยิง API อัปเดตสถานะและส่งบันทึกความคืบหน้า
         const res = await reportApi.updateReportStatus(
           Number(reportId), 
           backendStatus, 
@@ -439,6 +479,7 @@ function ViewReportMemberDetailContent() {
           : "บันทึกและอัปเดตสถานะรายงานเรียบร้อย"
       );
 
+      // เมื่อบันทึกสำเร็จ ให้รอ 1.3 วินาที แล้วกลับไปยังหน้ารายการรายงาน
       setTimeout(() => {
         router.push("/ranger/list-report-member");
       }, 1300);
