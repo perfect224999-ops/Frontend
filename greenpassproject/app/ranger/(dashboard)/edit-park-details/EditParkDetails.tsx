@@ -232,8 +232,11 @@ export default function EditParkDetails() {
             } catch (e) {}
           }
 
-          setIsSeasonalPark(dbPark.isSeasonalPark !== undefined ? Boolean(dbPark.isSeasonalPark) : Boolean(parsedSaved?.isSeasonalPark));
-          setIsTemporaryClosed(dbPark.isTemporaryClosed !== undefined ? Boolean(dbPark.isTemporaryClosed) : Boolean(parsedSaved?.isTemporaryClosed));
+          const seasonalVal = dbPark.isSeasonalPark !== undefined ? Boolean(dbPark.isSeasonalPark) : Boolean(parsedSaved?.isSeasonalPark);
+          const tempClosedVal = dbPark.isTemporaryClosed !== undefined ? Boolean(dbPark.isTemporaryClosed) : Boolean(parsedSaved?.isTemporaryClosed);
+
+          setIsSeasonalPark(seasonalVal);
+          setIsTemporaryClosed(seasonalVal ? false : tempClosedVal);
           setSeasonOpenDate(dbPark.seasonOpenDate || parsedSaved?.seasonOpenDate || "2026-01-01");
           setSeasonCloseDate(dbPark.seasonCloseDate || parsedSaved?.seasonCloseDate || "2026-12-31");
         }
@@ -596,7 +599,13 @@ export default function EditParkDetails() {
             <input
               type="checkbox"
               checked={isSeasonalPark}
-              onChange={(e) => setIsSeasonalPark(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsSeasonalPark(checked);
+                if (checked) {
+                  setIsTemporaryClosed(false);
+                }
+              }}
               className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
             />
             <div>
@@ -617,7 +626,13 @@ export default function EditParkDetails() {
             <input
               type="checkbox"
               checked={isTemporaryClosed}
-              onChange={(e) => setIsTemporaryClosed(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsTemporaryClosed(checked);
+                if (checked) {
+                  setIsSeasonalPark(false);
+                }
+              }}
               className="w-5 h-5 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
             />
             <div>
