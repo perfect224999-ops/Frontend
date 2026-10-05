@@ -474,11 +474,8 @@ export default function ListNews() {
               <Trash2 className="w-7 h-7" />
             </div>
 
-            <div className="space-y-2">
-              <h4 className="text-base font-extrabold text-slate-900">ยืนยันการลบประกาศข่าวสาร</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                คุณแน่ใจหรือว่าต้องการลบข่าวสารประกาศนี้ออกจากระบบข้อมูลของอุทยาน? การดำเนินการนี้ไม่สามารถยกเลิกได้
-              </p>
+            <div>
+              <h4 className="text-base font-extrabold text-slate-900">ยืนยันการลบประกาศข่าวสารหรือไม่ ?</h4>
             </div>
 
             <div className="flex items-center justify-center gap-3 pt-1">

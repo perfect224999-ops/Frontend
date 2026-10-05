@@ -100,10 +100,10 @@ function SetRoleContent() {
             found.canProgressReport !== undefined
           );
 
-          let stamp = true;
-          let announce = true;
-          let edit = true;
-          let rep = true;
+          let stamp = false;
+          let announce = false;
+          let edit = false;
+          let rep = false;
 
           if (hasFlags) {
             stamp = Boolean(found.canIssueStamp);

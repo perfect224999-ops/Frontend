@@ -405,6 +405,10 @@ export default function AddParkRangerPage() {
         gender: genderInt,
         phone: cleanPhone,
         email: cleanEmail,
+        canAnnouncement: false,
+        canIssueStamp: false,
+        canProgressReport: false,
+        canEditParkDetails: false,
         signature: signature.trim() || "src/sig1.png"
       });
 
@@ -419,12 +423,7 @@ export default function AddParkRangerPage() {
         }
       }
 
-      const defaultRoles = [
-        "สแกนแสตมป์",
-        "ประกาศข่าวสาร",
-        "แก้ไขรายละเอียด",
-        "รายงานความคืบหน้าของเหตุการณ์"
-      ];
+      const defaultRoles: string[] = [];
 
       const createdTimestamp = Date.now();
 
@@ -449,11 +448,11 @@ export default function AddParkRangerPage() {
         email: cleanEmail,
         signature: signature.trim() || "src/sig1.png",
         role: position,
-        roles: defaultRoles,
-        canIssueStamp: true,
-        canAnnouncement: true,
-        canEditParkDetails: true,
-        canProgressReport: true,
+        roles: [],
+        canIssueStamp: false,
+        canAnnouncement: false,
+        canEditParkDetails: false,
+        canProgressReport: false,
         status: "Active",
         createdAt: createdTimestamp,
         createdTimestamp: createdTimestamp

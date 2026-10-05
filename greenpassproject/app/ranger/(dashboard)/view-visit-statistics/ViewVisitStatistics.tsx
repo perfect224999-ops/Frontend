@@ -14,7 +14,8 @@ import {
   BarChart3, 
   Sparkles,
   ArrowUpRight,
-  PieChart
+  PieChart,
+  Filter
 } from "lucide-react";
 
 interface HistoryItem {
@@ -31,6 +32,11 @@ interface PeriodStats {
 }
 
 const MONTH_LABELS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const FULL_MONTH_NAMES = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", 
+  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", 
+  "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+];
 const YEARS_LIST = ["ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"];
 
 const createEmptyMonthlyHistory = (): HistoryItem[] =>
@@ -60,6 +66,8 @@ const createInitialYearlyStats = (): PeriodStats => ({
 export default function ViewVisitStatistics() {
   const [filter, setFilter] = useState<"monthly" | "yearly">("monthly");
   const [selectedYear, setSelectedYear] = useState<string>("ปี 2026");
+  const [startMonth, setStartMonth] = useState<number>(0); // 0 = ม.ค.
+  const [endMonth, setEndMonth] = useState<number>(11); // 11 = ธ.ค.
   const [parkName, setParkName] = useState<string>("อุทยานแห่งชาติ");
   const [parkId, setParkId] = useState<number>(1);
 
@@ -154,9 +162,40 @@ export default function ViewVisitStatistics() {
     }
   };
 
-  const currentThaiCard = filter === "monthly" ? currentMonthlyStats.thai : yearlyStats.thai;
-  const currentForeignerCard = filter === "monthly" ? currentMonthlyStats.foreigner : yearlyStats.foreigner;
-  const currentTotalCard = filter === "monthly" ? currentMonthlyStats.total : yearlyStats.total;
+  const handleStartMonthChange = (newStart: number) => {
+    setStartMonth(newStart);
+    if (newStart > endMonth) {
+      setEndMonth(newStart);
+    }
+  };
+
+  const handleEndMonthChange = (newEnd: number) => {
+    setEndMonth(newEnd);
+    if (newEnd < startMonth) {
+      setStartMonth(newEnd);
+    }
+  };
+
+  // Logic for custom month range filtering
+  const isCustomRange = filter === "monthly" && (startMonth !== 0 || endMonth !== 11);
+  const rangeText = isCustomRange 
+    ? `ช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]}` 
+    : "12 เดือน";
+
+  const allMonthlyHistory = currentMonthlyStats.history || [];
+  const filteredMonthlyHistory = allMonthlyHistory.filter((_, idx) => idx >= startMonth && idx <= endMonth);
+
+  const currentThaiCard = filter === "monthly" 
+    ? filteredMonthlyHistory.reduce((acc, curr) => acc + curr.thai, 0) 
+    : yearlyStats.thai;
+
+  const currentForeignerCard = filter === "monthly" 
+    ? filteredMonthlyHistory.reduce((acc, curr) => acc + curr.foreigner, 0) 
+    : yearlyStats.foreigner;
+
+  const currentTotalCard = filter === "monthly" 
+    ? currentThaiCard + currentForeignerCard 
+    : yearlyStats.total;
 
   const getTitle = () => {
     if (filter === "monthly") return `สถิติจำนวนผู้เข้าชม${parkName}`;
@@ -165,18 +204,22 @@ export default function ViewVisitStatistics() {
 
   const getCardLabel = (type: "thai" | "foreigner" | "total") => {
     if (type === "thai") {
-      if (filter === "monthly") return `นักท่องเที่ยวชาวไทย (${currentSelectedYearLabel})`;
+      if (filter === "monthly") return `นักท่องเที่ยวชาวไทย (${rangeText} ${currentSelectedYearLabel})`;
       return `ชาวไทย (สะสมรวมทุกปี)`;
     }
     if (type === "foreigner") {
-      if (filter === "monthly") return `นักท่องเที่ยวชาวต่างชาติ (${currentSelectedYearLabel})`;
+      if (filter === "monthly") return `นักท่องเที่ยวชาวต่างชาติ (${rangeText} ${currentSelectedYearLabel})`;
       return `ชาวต่างชาติ (สะสมรวมทุกปี)`;
     }
-    if (filter === "monthly") return `ยอดรวมทั้งหมด 12 เดือน (${currentSelectedYearLabel})`;
+    if (filter === "monthly") {
+      return isCustomRange 
+        ? `ยอดรวมช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} (${currentSelectedYearLabel})`
+        : `ยอดรวมทั้งหมด 12 เดือน (${currentSelectedYearLabel})`;
+    }
     return `ยอดรวมสะสมสุทธิทุกปี`;
   };
 
-  const currentHistoryData = filter === "monthly" ? currentMonthlyStats.history : yearlyStats.history;
+  const currentHistoryData = filter === "monthly" ? filteredMonthlyHistory : yearlyStats.history;
   const thaiPercentage = Math.round((currentThaiCard / Math.max(1, currentTotalCard)) * 100);
   const foreignerPercentage = 100 - thaiPercentage;
 
@@ -231,65 +274,125 @@ export default function ViewVisitStatistics() {
         </div>
       </div>
 
-      {/* 2. YEAR SELECTION TOOLBAR (Shown in Monthly mode) */}
+      {/* 2. YEAR & MONTH RANGE SELECTION TOOLBAR (Shown in Monthly mode) */}
       {filter === "monthly" && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-slate-700">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <Calendar className="w-4 h-4" />
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 space-y-4">
+          
+          {/* Top Row: Year Selection */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3 text-slate-700">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-2xs">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">เลือกปีงบประมาณ / ปีกิจกรรม:</span>
+                <span className="text-[11px] text-slate-500">แสดงผลสถิติจำนวนผู้เข้าชมอุทยานประจำ{currentSelectedYearLabel}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-xs font-bold text-slate-900 block">เลือกปีงบประมาณ / ปีกิจกรรม:</span>
-              <span className="text-[11px] text-slate-500">แสดงผลเปรียบเทียบสถิติย้อนหลัง 12 เดือนประจำ{currentSelectedYearLabel}</span>
+
+            {/* Year Buttons & Arrows */}
+            <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+              <button
+                onClick={handlePrevYear}
+                disabled={activeYearIdx === 0}
+                className={`p-2 rounded-xl border transition-all ${
+                  activeYearIdx === 0 
+                    ? "opacity-30 border-slate-200 text-slate-400 cursor-not-allowed" 
+                    : "bg-white border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer shadow-2xs"
+                }`}
+                title="ปีก่อนหน้า"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-1.5 flex-wrap py-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {yearsList.map((yLabel) => {
+                  const isActive = yLabel === currentSelectedYearLabel;
+                  return (
+                    <button
+                      key={yLabel}
+                      onClick={() => setSelectedYear(yLabel)}
+                      className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        isActive 
+                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-105 border border-emerald-500" 
+                          : "bg-slate-100 text-slate-650 hover:bg-slate-200 border border-transparent"
+                      }`}
+                    >
+                      {yLabel}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={handleNextYear}
+                disabled={activeYearIdx === yearsList.length - 1}
+                className={`p-2 rounded-xl border transition-all ${
+                  activeYearIdx === yearsList.length - 1 
+                    ? "opacity-30 border-slate-200 text-slate-400 cursor-not-allowed" 
+                    : "bg-white border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer shadow-2xs"
+                }`}
+                title="ปีถัดไป"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          {/* Year Buttons & Arrows */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevYear}
-              disabled={activeYearIdx === 0}
-              className={`p-2 rounded-lg border transition-all ${
-                activeYearIdx === 0 
-                  ? "opacity-30 border-slate-200 text-slate-400 cursor-not-allowed" 
-                  : "bg-white border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer shadow-2xs"
-              }`}
-              title="ปีก่อนหน้า"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+          {/* Bottom Row: Month Range Selector & Quick Preset Shortcuts */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pt-1">
+            
+            {/* Custom Range Selectors */}
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-2 bg-emerald-50/80 px-3 py-2 rounded-xl border border-emerald-200/80">
+                <Filter className="w-4 h-4 text-emerald-700" />
+                <span className="font-extrabold text-emerald-950">เลือกช่วงเดือน:</span>
+              </div>
 
-            <div className="flex items-center gap-1.5">
-              {yearsList.map((yLabel) => {
-                const isActive = yLabel === currentSelectedYearLabel;
-                return (
-                  <button
-                    key={yLabel}
-                    onClick={() => setSelectedYear(yLabel)}
-                    className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
-                      isActive 
-                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-105 border border-emerald-500" 
-                        : "bg-slate-100 text-slate-650 hover:bg-slate-200 border border-transparent"
-                    }`}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-2xs hover:border-emerald-500 focus-within:border-emerald-500 transition-colors">
+                  <span className="text-[11px] font-bold text-slate-500">ตั้งแต่</span>
+                  <select
+                    value={startMonth}
+                    onChange={(e) => handleStartMonthChange(Number(e.target.value))}
+                    className="bg-transparent text-xs font-extrabold text-slate-800 focus:outline-none cursor-pointer"
                   >
-                    {yLabel}
-                  </button>
-                );
-              })}
-            </div>
+                    {MONTH_LABELS.map((m, idx) => (
+                      <option key={idx} value={idx}>
+                        {FULL_MONTH_NAMES[idx]} ({m})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <button
-              onClick={handleNextYear}
-              disabled={activeYearIdx === yearsList.length - 1}
-              className={`p-2 rounded-lg border transition-all ${
-                activeYearIdx === yearsList.length - 1 
-                  ? "opacity-30 border-slate-200 text-slate-400 cursor-not-allowed" 
-                  : "bg-white border-slate-300 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 cursor-pointer shadow-2xs"
-              }`}
-              title="ปีถัดไป"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+                <span className="text-slate-400 font-bold">-</span>
+
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-2xs hover:border-emerald-500 focus-within:border-emerald-500 transition-colors">
+                  <span className="text-[11px] font-bold text-slate-500">ถึงเดือน</span>
+                  <select
+                    value={endMonth}
+                    onChange={(e) => handleEndMonthChange(Number(e.target.value))}
+                    className="bg-transparent text-xs font-extrabold text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    {MONTH_LABELS.map((m, idx) => (
+                      <option key={idx} value={idx}>
+                        {FULL_MONTH_NAMES[idx]} ({m})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Active Range Summary Pill */}
+              <div className="px-3 py-1.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs flex items-center gap-1.5 shadow-xs">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                <span>
+                  {startMonth === 0 && endMonth === 11
+                    ? "แสดงทั้งปี (12 เดือน)"
+                    : `ช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} (${endMonth - startMonth + 1} เดือน)`}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -395,7 +498,9 @@ export default function ViewVisitStatistics() {
             <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <PieChart className="w-4 h-4 text-emerald-600" />
               {filter === "monthly" 
-                ? `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชม 12 เดือนประจำ${currentSelectedYearLabel}` 
+                ? isCustomRange
+                  ? `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชม ช่วงเดือน ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} ประจำ${currentSelectedYearLabel}`
+                  : `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชม 12 เดือนประจำ${currentSelectedYearLabel}` 
                 : `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชมรายปี (ทุกปีสะสม)`}
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">กราฟเปรียบเทียบปริมาณผู้เข้าชมอุทยานระหว่างชาวไทยและชาวต่างชาติ</p>
@@ -417,21 +522,21 @@ export default function ViewVisitStatistics() {
         {/* Dynamic Interactive Chart Container */}
         <div className="pt-4">
           {filter === "monthly" ? (
-            /* MONTHLY VIEW: 12 BARS */
-            <div className="h-64 flex items-end justify-between gap-1.5 sm:gap-2.5 pt-10 pb-4 px-3 sm:px-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 relative">
+            /* MONTHLY / PERIOD VIEW BARS */
+            <div className="h-64 flex items-end justify-around gap-1.5 sm:gap-2.5 pt-10 pb-4 px-3 sm:px-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 relative">
               
               {/* Background Grid Lines */}
               <div className="absolute inset-x-0 top-1/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
               <div className="absolute inset-x-0 top-2/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
               <div className="absolute inset-x-0 top-3/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
 
-              {currentMonthlyStats.history.map((item, idx) => {
-                const maxVal = Math.max(...currentMonthlyStats.history.map((h) => Math.max(h.thai, h.foreigner, 1)), 35);
+              {filteredMonthlyHistory.map((item, idx) => {
+                const maxVal = Math.max(...filteredMonthlyHistory.map((h) => Math.max(h.thai, h.foreigner, 1)), 35);
                 const thaiHeight = `${Math.min(100, Math.max(12, (item.thai / maxVal) * 100))}%`;
                 const foreignerHeight = `${Math.min(100, Math.max(12, (item.foreigner / maxVal) * 100))}%`;
                 
                 return (
-                  <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end relative group z-10">
+                  <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end relative group z-10 max-w-[120px]">
                     
                     {/* Glassmorphism Hover Tooltip */}
                     <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-slate-900/95 text-white text-[11px] py-1.5 px-3 rounded-xl whitespace-nowrap shadow-xl pointer-events-none z-30 font-medium backdrop-blur-md border border-slate-700/50 transform group-hover:-translate-y-1">
@@ -443,7 +548,7 @@ export default function ViewVisitStatistics() {
                     <div className="w-full flex justify-center items-end gap-1 sm:gap-1.5 h-[80%] pb-1">
                       
                       {/* Thai Bar (Green Gradient) */}
-                      <div className="flex flex-col items-center h-full justify-end w-2.5 sm:w-4 group/bar">
+                      <div className="flex flex-col items-center h-full justify-end w-3 sm:w-5 group/bar">
                         <span className="text-[8px] sm:text-[9px] font-bold text-emerald-800 mb-0.5 opacity-90 group-hover/bar:scale-110 transition-transform">
                           {item.thai}
                         </span>
@@ -454,7 +559,7 @@ export default function ViewVisitStatistics() {
                       </div>
 
                       {/* Foreigner Bar (Blue Gradient) */}
-                      <div className="flex flex-col items-center h-full justify-end w-2.5 sm:w-4 group/bar">
+                      <div className="flex flex-col items-center h-full justify-end w-3 sm:w-5 group/bar">
                         <span className="text-[8px] sm:text-[9px] font-bold text-sky-800 mb-0.5 opacity-90 group-hover/bar:scale-110 transition-transform">
                           {item.foreigner}
                         </span>
@@ -541,11 +646,11 @@ export default function ViewVisitStatistics() {
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide flex items-center gap-2.5">
             <Users className="w-5 h-5 text-emerald-600" />
-            ตารางตารางสรุปจำนวนสแตมป์ผู้เข้าชมอุทยาน ({filter === "monthly" ? `แยกรายเดือน 12 เดือนประจำ${currentSelectedYearLabel}` : "เปรียบเทียบในแต่ละปี"})
+            ตารางสรุปจำนวนสแตมป์ผู้เข้าชมอุทยาน ({filter === "monthly" ? (isCustomRange ? `ช่วงเดือน ${FULL_MONTH_NAMES[startMonth]} - ${FULL_MONTH_NAMES[endMonth]} ประจำ${currentSelectedYearLabel}` : `แยกรายเดือน 12 เดือนประจำ${currentSelectedYearLabel}`) : "เปรียบเทียบในแต่ละปี"})
           </h3>
         </div>
 
-        <div className="overflow-x-auto border border-slate-300 rounded-2xl shadow-sm">
+        <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border border-slate-300 rounded-2xl shadow-sm">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gradient-to-r from-[#042410] via-[#094721] to-[#042410] text-white text-sm sm:text-base">
@@ -595,7 +700,9 @@ export default function ViewVisitStatistics() {
             {/* Table Footer Total Summary */}
             <tfoot>
               <tr className="bg-slate-950 text-white font-extrabold text-sm sm:text-base border-t-2 border-slate-800">
-                <td className="py-4 px-6 uppercase tracking-wider text-emerald-300 font-extrabold">ยอดรวมสุทธิ ({filter === "monthly" ? currentSelectedYearLabel : "ทุกปีรวมกัน"})</td>
+                <td className="py-4 px-6 uppercase tracking-wider text-emerald-300 font-extrabold">
+                  ยอดรวมสุทธิ ({filter === "monthly" ? (isCustomRange ? `ช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} ${currentSelectedYearLabel}` : currentSelectedYearLabel) : "ทุกปีรวมกัน"})
+                </td>
                 <td className="py-4 px-6 text-center text-emerald-400 font-black text-base sm:text-lg">{currentThaiCard.toLocaleString()} คน</td>
                 <td className="py-4 px-6 text-center text-sky-300 font-black text-base sm:text-lg">{currentForeignerCard.toLocaleString()} คน</td>
                 <td className="py-4 px-6 text-center text-amber-300 font-black text-lg sm:text-xl">{currentTotalCard.toLocaleString()} คน</td>

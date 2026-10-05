@@ -215,13 +215,8 @@ function RangerDetailContent() {
             }
           } catch (e) {}
 
-          // Default: By system design, newly created rangers have all 4 roles enabled
-          return [
-            "สแกนแสตมป์",
-            "ประกาศข่าวสาร",
-            "แก้ไขรายละเอียด",
-            "รายงานความคืบหน้าของเหตุการณ์"
-          ];
+          // Default: Newly created rangers start with no assigned roles until Admin sets them
+          return [];
         };
 
         // 1. Try getRangerByUsername from MySQL DB API (Primary Source of Truth)

@@ -415,11 +415,8 @@ export default function ViewRewardAdminPage() {
             </div>
 
             {/* Modal Heading & Explanation */}
-            <div className="space-y-2">
-              <h4 className="text-base font-extrabold text-slate-900">ยืนยันการลบของรางวัล</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                คุณแน่ใจหรือไม่ว่าต้องการลบรายการของรางวัลนี้ออกจากระบบ? การดำเนินการนี้ไม่สามารถยกเลิกหรือกู้คืนได้
-              </p>
+            <div>
+              <h4 className="text-base font-extrabold text-slate-900">ยืนยันการลบของรางวัลหรือไม่?</h4>
             </div>
 
             {/* Action Buttons */}

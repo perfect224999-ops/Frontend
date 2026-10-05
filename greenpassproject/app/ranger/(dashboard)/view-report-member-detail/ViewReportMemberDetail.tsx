@@ -498,10 +498,6 @@ function ViewReportMemberDetailContent() {
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium">รหัสรายงาน:</span>
-          <span className="bg-slate-800 text-white text-xs font-mono font-bold px-3 py-1 rounded-full shadow-2xs">
-            #{currentReport.id}
-          </span>
           {currentReport.isSevere ? (
             <span className="bg-rose-100 text-rose-700 text-xs font-black px-3 py-1 rounded-full border border-rose-300 flex items-center gap-1 shadow-2xs animate-pulse">
               <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
@@ -648,24 +644,19 @@ function ViewReportMemberDetailContent() {
                   />
                 </div>
 
-                {/* Field: รายละเอียดสถานะพนักงาน / ดำเนินการ */}
+                {/* Field: สถานะพนักงาน */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" />
-                    รายละเอียดสถานะพนักงาน / ดำเนินการ <span className="text-rose-500">*</span>
+                    สถานะพนักงาน
                   </label>
-                  <select
-                    disabled={!canProgressReport || isInProgressDone}
-                    value={step2Status}
-                    onChange={(e) => setStep2Status(e.target.value)}
-                    className={`w-full bg-white text-slate-800 text-xs font-semibold px-4 py-3 rounded-xl border border-slate-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 focus:outline-none transition-all shadow-2xs ${
-                      (!canProgressReport || isInProgressDone) ? 'opacity-75 cursor-not-allowed bg-slate-100' : ''
-                    }`}
-                  >
-                    <option value="รับทราบ" disabled>รับทราบ (ยืนยันแล้ว)</option>
-                    <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
-                    <option value="ดำเนินการแก้ไขสำเร็จ" disabled>ดำเนินการแก้ไขสำเร็จ (อยู่ในขั้นตอนที่ 3)</option>
-                  </select>
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value="กำลังดำเนินการ"
+                    className="w-full bg-slate-100 text-slate-800 text-xs font-semibold px-4 py-3 rounded-xl border border-slate-200 cursor-not-allowed shadow-2xs select-none"
+                  />
                 </div>
 
                 {/* Field: รายละเอียดความคืบหน้า */}
@@ -814,24 +805,19 @@ function ViewReportMemberDetailContent() {
                   />
                 </div>
 
-                {/* Field: รายละเอียดสถานะพนักงาน / ดำเนินการ */}
+                {/* Field: สถานะพนักงาน */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    รายละเอียดสถานะพนักงาน / ดำเนินการ <span className="text-rose-500">*</span>
+                    สถานะพนักงาน
                   </label>
-                  <select
-                    disabled={!canProgressReport || isCompletedDone}
-                    value={step3Status}
-                    onChange={(e) => setStep3Status(e.target.value)}
-                    className={`w-full bg-white text-slate-800 text-xs font-semibold px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all shadow-2xs ${
-                      (!canProgressReport || isCompletedDone) ? 'opacity-75 cursor-not-allowed bg-slate-100' : ''
-                    }`}
-                  >
-                    <option value="รับทราบ" disabled>รับทราบ (ยืนยันแล้ว)</option>
-                    <option value="กำลังดำเนินการ" disabled>กำลังดำเนินการ (ยืนยันแล้ว)</option>
-                    <option value="ดำเนินการแก้ไขสำเร็จ">ดำเนินการแก้ไขสำเร็จ</option>
-                  </select>
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value="ดำเนินการแก้ไขสำเร็จ"
+                    className="w-full bg-slate-100 text-slate-800 text-xs font-semibold px-4 py-3 rounded-xl border border-slate-200 cursor-not-allowed shadow-2xs select-none"
+                  />
                 </div>
 
                 {/* Field: รายละเอียดผลการซ่อมแซมสำเร็จ */}
