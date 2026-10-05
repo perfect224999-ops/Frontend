@@ -147,15 +147,34 @@ export default function GlobalEmergencyAlert() {
   };
 
   // ----------------------------------------------------
-  // 🛑 ฟังก์ชันกดยืนยันรับทราบเหตุฉุกเฉิน (ปิด Modal และหยุดเสียง)
+  // 🛑 ฟังก์ชันกดยืนยันรับทราบเหตุฉุกเฉิน (ปิด Modal, หยุดเสียง และบันทึกสถานะเป็น "รับทราบ")
   // ----------------------------------------------------
-  const handleAcknowledgeEmergency = () => {
+  const handleAcknowledgeEmergency = async () => {
     stopEmergencySirenSound();
     if (activeEmergencyAlert) {
+      const reportId = activeEmergencyAlert.id;
+      const rangerUsername = (typeof window !== "undefined"
+        ? (localStorage.getItem("ranger_username") || localStorage.getItem("username") || "")
+        : "");
+
+      // อัปเดตสถานะใน Backend / API เป็น "Acknowledged" (รับทราบ)
+      if (reportId && !isNaN(Number(reportId))) {
+        try {
+          await reportApi.updateReportStatus(
+            Number(reportId),
+            "Acknowledged",
+            rangerUsername,
+            "เจ้าหน้าที่กดยอมรับและรับทราบเหตุฉุกเฉินจากหน้าจอแจ้งเตือนเรียบร้อยแล้ว"
+          );
+        } catch (err) {
+          console.warn("Could not sync report status acknowledgement to backend:", err);
+        }
+      }
+
       if (typeof window !== "undefined") {
         const ackList = JSON.parse(localStorage.getItem("greenpass_ack_reports") || "[]");
-        if (!ackList.includes(activeEmergencyAlert.id)) {
-          ackList.push(activeEmergencyAlert.id);
+        if (!ackList.includes(reportId)) {
+          ackList.push(reportId);
           localStorage.setItem("greenpass_ack_reports", JSON.stringify(ackList));
         }
         localStorage.removeItem("greenpass_emergency_alert");
@@ -163,9 +182,12 @@ export default function GlobalEmergencyAlert() {
         // แจ้งเตือนทุก Tab ปิดเสียงและปิด Modal พร้อมกัน
         try {
           const bc = new BroadcastChannel("greenpass_emergency_channel");
-          bc.postMessage({ type: "ACKNOWLEDGE", id: activeEmergencyAlert.id });
+          bc.postMessage({ type: "ACKNOWLEDGE", id: reportId });
           bc.close();
         } catch (e) {}
+
+        // กระจาย Event ให้หน้าต่างที่เปิดอยู่ (เช่น รายการรายงาน) รีโหลดข้อมูลสถานะใหม่เป็น "รับทราบ"
+        window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: { id: reportId, status: "Acknowledged" } }));
       }
       setActiveEmergencyAlert(null);
     }

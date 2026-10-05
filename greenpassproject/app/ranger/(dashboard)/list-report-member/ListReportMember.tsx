@@ -167,7 +167,7 @@ export default function ListReportMember() {
               id: reportIdStr,
               reportDate: dateStr || "วันนี้",
               category: r.typeName || r.type?.typeName || r.category || "ปกติ",
-              status: r.status === "Pending" ? "แจ้งรายงาน" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status || "แจ้งรายงาน",
+              status: r.status === "Pending" ? "แจ้งรายงาน" : (r.status === "Acknowledged" || r.status === "รับทราบ") ? "รับทราบ" : r.status === "InProgress" ? "กำลังดำเนินการ" : r.status === "Completed" ? "ดำเนินการแก้ไขสำเร็จ" : r.status || "แจ้งรายงาน",
               reportDetails: r.description ? `${r.name ? r.name + ": " : ""}${r.description}` : (r.name || ""),
               ranger: assignedRangerName,
               rangerUsername: assignedRangerUsername,
@@ -221,7 +221,7 @@ export default function ListReportMember() {
 
   const totalCount = reports.length;
   const newCount = reports.filter((r) => r.status === "แจ้งรายงาน").length;
-  const inProgressCount = reports.filter((r) => r.status === "กำลังดำเนินการ").length;
+  const inProgressCount = reports.filter((r) => r.status === "กำลังดำเนินการ" || r.status === "รับทราบ").length;
   const completedCount = reports.filter(
     (r) => r.status === "ดำเนินการแก้ไขสำเร็จ" || r.status === "ดำเนินการสำเร็จ"
   ).length;
@@ -447,6 +447,11 @@ export default function ListReportMember() {
                           ) : report.status === "แจ้งรายงาน" ? (
                             <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                              {report.status}
+                            </span>
+                          ) : report.status === "รับทราบ" ? (
+                            <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
                               {report.status}
                             </span>
                           ) : report.status === "กำลังดำเนินการ" ? (
