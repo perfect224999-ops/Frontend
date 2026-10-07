@@ -383,7 +383,7 @@ function ViewReportMemberDetailContent() {
         );
       }
       setIsLoading(false);
-      setSuccess("รับทราบเหตุการณ์เรียบร้อย ข้อมูลส่วนปฏิบัติงาน (กำลังดำเนินการ) เปิดให้กรอกด้านล่างแล้ว");
+      setSuccess("รับทราบเหตุการณ์เรียบร้อย ข้อมูลส่วนปฏิบัติงานเปิดให้กรอกด้านล่างแล้ว");
       await loadReport();
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: { id: reportId, status: "Acknowledged" } }));
@@ -775,7 +775,7 @@ function ViewReportMemberDetailContent() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    ขั้นตอนที่ 3: บันทึกผลการแก้ไขเสร็จสิ้น (ดำเนินการแก้ไขสำเร็จ)
+                    ขั้นตอนที่ 3: บันทึกผลการแก้ไขเสร็จสิ้น
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     บันทึกสรุปผลงานแก้ไขปัญหาเสร็จสิ้น และแนบรูปภาพหลักฐานงานสำเร็จ
