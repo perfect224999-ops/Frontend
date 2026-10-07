@@ -383,7 +383,7 @@ function ViewReportMemberDetailContent() {
         );
       }
       setIsLoading(false);
-      setSuccess("รับทราบเหตุการณ์เรียบร้อย ข้อมูลส่วนปฏิบัติงานเปิดให้กรอกด้านล่างแล้ว");
+      setSuccess("รับทราบเหตุการณ์เรียบร้อย");
       await loadReport();
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("greenpass_report_updated", { detail: { id: reportId, status: "Acknowledged" } }));
