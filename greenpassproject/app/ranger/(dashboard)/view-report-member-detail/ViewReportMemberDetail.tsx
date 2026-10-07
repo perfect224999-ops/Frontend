@@ -613,7 +613,7 @@ function ViewReportMemberDetailContent() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    ขั้นตอนที่ 2: บันทึกข้อมูลเข้าปฏิบัติงาน (กำลังดำเนินการ)
+                    ขั้นตอนที่ 2: บันทึกข้อมูลเข้าปฏิบัติงาน
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     บันทึกข้อมูลและอัปโหลดรูปภาพหลักฐานระหว่างเจ้าหน้าที่เข้าปฏิบัติงานในพื้นที่
