@@ -2,8 +2,104 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { stampApi } from "@/service/api";
+import { stampApi, parkApi, rangerApi } from "@/service/api";
 import { QrCode, CheckCircle2, User, Sparkles, MapPin, RefreshCw, AlertTriangle, Clock, XCircle, Maximize2, Lock, ArrowLeft, UserX } from "lucide-react";
+
+export const computeParkStatus = (isTempClosed?: boolean, open?: string, close?: string) => {
+  if (isTempClosed) {
+    return {
+      isOpen: false,
+      isTempClosed: true,
+      isHoursClosed: false,
+      statusText: "ปิดบริการชั่วคราว",
+      subtext: "ปิดบริการชั่วคราวเนื่องจากเหตุฉุกเฉินหรือสภาพอากาศ"
+    };
+  }
+
+  const openTime = open || "06:00";
+  const closeTime = close || "18:00";
+
+  const parseMinutes = (t: string) => {
+    const clean = t.trim().substring(0, 5);
+    const parts = clean.split(":");
+    if (parts.length === 2) {
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (!isNaN(h) && !isNaN(m)) return h * 60 + m;
+    }
+    return null;
+  };
+
+  const openM = parseMinutes(openTime);
+  const closeM = parseMinutes(closeTime);
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (openM !== null && closeM !== null) {
+    let openNow = false;
+    if (closeM >= openM) {
+      openNow = currentMinutes >= openM && currentMinutes < closeM;
+    } else {
+      openNow = currentMinutes >= openM || currentMinutes < closeM;
+    }
+
+    if (!openNow) {
+      return {
+        isOpen: false,
+        isTempClosed: false,
+        isHoursClosed: true,
+        statusText: "ปิดให้บริการ",
+        subtext: `อยู่นอกเวลาให้บริการประจำวัน (เปิดทำการเวลา ${openTime} น. - ${closeTime} น.)`
+      };
+    }
+  }
+
+  return {
+    isOpen: true,
+    isTempClosed: false,
+    isHoursClosed: false,
+    statusText: "เปิดตามปกติ",
+    subtext: "เปิดบริการนักท่องเที่ยวตามปกติ"
+  };
+};
+
+const getInitialParkStatusInfo = () => {
+  if (typeof window !== "undefined") {
+    try {
+      const savedParkData = localStorage.getItem("greenpass_park_saved_data");
+      if (savedParkData) {
+        const parsed = JSON.parse(savedParkData);
+        if (parsed) {
+          const status = computeParkStatus(
+            Boolean(parsed.isTemporaryClosed),
+            parsed.openTime || "06:00",
+            parsed.closeTime || "18:00"
+          );
+          return {
+            isClosed: !status.isOpen,
+            isTempClosed: status.isTempClosed,
+            isHoursClosed: status.isHoursClosed,
+            statusText: status.statusText,
+            subtext: status.subtext,
+            parkName: parsed.name || parsed.parkName || localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ",
+            openHours: parsed.openHours || `เปิดทุกวัน ตั้งแต่เวลา ${parsed.openTime || "06:00"} น. - ${parsed.closeTime || "18:00"} น.`
+          };
+        }
+      }
+    } catch (e) {}
+  }
+
+  const defaultStatus = computeParkStatus(false, "06:00", "18:00");
+  return {
+    isClosed: !defaultStatus.isOpen,
+    isTempClosed: false,
+    isHoursClosed: defaultStatus.isHoursClosed,
+    statusText: defaultStatus.statusText,
+    subtext: defaultStatus.subtext,
+    parkName: typeof window !== "undefined" ? (localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ") : "อุทยานแห่งชาติ",
+    openHours: "เปิดทุกวัน ตั้งแต่เวลา 06.00 น. - 18.00 น."
+  };
+};
 
 export default function ScanCheckinQRCode() {
   const router = useRouter();
@@ -21,6 +117,8 @@ export default function ScanCheckinQRCode() {
   } | null>(null);
 
   const [canIssueStamp, setCanIssueStamp] = useState(true);
+  const [parkStatusInfo, setParkStatusInfo] = useState(getInitialParkStatusInfo);
+  const [isCheckingParkStatus, setIsCheckingParkStatus] = useState<boolean>(true);
 
   useEffect(() => {
     const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
@@ -35,7 +133,94 @@ export default function ScanCheckinQRCode() {
   }, []);
 
   useEffect(() => {
-    if (!canIssueStamp) return;
+    const checkParkStatus = async () => {
+      try {
+        let targetParkId = typeof window !== "undefined" ? localStorage.getItem("ranger_park_id") : null;
+        const storedRanger = typeof window !== "undefined" ? (localStorage.getItem("ranger_username") || localStorage.getItem("username")) : null;
+
+        if (!targetParkId && storedRanger) {
+          try {
+            const rangerRes = await rangerApi.getRangerByUsername(storedRanger);
+            const rObj = rangerRes?.result || rangerRes?.data;
+            const rParkId = rObj?.park?.parkId || rObj?.parkId;
+            if (rParkId) {
+              targetParkId = String(rParkId);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("ranger_park_id", targetParkId);
+              }
+            }
+          } catch (e) {}
+        }
+
+        const pId = targetParkId ? Number(targetParkId) : 1;
+
+        // 1. Check local storage saved data for immediate park status
+        if (typeof window !== "undefined") {
+          const savedParkData = localStorage.getItem("greenpass_park_saved_data");
+          if (savedParkData) {
+            try {
+              const parsed = JSON.parse(savedParkData);
+              if (parsed && (parsed.parkId === pId || !parsed.parkId)) {
+                const status = computeParkStatus(
+                  Boolean(parsed.isTemporaryClosed),
+                  parsed.openTime || "06:00",
+                  parsed.closeTime || "18:00"
+                );
+                setParkStatusInfo({
+                  isClosed: !status.isOpen,
+                  isTempClosed: status.isTempClosed,
+                  isHoursClosed: status.isHoursClosed,
+                  statusText: status.statusText,
+                  subtext: status.subtext,
+                  parkName: parsed.name || parsed.parkName || localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ",
+                  openHours: parsed.openHours || `เปิดทุกวัน ตั้งแต่เวลา ${parsed.openTime || "06:00"} น. - ${parsed.closeTime || "18:00"} น.`
+                });
+              }
+            } catch (e) {}
+          }
+        }
+
+        // 2. Fetch latest park data from DB API
+        const res = await parkApi.getParkById(pId);
+        const dbPark = res?.result || res?.data;
+        if (dbPark) {
+          const formatTime = (t?: string) => t ? t.substring(0, 5) : "";
+          const openStr = dbPark.openTime ? formatTime(dbPark.openTime) : "06:00";
+          const closeStr = dbPark.closeTime ? formatTime(dbPark.closeTime) : "18:00";
+          const isTempClosed = dbPark.isTemporaryClosed !== undefined 
+            ? Boolean(dbPark.isTemporaryClosed) 
+            : (dbPark.status === "ปิดบริการชั่วคราว");
+          
+          const status = computeParkStatus(isTempClosed, openStr, closeStr);
+
+          const cleanName = (n: string) => {
+            if (!n) return "อุทยานแห่งชาติ";
+            const stripped = n.replace(/^(อุทยานแห่งชาติ)+/g, "").trim();
+            return `อุทยานแห่งชาติ${stripped}`;
+          };
+
+          setParkStatusInfo({
+            isClosed: !status.isOpen,
+            isTempClosed: status.isTempClosed,
+            isHoursClosed: status.isHoursClosed,
+            statusText: status.statusText,
+            subtext: status.subtext,
+            parkName: cleanName(dbPark.name),
+            openHours: `เปิดทุกวัน ตั้งแต่เวลา ${openStr} น. - ${closeStr} น.`
+          });
+        }
+      } catch (err) {
+        console.warn("Could not check park status for QR scan:", err);
+      } finally {
+        setIsCheckingParkStatus(false);
+      }
+    };
+
+    checkParkStatus();
+  }, []);
+
+  useEffect(() => {
+    if (!canIssueStamp || parkStatusInfo.isClosed || isCheckingParkStatus) return;
     let html5QrCode: any;
     let isActive = true;
 
@@ -91,9 +276,19 @@ export default function ScanCheckinQRCode() {
         }
       }
     };
-  }, [isScanning, showSuccessPopup, showErrorPopup]);
+  }, [isScanning, showSuccessPopup, showErrorPopup, canIssueStamp, parkStatusInfo.isClosed, isCheckingParkStatus]);
 
   const processScanResult = async (decodedToken: string) => {
+    if (parkStatusInfo.isClosed) {
+      setErrorMessage(
+        parkStatusInfo.isTempClosed
+          ? "อุทยานปิดบริการชั่วคราวเนื่องจากเหตุฉุกเฉินหรือสภาพอากาศ ไม่สามารถมอบสแตมป์สะสมได้ในขณะนี้"
+          : "ขณะนี้อยู่นอกเวลาทำการประจำวันของอุทยาน ไม่สามารถมอบสแตมป์สะสมได้ในขณะนี้"
+      );
+      setShowErrorPopup(true);
+      return;
+    }
+
     const rangerUsername = typeof window !== "undefined" ? localStorage.getItem("ranger_username") || "ranger01" : "ranger01";
 
     try {
@@ -129,13 +324,13 @@ export default function ScanCheckinQRCode() {
       } else {
         const rawMsg = response?.message || "";
         let finalMsg = "ไม่สามารถบันทึกตราประทับได้";
-        if (rawMsg.includes("ไม่พบข้อมูล") || response?.status === 404 || response?.statusCode === 404) {
-          // 4.1.1 กรณีที่ระบบค้นหาข้อมูลสมาชิกไม่เจอ
+        if (rawMsg.includes("ปิดบริการชั่วคราว") || rawMsg.includes("ปิดบริการ") || rawMsg.includes("ปิดให้บริการ")) {
+          finalMsg = "อุทยานปิดให้บริการ ไม่สามารถมอบสแตมป์สะสมได้";
+        } else if (rawMsg.includes("ไม่พบข้อมูล") || response?.status === 404 || response?.statusCode === 404) {
           finalMsg = "ไม่พบข้อมูลสมาชิก";
         } else if (rawMsg.includes("ซ้ำ") || rawMsg.includes("2 ชั่วโมง")) {
           finalMsg = rawMsg;
         } else if (rawMsg.includes("ไม่สามารถบันทึกตราประทับได้") || rawMsg.includes("ไม่สามารถบันทึก") || !rawMsg) {
-          // 5.1.1 กรณีที่บันทึกข้อมูลตราประทับไม่สำเร็จ
           finalMsg = "ไม่สามารถบันทึกตราประทับได้";
         } else {
           finalMsg = rawMsg;
@@ -147,13 +342,13 @@ export default function ScanCheckinQRCode() {
       console.error("Error scan checkin:", err);
       const rawMsg = err?.response?.data?.message || err?.message || "";
       let finalMsg = "ไม่สามารถบันทึกตราประทับได้";
-      if (err?.response?.status === 404 || rawMsg.includes("ไม่พบข้อมูล") || rawMsg.includes("not found")) {
-        // 4.1.1 กรณีที่ระบบค้นหาข้อมูลสมาชิกไม่เจอ
+      if (rawMsg.includes("ปิดบริการชั่วคราว") || rawMsg.includes("ปิดบริการ") || rawMsg.includes("ปิดให้บริการ")) {
+        finalMsg = "อุทยานปิดให้บริการ ไม่สามารถมอบสแตมป์สะสมได้";
+      } else if (err?.response?.status === 404 || rawMsg.includes("ไม่พบข้อมูล") || rawMsg.includes("not found")) {
         finalMsg = "ไม่พบข้อมูลสมาชิก";
       } else if (rawMsg.includes("ซ้ำ") || rawMsg.includes("2 ชั่วโมง")) {
         finalMsg = rawMsg;
       } else if (rawMsg.includes("ไม่สามารถบันทึกตราประทับได้")) {
-        // 5.1.1 กรณีที่บันทึกข้อมูลตราประทับไม่สำเร็จ
         finalMsg = "ไม่สามารถบันทึกตราประทับได้";
       }
       setErrorMessage(finalMsg);
@@ -170,11 +365,13 @@ export default function ScanCheckinQRCode() {
   const handleCloseErrorPopup = () => {
     setShowErrorPopup(false);
     setErrorMessage("");
-    setIsScanning(true);
+    if (!parkStatusInfo.isClosed) {
+      setIsScanning(true);
+    }
   };
 
+  const isParkClosedError = errorMessage.includes("ปิดบริการชั่วคราว") || errorMessage.includes("ปิดบริการ") || errorMessage.includes("ปิดให้บริการ");
   const isMemberNotFoundError = errorMessage.includes("ไม่พบข้อมูลสมาชิก") || errorMessage.includes("ไม่พบข้อมูลนักท่องเที่ยว");
-  const isStampFailedError = errorMessage.includes("ไม่สามารถบันทึกตราประทับได้") || errorMessage.includes("ไม่สามารถบันทึก");
   const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว") || errorMessage.includes("2 ชั่วโมง");
 
   if (!canIssueStamp) {
@@ -193,13 +390,137 @@ export default function ScanCheckinQRCode() {
           <div className="pt-2">
             <button
               onClick={() => router.push("/ranger/view-park-detail")}
-              className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>กลับสู่หน้าหลักอุทยาน</span>
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (parkStatusInfo.isClosed) {
+    return (
+      <div className="w-full max-w-[1600px] mx-auto space-y-6 font-sans">
+        {/* Header Banner */}
+        <div className="bg-[#0a5829] text-white rounded-2xl p-6 sm:p-8 shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="relative z-10 space-y-2">
+            <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs uppercase tracking-wider">
+              <QrCode className="w-4 h-4" /> Check-in &amp; Stamp Terminal
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold">สแกน QR Code มอบสแตมป์อุทยาน</h1>
+            <p className="text-emerald-100 text-xs sm:text-sm max-w-2xl">
+              นำกล้องส่องไปยัง QR Code บนมือถือนักท่องเที่ยวเพื่อตรวจสอบรายชื่อและมอบสแตมป์สะสม
+            </p>
+          </div>
+
+          <div className={`relative z-10 flex items-center space-x-2 px-4 py-2 rounded-full border text-xs sm:text-sm font-bold shadow-md ${
+            parkStatusInfo.isTempClosed 
+              ? "bg-rose-950/80 border-rose-500/40 text-rose-200" 
+              : "bg-amber-950/80 border-amber-500/40 text-amber-200"
+          }`}>
+            <span className={`w-3 h-3 rounded-full animate-pulse ${
+              parkStatusInfo.isTempClosed ? "bg-rose-500" : "bg-amber-500"
+            }`} />
+            <span>{parkStatusInfo.isTempClosed ? "⚠️ ปิดบริการชั่วคราว" : "🌙 ปิดให้บริการ (อยู่นอกเวลาทำการ)"}</span>
+          </div>
+        </div>
+
+        {/* Park Closed Status Alert Card */}
+        <div className={`border-2 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+          parkStatusInfo.isTempClosed
+            ? "bg-rose-50/90 border-rose-200"
+            : "bg-amber-50/90 border-amber-200"
+        }`}>
+          <div className="flex items-start sm:items-center space-x-4">
+            <div className={`p-3.5 rounded-2xl shrink-0 shadow-inner ${
+              parkStatusInfo.isTempClosed
+                ? "bg-rose-100 text-rose-600"
+                : "bg-amber-100 text-amber-600"
+            }`}>
+              {parkStatusInfo.isTempClosed ? (
+                <AlertTriangle className="w-7 h-7 text-rose-600" />
+              ) : (
+                <Clock className="w-7 h-7 text-amber-600" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">สถานะเปิดทำการ</p>
+              <h3 className={`text-lg font-black flex items-center gap-2 ${
+                parkStatusInfo.isTempClosed ? "text-rose-700" : "text-amber-800"
+              }`}>
+                <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+                  parkStatusInfo.isTempClosed ? "bg-rose-500" : "bg-amber-500"
+                }`} />
+                {parkStatusInfo.statusText}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium">
+                {parkStatusInfo.subtext} — ระงับการสแกน QR Code มอบตราประทับสแตมป์
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => router.push("/ranger/edit-park-details")}
+            className={`w-full sm:w-auto shrink-0 px-4 py-2.5 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+              parkStatusInfo.isTempClosed
+                ? "bg-rose-600 hover:bg-rose-700"
+                : "bg-amber-600 hover:bg-amber-700"
+            }`}
+          >
+            <span>แก้ไขสถานะ/เวลาทำการอุทยาน</span>
+          </button>
+        </div>
+
+        {/* Locked Camera Stream Card */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-10 text-center space-y-6 shadow-md max-w-xl mx-auto my-6">
+          <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-inner border-2 ${
+            parkStatusInfo.isTempClosed
+              ? "bg-rose-100 text-rose-600 border-rose-200"
+              : "bg-amber-100 text-amber-600 border-amber-200"
+          }`}>
+            <Lock className="w-10 h-10" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold text-slate-900">ไม่อนุญาตให้สแกนสแตมป์ในขณะนี้</h2>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed max-w-md mx-auto">
+              เนื่องจาก <span className={`font-bold px-2 py-0.5 rounded border ${
+                parkStatusInfo.isTempClosed
+                  ? "text-rose-700 bg-rose-50 border-rose-200"
+                  : "text-amber-800 bg-amber-50 border-amber-200"
+              }`}>{parkStatusInfo.parkName}</span> อยู่ในสถานะ <span className={`font-bold ${
+                parkStatusInfo.isTempClosed ? "text-rose-600" : "text-amber-700"
+              }`}>{parkStatusInfo.statusText}</span> ({parkStatusInfo.openHours}) ระบบจึงล็อกการใช้งานกล้องสแกน QR Code เพื่อป้องกันการประทับตราสแตมป์
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => router.push("/ranger/edit-park-details")}
+              className="py-3 px-6 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>ไปที่หน้าแก้ไขข้อมูลอุทยาน</span>
+            </button>
+            <button
+              onClick={() => router.push("/ranger/view-park-detail")}
+              className="py-3 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>กลับสู่หน้าหลักอุทยาน</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCheckingParkStatus) {
+    return (
+      <div className="w-full max-w-4xl mx-auto py-24 flex flex-col items-center justify-center space-y-4 font-sans text-center">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-600">กำลังตรวจสอบสถานะการเปิดให้บริการของอุทยาน...</p>
       </div>
     );
   }
@@ -240,7 +561,7 @@ export default function ScanCheckinQRCode() {
       </div>
 
       {/* Large Camera Stream Frame Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-md space-y-4">
+      <div className="bg-[#ffffff] rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-md space-y-4">
         
         <div className="relative w-full h-[480px] sm:h-[580px] lg:h-[640px] bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-800 shadow-2xl">
           
@@ -257,7 +578,7 @@ export default function ScanCheckinQRCode() {
                 <div className="absolute bottom-3 right-3 w-8 h-8 border-b-4 border-r-4 border-emerald-400 rounded-br-lg" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-emerald-300 text-xs font-bold bg-slate-950/70 px-3 py-1 rounded-full border border-emerald-500/40 backdrop-blur-xs flex items-center gap-1.5">
-                    <Maximize2 className="w-3.5 h-3.5" /> วาง QR Code ให้อยู่ในกรอบ
+                    <Maximize2 className="w-3.5 h-3.5" /> วาง QR Codeให้อยู่ในกรอบ
                   </span>
                 </div>
               </div>
@@ -341,20 +662,24 @@ export default function ScanCheckinQRCode() {
         </div>
       )}
 
-      {/* POPUP MODAL 2: ERROR / DUPLICATE SCAN / ALTERNATE FLOW POPUP */}
+      {/* POPUP MODAL 2: ERROR / DUPLICATE SCAN / PARK CLOSED POPUP */}
       {showErrorPopup && (
         <div className="fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-slate-200 space-y-6 animate-scale-up">
             
             {/* Warning Icon Badge */}
             <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-inner border-2 ${
-              isDuplicateError 
+              isParkClosedError
+                ? "bg-rose-100 text-rose-600 border-rose-300"
+                : isDuplicateError 
                 ? "bg-amber-100 text-amber-600 border-amber-300" 
                 : isMemberNotFoundError
                 ? "bg-rose-100 text-rose-600 border-rose-300"
                 : "bg-rose-100 text-rose-600 border-rose-300"
             }`}>
-              {isDuplicateError ? (
+              {isParkClosedError ? (
+                <AlertTriangle className="w-11 h-11" />
+              ) : isDuplicateError ? (
                 <Clock className="w-11 h-11" />
               ) : isMemberNotFoundError ? (
                 <UserX className="w-11 h-11" />
@@ -366,13 +691,19 @@ export default function ScanCheckinQRCode() {
             {/* Title Badge & Heading */}
             <div className="space-y-1.5">
               <span className={`px-3 py-1 font-extrabold text-xs rounded-full border uppercase tracking-wider inline-flex items-center gap-1.5 ${
-                isDuplicateError 
+                isParkClosedError
+                  ? "bg-rose-50 text-rose-800 border-rose-200"
+                  : isDuplicateError 
                   ? "bg-amber-50 text-amber-800 border-amber-200" 
                   : isMemberNotFoundError
                   ? "bg-rose-50 text-rose-800 border-rose-200"
                   : "bg-rose-50 text-rose-800 border-rose-200"
               }`}>
-                {isDuplicateError ? (
+                {isParkClosedError ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4" /> อุทยานปิดให้บริการ
+                  </>
+                ) : isDuplicateError ? (
                   <>
                     <Clock className="w-4 h-4" /> ไม่อนุญาตให้สแกนซ้ำภายใน 2 ชั่วโมง
                   </>
@@ -387,7 +718,9 @@ export default function ScanCheckinQRCode() {
                 )}
               </span>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 pt-1">
-                {isDuplicateError 
+                {isParkClosedError
+                  ? "อุทยานปิดให้บริการ"
+                  : isDuplicateError 
                   ? "พบการสแกนสแตมป์ซ้ำภายใน 2 ชั่วโมง" 
                   : isMemberNotFoundError
                   ? "ไม่พบข้อมูลสมาชิก"
@@ -408,7 +741,9 @@ export default function ScanCheckinQRCode() {
               <p className={`text-xs opacity-85 pt-2 border-t ${
                 isDuplicateError ? "border-amber-200/60" : "border-rose-200/60"
               }`}>
-                {isDuplicateError 
+                {isParkClosedError
+                  ? "ขณะนี้อุทยานอยู่ในสถานะปิดให้บริการ (ปิดบริการชั่วคราว หรืออยู่นอกเวลาทำการ) จึงระงับระบบการสแกนรับตราประทับสแตมป์แก่ผู้ใช้ชั่วคราว"
+                  : isDuplicateError 
                   ? "ระบบเปิดใช้งานเงื่อนไขความปลอดภัย: นักท่องเที่ยว 1 คน สามารถสแกนรับสแตมป์ได้ 1 ครั้ง ต่อ 1 อุทยานในระยะเวลา 2 ชั่วโมงเท่านั้น" 
                   : isMemberNotFoundError
                   ? "ระบบค้นหาข้อมูลสมาชิกในฐานข้อมูลไม่พบ กรุณาตรวจสอบ QR Code หรือสถานะบัญชีสมาชิกใหม่อีกครั้ง"
@@ -421,11 +756,15 @@ export default function ScanCheckinQRCode() {
               <button
                 onClick={handleCloseErrorPopup}
                 className={`w-full py-3 text-white font-bold text-sm rounded-2xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2 ${
-                  isDuplicateError ? "bg-amber-600 hover:bg-amber-500" : "bg-rose-600 hover:bg-rose-500"
+                  isParkClosedError
+                    ? "bg-rose-600 hover:bg-rose-500"
+                    : isDuplicateError 
+                    ? "bg-amber-600 hover:bg-amber-500" 
+                    : "bg-rose-600 hover:bg-rose-500"
                 }`}
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>รับทราบ / สแกนคนถัดไป</span>
+                <span>รับทราบ</span>
               </button>
             </div>
 

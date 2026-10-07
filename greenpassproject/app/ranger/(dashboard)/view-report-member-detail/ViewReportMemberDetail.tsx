@@ -64,7 +64,7 @@ const resolveReportImageUrl = (img?: string | null) => {
   if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
     return trimmed;
   }
-  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://localhost:8081/api/v1";
+  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://26.253.157.112:8081/api/v1";
   if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return `${baseUrl}${cleanPath}`;
@@ -144,6 +144,7 @@ function ViewReportMemberDetailContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [canProgressReport, setCanProgressReport] = useState(true);
   const [selectedZoomImage, setSelectedZoomImage] = useState<string | null>(null);
 
@@ -290,7 +291,7 @@ function ViewReportMemberDetailContent() {
           setCurrentReport(backendReport);
           setStartDate(backendReport.startDate !== "-" ? backendReport.startDate : getTodayThaiDate());
           setCompletedDate(backendReport.completedDate !== "-" ? backendReport.completedDate : getTodayThaiDate());
-
+          setIsPageLoading(false);
           return;
         }
       } catch (err) {
@@ -334,6 +335,7 @@ function ViewReportMemberDetailContent() {
       setStartDate(isProg ? (found.startDate === "-" ? getTodayThaiDate() : found.startDate) : getTodayThaiDate());
       setCompletedDate(isComp ? (found.completedDate === "-" ? getTodayThaiDate() : found.completedDate) : getTodayThaiDate());
     }
+    setIsPageLoading(false);
   }
 
   useEffect(() => {
@@ -459,6 +461,15 @@ function ViewReportMemberDetailContent() {
       setError("ไม่สามารถบันทึกสถานะได้ กรุณาลองใหม่อีกครั้ง");
     }
   };
+
+  if (isPageLoading) {
+    return (
+      <div className="max-w-5xl mx-auto py-24 flex flex-col items-center justify-center space-y-4 font-sans text-center">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-600">กำลังดึงข้อมูลรายละเอียดรายงาน...</p>
+      </div>
+    );
+  }
 
   if (!currentReport) {
     return (

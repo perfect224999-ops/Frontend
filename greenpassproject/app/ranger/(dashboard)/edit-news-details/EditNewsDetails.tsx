@@ -64,6 +64,7 @@ function EditNewsDetailsContent() {
   const [image, setImage] = useState("");
   const [parkName, setParkName] = useState<string>("อุทยานแห่งชาติ");
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
@@ -83,7 +84,7 @@ function EditNewsDetailsContent() {
     if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
       return trimmed;
     }
-    const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://localhost:8081/api/v1";
+    const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://26.253.157.112:8081/api/v1";
     if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
       const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
       return `${baseUrl}${cleanPath}`;
@@ -161,6 +162,8 @@ function EditNewsDetailsContent() {
         }
       } catch (err) {
         console.warn("Could not fetch announcement details from API:", err);
+      } finally {
+        if (isMounted) setIsFetching(false);
       }
     };
 
@@ -290,6 +293,15 @@ function EditNewsDetailsContent() {
       setIsLoading(false);
     }
   };
+
+  if (isFetching && !currentNews) {
+    return (
+      <div className="max-w-5xl mx-auto py-24 flex flex-col items-center justify-center space-y-4 font-sans text-center">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-600">กำลังดึงข้อมูลข่าวสารสำหรับแก้ไข...</p>
+      </div>
+    );
+  }
 
   if (!currentNews) {
     return (

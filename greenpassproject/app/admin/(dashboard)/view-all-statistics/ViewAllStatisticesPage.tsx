@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   BarChart3,
   Trees,
@@ -178,31 +178,19 @@ export default function ViewAllStatisticesPage() {
   });
 
   const [parkStats, setParkStats] = useState<ParkStatItem[]>([]);
+  const statsCacheRef = useRef<Record<string, { metrics: any; parkStats: ParkStatItem[] }>>({});
 
   useEffect(() => {
-    // 1. Instant render from sessionStorage cache
-    const cacheKey = `greenpass_real_stats_cache_v2_${month}_${year}`;
-    const cached = typeof window !== "undefined" ? sessionStorage.getItem(cacheKey) : null;
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (parsed.metrics) setMetrics(parsed.metrics);
-        if (parsed.parkStats) {
-          setParkStats(parsed.parkStats.map((p: ParkStatItem) => ({
-            ...p,
-            province: resolveProvince(p),
-            thaiVisitors: p.thaiVisitors || 0,
-            foreignVisitors: p.foreignVisitors || 0,
-            totalVisitors: p.totalVisitors || ((p.thaiVisitors || 0) + (p.foreignVisitors || 0))
-          })));
-        }
-        setLoading(false);
-      } catch (e) { }
+    const cacheKey = `${month}_${year}`;
+    if (statsCacheRef.current[cacheKey]) {
+      const cached = statsCacheRef.current[cacheKey];
+      setMetrics(cached.metrics);
+      setParkStats(cached.parkStats);
+      setLoading(false);
     } else {
       setLoading(true);
     }
 
-    // 2. Fetch fresh data from DB
     async function fetchStats() {
       try {
         const monthNum = month !== "ทั้งหมด" ? MONTH_MAP[month] : undefined;
@@ -233,18 +221,18 @@ export default function ViewAllStatisticesPage() {
             totalRanger: m?.totalRanger || 0,
             totalNews: m?.totalNews || 0,
             totalReport: m?.totalReport || 0,
-            totalVisitors: m?.totalVisitors ?? calculatedTotalVisitors,
-            totalThaiVisitors: m?.totalThaiVisitors ?? calculatedTotalThai,
-            totalForeignVisitors: m?.totalForeignVisitors ?? calculatedTotalForeign,
+            totalVisitors: calculatedTotalVisitors,
+            totalThaiVisitors: calculatedTotalThai,
+            totalForeignVisitors: calculatedTotalForeign,
+          };
+
+          statsCacheRef.current[cacheKey] = {
+            metrics: newMetrics,
+            parkStats: newParkStats
           };
 
           setMetrics(newMetrics);
           setParkStats(newParkStats);
-
-          sessionStorage.setItem(cacheKey, JSON.stringify({
-            metrics: newMetrics,
-            parkStats: newParkStats
-          }));
         }
       } catch (err) {
         console.error("Failed to load DB statistics:", err);
@@ -509,73 +497,6 @@ export default function ViewAllStatisticesPage() {
           </div>
         </div>
 
-        {/* Visitor Summary Table */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-600" />
-              สรุปข้อมูลสถิตินักท่องเที่ยวเข้าชมรายอุทยาน
-            </h3>
-            <span className="text-[11px] text-slate-500 font-semibold">
-              พบ {filteredParkStats.length} อุทยาน
-            </span>
-          </div>
-
-          <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full text-center border-collapse">
-              <thead>
-                <tr className="bg-slate-900 text-slate-100 font-bold text-sm sm:text-base">
-                  <th className="py-4 px-5 text-center">อุทยานแห่งชาติ</th>
-                  <th className="py-4 px-4 text-center">นักท่องเที่ยวชาวไทย (คน)</th>
-                  <th className="py-4 px-4 text-center">นักท่องเที่ยวชาวต่างชาติ (คน)</th>
-                  <th className="py-4 px-4 text-center">จำนวนนักท่องเที่ยวรวม (คน)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-150 text-slate-800 font-bold text-sm sm:text-base">
-                {filteredParkStats.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400 font-medium">
-                      ไม่พบข้อมูลสถิตินักท่องเที่ยวในเงื่อนไขที่เลือก
-                    </td>
-                  </tr>
-                ) : (
-                  filteredParkStats.map((item) => {
-                    const thai = item.thaiVisitors || 0;
-                    const foreign = item.foreignVisitors || 0;
-                    const total = item.totalVisitors || (thai + foreign);
-                    return (
-                      <tr key={item.parkId} className="hover:bg-emerald-50/50 transition-colors">
-                        <td className="py-4 px-5 font-extrabold text-slate-900 flex items-center justify-center gap-2">
-                          <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
-                          <span>{item.parkName}</span>
-                        </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-blue-50 text-blue-900 border border-blue-200 shadow-2xs">
-                            <span className="text-xs">🇹🇭</span>
-                            <span>{thai.toLocaleString()} คน</span>
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-purple-50 text-purple-900 border border-purple-200 shadow-2xs">
-                            <Globe className="w-3.5 h-3.5 text-purple-600" />
-                            <span>{foreign.toLocaleString()} คน</span>
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-black bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-xs">
-                            <UserCheck className="w-4 h-4 text-emerald-700" />
-                            <span>{total.toLocaleString()} คน</span>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         {/* Bar Chart Section */}
         <div className="bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200 rounded-3xl p-6 space-y-6 shadow-sm">
 
@@ -679,6 +600,73 @@ export default function ViewAllStatisticesPage() {
 
           </div>
 
+        </div>
+
+        {/* Visitor Summary Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-600" />
+              สรุปข้อมูลสถิตินักท่องเที่ยวเข้าชมรายอุทยาน
+            </h3>
+            <span className="text-[11px] text-slate-500 font-semibold">
+              พบ {filteredParkStats.length} อุทยาน
+            </span>
+          </div>
+
+          <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <table className="w-full text-center border-collapse">
+              <thead>
+                <tr className="bg-slate-900 text-slate-100 font-bold text-sm sm:text-base">
+                  <th className="py-4 px-5 text-center">อุทยานแห่งชาติ</th>
+                  <th className="py-4 px-4 text-center">นักท่องเที่ยวชาวไทย (คน)</th>
+                  <th className="py-4 px-4 text-center">นักท่องเที่ยวชาวต่างชาติ (คน)</th>
+                  <th className="py-4 px-4 text-center">จำนวนนักท่องเที่ยวรวม (คน)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-150 text-slate-800 font-bold text-sm sm:text-base">
+                {filteredParkStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-400 font-medium">
+                      ไม่พบข้อมูลสถิตินักท่องเที่ยวในเงื่อนไขที่เลือก
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParkStats.map((item) => {
+                    const thai = item.thaiVisitors || 0;
+                    const foreign = item.foreignVisitors || 0;
+                    const total = item.totalVisitors || (thai + foreign);
+                    return (
+                      <tr key={item.parkId} className="hover:bg-emerald-50/50 transition-colors">
+                        <td className="py-4 px-5 font-extrabold text-slate-900 flex items-center justify-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                          <span>{item.parkName}</span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-blue-50 text-blue-900 border border-blue-200 shadow-2xs">
+                            <span className="text-xs">🇹🇭</span>
+                            <span>{thai.toLocaleString()} คน</span>
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-extrabold bg-purple-50 text-purple-900 border border-purple-200 shadow-2xs">
+                            <Globe className="w-3.5 h-3.5 text-purple-600" />
+                            <span>{foreign.toLocaleString()} คน</span>
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-black bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-xs">
+                            <UserCheck className="w-4 h-4 text-emerald-700" />
+                            <span>{total.toLocaleString()} คน</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </div>

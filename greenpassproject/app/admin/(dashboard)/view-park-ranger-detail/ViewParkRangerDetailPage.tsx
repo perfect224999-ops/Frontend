@@ -122,14 +122,14 @@ const getSignatureImageSrc = (sig: string) => {
     return trimmed;
   }
   if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
-    const baseUrl = getBaseURL ? getBaseURL() : "http://localhost:8081/api/v1";
+    const baseUrl = getBaseURL ? getBaseURL() : "http://26.253.157.112:8081/api/v1";
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return `${baseUrl}${cleanPath}`;
   }
   if (trimmed.startsWith("src/")) {
     return `/${trimmed}`;
   }
-  const baseUrl = getBaseURL ? getBaseURL() : "http://localhost:8081/api/v1";
+  const baseUrl = getBaseURL ? getBaseURL() : "http://26.253.157.112:8081/api/v1";
   return `${baseUrl}/uploads/signatures/${trimmed}`;
 };
 
