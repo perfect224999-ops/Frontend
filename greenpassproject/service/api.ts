@@ -36,12 +36,30 @@ api.interceptors.request.use((config) => {
 // authApi สำหรับล็อกอิน
 export const authApi = {
   adminLogin: async (payload: { username: string; password: string }) => {
-    const response = await api.post('/admin/login', payload);
-    return response.data;
+    try {
+      const response = await api.post('/admin/login', payload, {
+        validateStatus: (status) => status < 500
+      });
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.data) {
+        return err.response.data;
+      }
+      throw err;
+    }
   },
   rangerLogin: async (payload: { username: string; password: string }) => {
-    const response = await api.post('/ranger/login', payload);
-    return response.data;
+    try {
+      const response = await api.post('/ranger/login', payload, {
+        validateStatus: (status) => status < 500
+      });
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.data) {
+        return err.response.data;
+      }
+      throw err;
+    }
   }
 };
 
@@ -138,7 +156,12 @@ export const rangerApi = {
     gender: string | number;
     phone: string;
     email: string;
+    canAnnouncement?: boolean;
+    canIssueStamp?: boolean;
+    canProgressReport?: boolean;
+    canEditParkDetails?: boolean;
     signature?: string;
+    [key: string]: any;
   }) => {
     const response = await api.post('/ranger/add', payload);
     return response.data;

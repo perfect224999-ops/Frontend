@@ -63,46 +63,19 @@ export const computeParkStatus = (isTempClosed?: boolean, open?: string, close?:
   };
 };
 
-const getInitialParkStatusInfo = () => {
-  if (typeof window !== "undefined") {
-    try {
-      const savedParkData = localStorage.getItem("greenpass_park_saved_data");
-      if (savedParkData) {
-        const parsed = JSON.parse(savedParkData);
-        if (parsed) {
-          const status = computeParkStatus(
-            Boolean(parsed.isTemporaryClosed),
-            parsed.openTime || "06:00",
-            parsed.closeTime || "18:00"
-          );
-          return {
-            isClosed: !status.isOpen,
-            isTempClosed: status.isTempClosed,
-            isHoursClosed: status.isHoursClosed,
-            statusText: status.statusText,
-            subtext: status.subtext,
-            parkName: parsed.name || parsed.parkName || localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ",
-            openHours: parsed.openHours || `เปิดทุกวัน ตั้งแต่เวลา ${parsed.openTime || "06:00"} น. - ${parsed.closeTime || "18:00"} น.`
-          };
-        }
-      }
-    } catch (e) {}
-  }
-
-  const defaultStatus = computeParkStatus(false, "06:00", "18:00");
-  return {
-    isClosed: !defaultStatus.isOpen,
-    isTempClosed: false,
-    isHoursClosed: defaultStatus.isHoursClosed,
-    statusText: defaultStatus.statusText,
-    subtext: defaultStatus.subtext,
-    parkName: typeof window !== "undefined" ? (localStorage.getItem("ranger_park_name") || "อุทยานแห่งชาติ") : "อุทยานแห่งชาติ",
-    openHours: "เปิดทุกวัน ตั้งแต่เวลา 06.00 น. - 18.00 น."
-  };
+const DEFAULT_PARK_STATUS_INFO = {
+  isClosed: false,
+  isTempClosed: false,
+  isHoursClosed: false,
+  statusText: "เปิดตามปกติ",
+  subtext: "เปิดบริการนักท่องเที่ยวตามปกติ",
+  parkName: "อุทยานแห่งชาติ",
+  openHours: "เปิดทุกวัน ตั้งแต่เวลา 06.00 น. - 18.00 น."
 };
 
 export default function ScanCheckinQRCode() {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState(true);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
@@ -117,10 +90,11 @@ export default function ScanCheckinQRCode() {
   } | null>(null);
 
   const [canIssueStamp, setCanIssueStamp] = useState(true);
-  const [parkStatusInfo, setParkStatusInfo] = useState(getInitialParkStatusInfo);
+  const [parkStatusInfo, setParkStatusInfo] = useState(DEFAULT_PARK_STATUS_INFO);
   const [isCheckingParkStatus, setIsCheckingParkStatus] = useState<boolean>(true);
 
   useEffect(() => {
+    setIsMounted(true);
     const savedRoles = typeof window !== "undefined" ? localStorage.getItem("ranger_roles") : null;
     if (savedRoles) {
       try {
@@ -220,7 +194,7 @@ export default function ScanCheckinQRCode() {
   }, []);
 
   useEffect(() => {
-    if (!canIssueStamp || parkStatusInfo.isClosed || isCheckingParkStatus) return;
+    if (!isMounted || !canIssueStamp || parkStatusInfo.isClosed || isCheckingParkStatus) return;
     let html5QrCode: any;
     let isActive = true;
 
@@ -276,7 +250,7 @@ export default function ScanCheckinQRCode() {
         }
       }
     };
-  }, [isScanning, showSuccessPopup, showErrorPopup, canIssueStamp, parkStatusInfo.isClosed, isCheckingParkStatus]);
+  }, [isMounted, isScanning, showSuccessPopup, showErrorPopup, canIssueStamp, parkStatusInfo.isClosed, isCheckingParkStatus]);
 
   const processScanResult = async (decodedToken: string) => {
     if (parkStatusInfo.isClosed) {
@@ -373,6 +347,15 @@ export default function ScanCheckinQRCode() {
   const isParkClosedError = errorMessage.includes("ปิดบริการชั่วคราว") || errorMessage.includes("ปิดบริการ") || errorMessage.includes("ปิดให้บริการ");
   const isMemberNotFoundError = errorMessage.includes("ไม่พบข้อมูลสมาชิก") || errorMessage.includes("ไม่พบข้อมูลนักท่องเที่ยว");
   const isDuplicateError = errorMessage.includes("ซ้ำ") || errorMessage.includes("วันนี้ไปแล้ว") || errorMessage.includes("2 ชั่วโมง");
+
+  if (!isMounted || isCheckingParkStatus) {
+    return (
+      <div className="w-full max-w-4xl mx-auto py-24 flex flex-col items-center justify-center space-y-4 font-sans text-center">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-slate-600">กำลังตรวจสอบสถานะการเปิดให้บริการของอุทยาน...</p>
+      </div>
+    );
+  }
 
   if (!canIssueStamp) {
     return (
@@ -512,15 +495,6 @@ export default function ScanCheckinQRCode() {
             </button>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (isCheckingParkStatus) {
-    return (
-      <div className="w-full max-w-4xl mx-auto py-24 flex flex-col items-center justify-center space-y-4 font-sans text-center">
-        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm font-bold text-slate-600">กำลังตรวจสอบสถานะการเปิดให้บริการของอุทยาน...</p>
       </div>
     );
   }

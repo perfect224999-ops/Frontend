@@ -202,7 +202,7 @@ function EditRewardContent() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                แก้ไขของรางวัล #{currentReward.id}
+                แก้ไขของรางวัล
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 ปรับปรุงข้อมูล ชื่อรางวัล สิทธิประโยชน์ และรูปภาพประกอบ
