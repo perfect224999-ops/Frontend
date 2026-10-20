@@ -89,7 +89,7 @@ const resolveReportImageUrl = (img?: string | null) => {
   if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("blob:")) {
     return trimmed;
   }
-  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://localhost:8081/api/v1";
+  const baseUrl = typeof getBaseURL === "function" ? getBaseURL() : "http://26.253.157.112:8081/api/v1";
   if (trimmed.startsWith("/uploads/") || trimmed.includes("uploads/")) {
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return `${baseUrl}${cleanPath}`;

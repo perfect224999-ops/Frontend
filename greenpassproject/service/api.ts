@@ -17,10 +17,7 @@ export const getBaseURL = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-    return `http://${window.location.hostname}:8081/api/v1`;
-  }
-  return 'http://localhost:8081/api/v1';
+  return 'http://26.253.157.112:8081/api/v1';
 };
 
 const api = axios.create({
