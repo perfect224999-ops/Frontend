@@ -41,7 +41,7 @@ const FULL_MONTH_NAMES = [
   "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", 
   "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
 ];
-const YEARS_LIST = ["ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"];
+const YEARS_LIST = ["ปี 2022", "ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"];
 
 // Color themes for comparing multiple years
 const YEAR_THEMES: Record<string, {
@@ -93,6 +93,16 @@ const YEAR_THEMES: Record<string, {
     lightBg: "bg-purple-50",
     borderColor: "border-purple-500",
     badgeBg: "bg-purple-100 text-purple-800 border-purple-300"
+  },
+  "ปี 2022": {
+    colorName: "Rose",
+    dotBg: "bg-rose-500",
+    barGradient: "bg-gradient-to-t from-rose-600 via-rose-500 to-pink-400",
+    barHoverGradient: "group-hover/bar:from-rose-500 group-hover/bar:to-pink-300",
+    textColor: "text-rose-700",
+    lightBg: "bg-rose-50",
+    borderColor: "border-rose-500",
+    badgeBg: "bg-rose-100 text-rose-800 border-rose-300"
   }
 };
 
@@ -110,7 +120,8 @@ const createInitialMonthlyByYear = (): Record<string, PeriodStats> => ({
   "ปี 2026": createEmptyPeriodStats(),
   "ปี 2025": createEmptyPeriodStats(),
   "ปี 2024": createEmptyPeriodStats(),
-  "ปี 2023": createEmptyPeriodStats()
+  "ปี 2023": createEmptyPeriodStats(),
+  "ปี 2022": createEmptyPeriodStats()
 });
 
 const createInitialYearlyStats = (): PeriodStats => ({
@@ -121,10 +132,10 @@ const createInitialYearlyStats = (): PeriodStats => ({
 });
 
 export default function ViewVisitStatistics() {
-  const [filter, setFilter] = useState<"monthly" | "yearly" | "comparison">("monthly");
+  const [filter, setFilter] = useState<"monthly" | "yearly" | "comparison">("comparison");
   const [selectedYear, setSelectedYear] = useState<string>("ปี 2026");
   const [startMonth, setStartMonth] = useState<number>(0); // 0 = ม.ค.
-  const [endMonth, setEndMonth] = useState<number>(11); // 11 = ธ.ค.
+  const [endMonth, setEndMonth] = useState<number>(5); // 5 = มิ.ย. (ครึ่งปีแรก 6 เดือน)
   const [parkName, setParkName] = useState<string>("อุทยานแห่งชาติ");
   const [parkId, setParkId] = useState<number>(1);
 
@@ -132,8 +143,11 @@ export default function ViewVisitStatistics() {
   const [yearlyStats, setYearlyStats] = useState<PeriodStats>(createInitialYearlyStats());
 
   // Comparison mode states
-  const [compareYears, setCompareYears] = useState<string[]>(["ปี 2024", "ปี 2025", "ปี 2026"]);
-  const [compareMetric, setCompareMetric] = useState<"total" | "thai" | "foreigner">("total");
+  const [compareYears, setCompareYears] = useState<string[]>(["ปี 2025", "ปี 2026"]);
+  const [yearSelectionMode, setYearSelectionMode] = useState<"single" | "multi">("multi");
+  const [compareMetric, setCompareMetric] = useState<"total" | "split" | "thai" | "foreigner">("total");
+  const [comparisonGraphView, setComparisonGraphView] = useState<"yearly" | "monthly">("yearly");
+  const [comparisonTableView, setComparisonTableView] = useState<"yearly" | "monthly">("yearly");
 
   useEffect(() => {
     async function fetchStats() {
@@ -244,6 +258,10 @@ export default function ViewVisitStatistics() {
 
   // Toggle year in comparison mode
   const toggleCompareYear = (yearLabel: string) => {
+    if (yearSelectionMode === "single") {
+      setCompareYears([yearLabel]);
+      return;
+    }
     if (compareYears.includes(yearLabel)) {
       if (compareYears.length > 1) {
         setCompareYears(compareYears.filter(y => y !== yearLabel));
@@ -252,6 +270,11 @@ export default function ViewVisitStatistics() {
       const updated = [...compareYears, yearLabel].sort((a, b) => yearsList.indexOf(a) - yearsList.indexOf(b));
       setCompareYears(updated);
     }
+  };
+
+  const selectSingleYear = (yearLabel: string) => {
+    setCompareYears([yearLabel]);
+    setYearSelectionMode("single");
   };
 
   // Logic for custom month range filtering
@@ -325,7 +348,7 @@ export default function ViewVisitStatistics() {
 
   const allFilteredMonths = MONTH_LABELS.slice(startMonth, endMonth + 1);
 
-  // Maximum value for scaling comparison chart
+  // Maximum value for scaling monthly comparison chart
   const maxValCompare = Math.max(
     ...compareYears.flatMap(y => {
       const { filtered } = getYearRangeStats(y);
@@ -334,6 +357,17 @@ export default function ViewVisitStatistics() {
         if (compareMetric === "foreigner") return item.foreigner;
         return item.thai + item.foreigner;
       });
+    }),
+    10
+  );
+
+  // Maximum value for scaling yearly comparison chart
+  const maxValYearCompare = Math.max(
+    ...comparisonYearStats.map(s => {
+      if (compareMetric === "thai") return s.thai;
+      if (compareMetric === "foreigner") return s.foreigner;
+      if (compareMetric === "split") return Math.max(s.thai, s.foreigner, 1);
+      return s.total;
     }),
     10
   );
@@ -537,12 +571,12 @@ export default function ViewVisitStatistics() {
         </div>
       )}
 
-      {/* 2.B: MULTI-YEAR COMPARISON TOOLBAR (Comparison Mode) */}
+      {/* 2.B: MULTI-YEAR COMPARISON & CUSTOM YEAR SELECTOR TOOLBAR */}
       {filter === "comparison" && (
         <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-emerald-500/20 space-y-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-emerald-100/40 via-transparent to-transparent pointer-events-none rounded-bl-full" />
           
-          {/* Header Description */}
+          {/* Header & Mode Switcher */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-emerald-600/30">
@@ -550,69 +584,195 @@ export default function ViewVisitStatistics() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-slate-900">เครื่องมือเปรียบเทียบสถิติข้ามปี (Multi-Year Comparison)</h3>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    เครื่องมือเลือกปีและเปรียบเทียบสถิติ (Yearly Statistics & Comparison)
+                  </h3>
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                     Active
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">เลือกปีและช่วงเดือนที่ต้องการเปรียบเทียบเพื่อวิเคราะห์แนวโน้มการเติบโต</p>
+                <p className="text-[11px] text-slate-500">
+                  {yearSelectionMode === "single" 
+                    ? "กดเลือกปีที่ต้องการดู หรือเลือกจากเมนูด้านล่างเพื่อแสดงผลสถิติรายปีได้ทันที" 
+                    : "กดเลือกปีที่ต้องการเปรียบเทียบได้อิสระ หรือใช้ทางลัดเพื่อเปรียบเทียบข้ามปี"}
+                </p>
               </div>
             </div>
 
-            {/* Quick Presets for Comparison */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-bold text-slate-400 mr-1">ทางลัดปี:</span>
+            {/* Mode Toggle: ดูปีเดียว (Single Year) vs เปรียบเทียบหลายปี (Multi-Year) */}
+            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
-                onClick={() => setCompareYears(["ปี 2024", "ปี 2025", "ปี 2026"])}
-                className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => {
+                  setYearSelectionMode("single");
+                  if (compareYears.length > 1) {
+                    setCompareYears([compareYears[compareYears.length - 1]]); // Keep latest selected
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  yearSelectionMode === "single"
+                    ? "bg-white text-emerald-950 shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="เลือกดูสถิติทีละปี"
               >
-                3 ปีล่าสุด (2024-2026)
+                <span>🎯 ดูปีเดียว (เลือก 1 ปี)</span>
               </button>
               <button
-                onClick={() => setCompareYears(["ปี 2025", "ปี 2026"])}
-                className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => {
+                  setYearSelectionMode("multi");
+                  if (compareYears.length === 1) {
+                    const currentIdx = yearsList.indexOf(compareYears[0]);
+                    const prevYear = currentIdx > 0 ? yearsList[currentIdx - 1] : yearsList[1] || "ปี 2025";
+                    setCompareYears([prevYear, compareYears[0]].sort((a, b) => yearsList.indexOf(a) - yearsList.indexOf(b)));
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  yearSelectionMode === "multi"
+                    ? "bg-white text-emerald-950 shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="เลือกเปรียบเทียบหลายปีพร้อมกัน"
               >
-                2 ปีล่าสุด (2025 vs 2026)
-              </button>
-              <button
-                onClick={() => setCompareYears(["ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"])}
-                className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
-              >
-                เลือกทุกปี (4 ปี)
+                <span>📊 เปรียบเทียบหลายปี</span>
               </button>
             </div>
           </div>
 
-          {/* Row 1: Multi-Select Year Checkboxes */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+          {/* Row 1: Direct Year Selection (Buttons + Dropdown Selector) */}
+          <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+            
+            {/* Left: Section Label & Dropdown selector */}
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                เลือกปีที่ต้องการเปรียบเทียบ (เลือกได้หลายปี):
+                {yearSelectionMode === "single" ? "กดเลือกปีที่ต้องการดู:" : "เลือกปีที่ต้องการเปรียบเทียบ (กดเลือกได้เลย):"}
               </span>
+
+              {/* Direct Select Dropdown */}
+              <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-2xs hover:border-emerald-500 focus-within:border-emerald-500 transition-colors">
+                <span className="text-[11px] font-bold text-slate-500">
+                  {yearSelectionMode === "single" ? "เลือกปี:" : "เพิ่ม/เลือกปี:"}
+                </span>
+                <select
+                  value={yearSelectionMode === "single" ? (compareYears[0] || "ปี 2026") : ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (yearSelectionMode === "single") {
+                      selectSingleYear(val);
+                    } else {
+                      toggleCompareYear(val);
+                    }
+                  }}
+                  className="bg-transparent text-xs font-black text-emerald-950 focus:outline-none cursor-pointer"
+                >
+                  {yearSelectionMode === "single" ? (
+                    yearsList.map((y) => (
+                      <option key={y} value={y}>
+                        {y} {y === "ปี 2026" ? "(ปีปัจจุบัน)" : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="">-- เลือกปีจากเมนูเพื่อเพิ่ม/สลับ --</option>
+                      {yearsList.map((y) => (
+                        <option key={y} value={y}>
+                          {compareYears.includes(y) ? `✓ ${y} (เลือกอยู่)` : `+ เพิ่ม ${y}`}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </div>
             </div>
 
+            {/* Center / Right: Clickable Year Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               {yearsList.map((y) => {
                 const isSelected = compareYears.includes(y);
                 const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
+                
                 return (
-                  <button
-                    key={y}
-                    onClick={() => toggleCompareYear(y)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all duration-200 cursor-pointer border ${
-                      isSelected
-                        ? `${theme.badgeBg} shadow-sm ring-1 ring-emerald-500/30 scale-102`
-                        : "bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 opacity-60"
-                    }`}
-                  >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? theme.dotBg : "bg-slate-300"}`} />
-                    <span>{y}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5" />}
-                  </button>
+                  <div key={y} className="relative group/pill flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (yearSelectionMode === "single") {
+                          selectSingleYear(y);
+                        } else {
+                          toggleCompareYear(y);
+                        }
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all duration-200 cursor-pointer border ${
+                        isSelected
+                          ? `${theme.badgeBg} shadow-sm ring-2 ring-emerald-500/40 scale-102`
+                          : "bg-white text-slate-700 border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/50 hover:text-emerald-900 shadow-2xs"
+                      }`}
+                      title={yearSelectionMode === "single" ? `คลิกเพื่อดูสถิติ ${y}` : `คลิกเพื่อเลือก/ยกเลิก ${y}`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? theme.dotBg : "bg-slate-300 group-hover/pill:bg-emerald-500"}`} />
+                      <span>{y}</span>
+                      {isSelected ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-700" />
+                      ) : yearSelectionMode === "multi" ? (
+                        <span className="w-3.5 h-3.5 border border-slate-300 rounded-sm inline-block group-hover/pill:border-emerald-400" />
+                      ) : null}
+                    </button>
+
+                    {/* Quick "ดูเฉพาะปีนี้" button when in multi mode */}
+                    {yearSelectionMode === "multi" && isSelected && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectSingleYear(y);
+                        }}
+                        className="ml-1 px-1.5 py-1 text-[10px] font-bold text-slate-400 hover:text-emerald-700 hover:bg-emerald-100 rounded-md transition-colors"
+                        title={`ดูเฉพาะ ${y} เพียงปีเดียว`}
+                      >
+                        เดี่ยว
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
+
+            {/* Quick Presets if in Multi-Year Mode */}
+            {yearSelectionMode === "multi" && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-1 xl:pt-0 border-t xl:border-t-0 border-slate-100 w-full xl:w-auto justify-end">
+                <span className="text-[11px] font-bold text-slate-400 mr-1">ทางลัด:</span>
+                <button
+                  onClick={() => setCompareYears(["ปี 2025", "ปี 2026"])}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                    compareYears.length === 2 && compareYears.includes("ปี 2025") && compareYears.includes("ปี 2026")
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                      : "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  2 ปีล่าสุด (2025 vs 2026)
+                </button>
+                <button
+                  onClick={() => setCompareYears(["ปี 2024", "ปี 2025", "ปี 2026"])}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                    compareYears.length === 3 && compareYears.includes("ปี 2024") && compareYears.includes("ปี 2025") && compareYears.includes("ปี 2026")
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                      : "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  3 ปีล่าสุด (2024-2026)
+                </button>
+                <button
+                  onClick={() => setCompareYears(["ปี 2022", "ปี 2023", "ปี 2024", "ปี 2025", "ปี 2026"])}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                    compareYears.length === 5
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                      : "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border-slate-200"
+                  }`}
+                >
+                  เลือกทุกปี (5 ปี)
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Row 2: Month Range Selector & Month Count Presets (Supports 5 months, 6 months, etc.) */}
@@ -914,19 +1074,52 @@ export default function ViewVisitStatistics() {
                   ? `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชม ช่วงเดือน ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} ประจำ${currentSelectedYearLabel}`
                   : `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชม 12 เดือนประจำ${currentSelectedYearLabel}` 
                 : filter === "comparison"
-                  ? `แผนภูมิแท่งเปรียบเทียบสถิติรายเดือนข้ามปี (${compareYears.map(y => y.replace("ปี ", "")).join(" vs ")}) ช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} (${selectedMonthsCount} เดือน)`
+                  ? comparisonGraphView === "yearly"
+                    ? `แผนภูมิแท่งเปรียบเทียบสถิติรายปี (${compareYears.map(y => y.replace("ปี ", "")).join(" vs ")}) ${isCustomRange ? `ช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} (${selectedMonthsCount} เดือน)` : `(เต็มปี 12 เดือน)`}`
+                    : `แผนภูมิแท่งเปรียบเทียบสถิติรายเดือนข้ามปี (${compareYears.map(y => y.replace("ปี ", "")).join(" vs ")}) ช่วง ${MONTH_LABELS[startMonth]} - ${MONTH_LABELS[endMonth]} (${selectedMonthsCount} เดือน)`
                   : `แผนภูมิแท่งเปรียบเทียบสถิติผู้เข้าชมรายปี (ทุกปีสะสม)`}
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
               {filter === "comparison" 
-                ? `เปรียบเทียบจำนวนผู้เข้าชมในแต่ละเดือนของปี ${compareYears.map(y => y.replace("ปี ", "")).join(", ")} แบบกลุ่มแท่งชัดเจน`
+                ? comparisonGraphView === "yearly"
+                  ? `เปรียบเทียบสถิติจำนวนผู้เข้าชมรวมในแต่ละปีของปี ${compareYears.map(y => y.replace("ปี ", "")).join(", ")} แบบกลุ่มแท่งรายปีชัดเจน`
+                  : `เปรียบเทียบจำนวนผู้เข้าชมในแต่ละเดือนของปี ${compareYears.map(y => y.replace("ปี ", "")).join(", ")} แบบกลุ่มแท่งชัดเจน`
                 : "กราฟเปรียบเทียบปริมาณผู้เข้าชมอุทยานระหว่างชาวไทยและชาวต่างชาติ"}
             </p>
           </div>
 
           {/* Metric Selector / Legends */}
           {filter === "comparison" ? (
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              
+              {/* Graph View Toggle: Yearly vs Monthly */}
+              <div className="bg-emerald-50/80 p-1 rounded-xl flex items-center gap-1 text-xs font-bold border border-emerald-200/80 shadow-2xs">
+                <button
+                  onClick={() => setComparisonGraphView("yearly")}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    comparisonGraphView === "yearly" 
+                      ? "bg-emerald-600 text-white shadow-xs font-black" 
+                      : "text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/60"
+                  }`}
+                  title="แสดงกราฟเปรียบเทียบรายปี"
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>กราฟรายปี (Yearly)</span>
+                </button>
+                <button
+                  onClick={() => setComparisonGraphView("monthly")}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    comparisonGraphView === "monthly" 
+                      ? "bg-emerald-600 text-white shadow-xs font-black" 
+                      : "text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/60"
+                  }`}
+                  title="แสดงกราฟเปรียบเทียบรายเดือน"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>กราฟรายเดือน (Monthly)</span>
+                </button>
+              </div>
+
               {/* Metric Switcher in Comparison Chart */}
               <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs font-bold border border-slate-200">
                 <button
@@ -938,6 +1131,16 @@ export default function ViewVisitStatistics() {
                   }`}
                 >
                   ยอดรวมสุทธิ
+                </button>
+                <button
+                  onClick={() => setCompareMetric("split")}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    compareMetric === "split" 
+                      ? "bg-white text-emerald-900 shadow-xs border border-slate-200/80 font-black" 
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  แยกสัญชาติ
                 </button>
                 <button
                   onClick={() => setCompareMetric("thai")}
@@ -962,17 +1165,30 @@ export default function ViewVisitStatistics() {
               </div>
 
               {/* Legends for each compared year */}
-              <div className="flex items-center gap-2.5 text-xs font-bold bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/70">
-                {compareYears.map(y => {
-                  const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
-                  return (
-                    <div key={y} className="flex items-center gap-1.5">
-                      <span className={`w-3 h-3 rounded-full ${theme.dotBg} shadow-2xs`} />
-                      <span className="text-slate-700">{y}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              {compareMetric === "split" ? (
+                <div className="flex items-center gap-3 text-xs font-bold bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/70">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs" />
+                    <span className="text-slate-700">ไทย</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-2xs" />
+                    <span className="text-slate-700">ต่างชาติ</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 text-xs font-bold bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/70">
+                  {compareYears.map(y => {
+                    const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
+                    return (
+                      <div key={y} className="flex items-center gap-1.5">
+                        <span className={`w-2.5 h-2.5 rounded-full ${theme.dotBg} shadow-2xs`} />
+                        <span className="text-slate-700">{y}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : (
             /* Standard Legend */
@@ -992,75 +1208,220 @@ export default function ViewVisitStatistics() {
         {/* Dynamic Interactive Chart Container */}
         <div className="pt-4">
           {filter === "comparison" ? (
-            /* COMPARISON VIEW: GROUPED BARS BY MONTH ACROSS SELECTED YEARS */
-            <div className="h-72 flex items-end justify-around gap-2 sm:gap-4 pt-12 pb-4 px-3 sm:px-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 relative">
-              
-              {/* Background Grid Lines */}
-              <div className="absolute inset-x-0 top-1/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
-              <div className="absolute inset-x-0 top-2/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
-              <div className="absolute inset-x-0 top-3/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
+            comparisonGraphView === "yearly" ? (
+              /* COMPARISON VIEW: YEARLY BARS (กราฟปี) */
+              <div className="h-72 sm:h-80 flex items-end justify-around gap-4 sm:gap-8 pt-12 pb-5 px-6 sm:px-12 bg-slate-50/80 rounded-2xl border border-slate-200/80 relative">
+                
+                {/* Background Grid Lines */}
+                <div className="absolute inset-x-0 top-1/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
+                <div className="absolute inset-x-0 top-2/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
+                <div className="absolute inset-x-0 top-3/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
 
-              {allFilteredMonths.map((mLabel, mRelIdx) => {
-                const actualMonthIdx = startMonth + mRelIdx;
+                {comparisonYearStats.map((item, idx) => {
+                  const theme = YEAR_THEMES[item.year] || YEAR_THEMES["ปี 2026"];
+                  const val = compareMetric === "thai" 
+                    ? item.thai 
+                    : compareMetric === "foreigner" 
+                      ? item.foreigner 
+                      : item.total;
+                  const height = `${Math.min(100, Math.max(12, (val / maxValYearCompare) * 100))}%`;
+                  const thaiHeight = `${Math.min(100, Math.max(12, (item.thai / maxValYearCompare) * 100))}%`;
+                  const foreignerHeight = `${Math.min(100, Math.max(12, (item.foreigner / maxValYearCompare) * 100))}%`;
 
-                return (
-                  <div key={mLabel} className="flex-1 flex flex-col items-center h-full justify-end relative group z-10 max-w-[160px]">
-                    
-                    {/* Glassmorphism Hover Tooltip with Multi-Year Comparison */}
-                    <div className="absolute -top-20 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-slate-900/95 text-white text-[11px] py-2 px-3.5 rounded-xl whitespace-nowrap shadow-xl pointer-events-none z-30 font-medium backdrop-blur-md border border-slate-700/60 transform group-hover:-translate-y-1">
-                      <div className="font-extrabold text-emerald-400 border-b border-slate-800 pb-1 mb-1">
-                        เดือน{FULL_MONTH_NAMES[actualMonthIdx]} ({mLabel})
+                  const prevItem = idx > 0 ? comparisonYearStats[idx - 1] : null;
+                  const diff = prevItem ? item.total - prevItem.total : null;
+                  const diffPct = prevItem && prevItem.total > 0 && diff !== null 
+                    ? Number(((diff / prevItem.total) * 100).toFixed(1)) 
+                    : null;
+
+                  return (
+                    <div key={item.year} className="flex-1 flex flex-col items-center h-full justify-end relative group z-10 max-w-[220px]">
+                      
+                      {/* Glassmorphism Hover Tooltip */}
+                      <div className="absolute -top-24 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-slate-900/95 text-white text-[11px] py-2.5 px-4 rounded-xl whitespace-nowrap shadow-xl pointer-events-none z-30 font-medium backdrop-blur-md border border-slate-700/60 transform group-hover:-translate-y-1">
+                        <div className="flex items-center gap-2 font-extrabold text-emerald-400 border-b border-slate-800 pb-1.5 mb-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${theme.dotBg}`} />
+                          <span>{item.year}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">({rangeText})</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-4 font-bold text-white">
+                            <span>ยอดรวมทั้งหมด:</span>
+                            <span className="text-amber-300">{item.total.toLocaleString()} คน</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-emerald-300">
+                            <span>สแตมป์ชาวไทย:</span>
+                            <span>{item.thai.toLocaleString()} คน ({item.total > 0 ? Math.round((item.thai / item.total) * 100) : 0}%)</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-sky-300">
+                            <span>สแตมป์ชาวต่างชาติ:</span>
+                            <span>{item.foreigner.toLocaleString()} คน ({item.total > 0 ? Math.round((item.foreigner / item.total) * 100) : 0}%)</span>
+                          </div>
+                          {diff !== null && diffPct !== null && (
+                            <div className="pt-1 mt-1 border-t border-slate-800 text-[10px] text-slate-300">
+                              แนวโน้มเทียบกับ {prevItem?.year}:{" "}
+                              <span className={diff >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {diff >= 0 ? `+${diffPct}%` : `${diffPct}%`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-0.5">
+
+                      {compareMetric === "split" ? (
+                        /* PAIR BARS FOR THAI & FOREIGNER */
+                        <div className="w-full flex flex-col items-center h-[82%] justify-end">
+                          <div className="text-[11px] font-black text-slate-900 bg-white/95 px-2.5 py-0.5 rounded-lg shadow-2xs border border-slate-200 mb-2">
+                            รวม {item.total.toLocaleString()} คน
+                          </div>
+                          <div className="w-full flex justify-center items-end gap-2 sm:gap-4 h-full pb-1">
+                            {/* Thai Bar */}
+                            <div className="flex flex-col items-center h-full justify-end w-8 sm:w-14 group/bar">
+                              <span className="text-[10px] sm:text-xs font-black text-emerald-800 mb-1 group-hover/bar:scale-110 transition-transform">
+                                {item.thai}
+                              </span>
+                              <div 
+                                style={{ height: thaiHeight }}
+                                className="w-full bg-gradient-to-t from-emerald-600 via-emerald-500 to-teal-400 rounded-t-xl shadow-md group-hover/bar:from-emerald-500 group-hover/bar:to-teal-300 transition-all duration-300"
+                              />
+                              <span className="text-[10px] sm:text-xs font-extrabold text-emerald-800 mt-1.5">ไทย</span>
+                            </div>
+
+                            {/* Foreigner Bar */}
+                            <div className="flex flex-col items-center h-full justify-end w-8 sm:w-14 group/bar">
+                              <span className="text-[10px] sm:text-xs font-black text-sky-800 mb-1 group-hover/bar:scale-110 transition-transform">
+                                {item.foreigner}
+                              </span>
+                              <div 
+                                style={{ height: foreignerHeight }}
+                                className="w-full bg-gradient-to-t from-sky-600 via-sky-500 to-indigo-400 rounded-t-xl shadow-md group-hover/bar:from-sky-500 group-hover/bar:to-indigo-300 transition-all duration-300"
+                              />
+                              <span className="text-[10px] sm:text-xs font-extrabold text-sky-800 mt-1.5">ต่างชาติ</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* SINGLE YEAR BAR (TOTAL, THAI ONLY, OR FOREIGNER ONLY) */
+                        <div className="w-full flex flex-col items-center h-[82%] justify-end pb-1 group/bar">
+                          {/* Top Value Tag */}
+                          <div className="mb-2 transition-transform group-hover/bar:scale-110">
+                            <span className="text-xs sm:text-sm font-black text-slate-900 bg-white px-3 py-1 rounded-xl shadow-2xs border border-slate-200">
+                              {val.toLocaleString()} คน
+                            </span>
+                          </div>
+
+                          {/* Bar with Year Theme Gradient */}
+                          <div className="w-14 sm:w-20 md:w-24 h-full flex items-end">
+                            <div 
+                              style={{ height }}
+                              className={`w-full ${theme.barGradient} ${theme.barHoverGradient} rounded-t-xl shadow-md transition-all duration-300 relative overflow-hidden group-hover/bar:shadow-lg`}
+                            >
+                              {/* Highlight shine */}
+                              <div className="absolute inset-x-0 top-0 h-2.5 bg-white/30 rounded-t-xl" />
+                            </div>
+                          </div>
+
+                          {/* Ratio pill when Total is selected */}
+                          {compareMetric === "total" && (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-slate-600 bg-slate-100/90 px-2 py-0.5 rounded-md">
+                              <span className="text-emerald-700">ไทย {item.thai}</span>
+                              <span className="text-slate-300">|</span>
+                              <span className="text-sky-700">ต่างชาติ {item.foreigner}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Year Label */}
+                      <div className={`mt-3 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white border shadow-2xs transition-all ${
+                        item.year === "ปี 2026" ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-slate-200"
+                      }`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${theme.dotBg}`} />
+                        <span className="text-xs sm:text-sm font-black text-slate-900">
+                          {item.year}
+                        </span>
+                        {item.year === "ปี 2026" && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-md">
+                            ปัจจุบัน
+                          </span>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* COMPARISON VIEW: GROUPED BARS BY MONTH ACROSS SELECTED YEARS */
+              <div className="h-72 flex items-end justify-around gap-2 sm:gap-4 pt-12 pb-4 px-3 sm:px-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 relative">
+                
+                {/* Background Grid Lines */}
+                <div className="absolute inset-x-0 top-1/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
+                <div className="absolute inset-x-0 top-2/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
+                <div className="absolute inset-x-0 top-3/4 border-b border-slate-200/40 border-dashed pointer-events-none" />
+
+                {allFilteredMonths.map((mLabel, mRelIdx) => {
+                  const actualMonthIdx = startMonth + mRelIdx;
+
+                  return (
+                    <div key={mLabel} className="flex-1 flex flex-col items-center h-full justify-end relative group z-10 max-w-[160px]">
+                      
+                      {/* Glassmorphism Hover Tooltip with Multi-Year Comparison */}
+                      <div className="absolute -top-20 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-slate-900/95 text-white text-[11px] py-2 px-3.5 rounded-xl whitespace-nowrap shadow-xl pointer-events-none z-30 font-medium backdrop-blur-md border border-slate-700/60 transform group-hover:-translate-y-1">
+                        <div className="font-extrabold text-emerald-400 border-b border-slate-800 pb-1 mb-1">
+                          เดือน{FULL_MONTH_NAMES[actualMonthIdx]} ({mLabel})
+                        </div>
+                        <div className="space-y-0.5">
+                          {compareYears.map(y => {
+                            const item = monthlyStatsByYear[y]?.history?.[actualMonthIdx] || { thai: 0, foreigner: 0 };
+                            const val = compareMetric === "thai" ? item.thai : compareMetric === "foreigner" ? item.foreigner : item.thai + item.foreigner;
+                            const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
+                            return (
+                              <div key={y} className="flex items-center justify-between gap-4">
+                                <span className="flex items-center gap-1.5 text-slate-300">
+                                  <span className={`w-2 h-2 rounded-full ${theme.dotBg}`} />
+                                  {y}:
+                                </span>
+                                <span className="font-bold text-white">
+                                  {val} คน <span className="text-slate-400 text-[10px]">(ไทย {item.thai} | ต่างชาติ {item.foreigner})</span>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Group of Bars for this Month */}
+                      <div className="w-full flex justify-center items-end gap-1 sm:gap-2 h-[82%] pb-1">
                         {compareYears.map(y => {
                           const item = monthlyStatsByYear[y]?.history?.[actualMonthIdx] || { thai: 0, foreigner: 0 };
                           const val = compareMetric === "thai" ? item.thai : compareMetric === "foreigner" ? item.foreigner : item.thai + item.foreigner;
+                          const height = `${Math.min(100, Math.max(12, (val / maxValCompare) * 100))}%`;
                           const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
+
                           return (
-                            <div key={y} className="flex items-center justify-between gap-4">
-                              <span className="flex items-center gap-1.5 text-slate-300">
-                                <span className={`w-2 h-2 rounded-full ${theme.dotBg}`} />
-                                {y}:
+                            <div key={y} className="flex flex-col items-center h-full justify-end w-3 sm:w-5 md:w-6 group/bar">
+                              <span className="text-[8px] sm:text-[10px] font-extrabold text-slate-700 mb-0.5 opacity-90 group-hover/bar:scale-110 transition-transform">
+                                {val}
                               </span>
-                              <span className="font-bold text-white">
-                                {val} คน <span className="text-slate-400 text-[10px]">(ไทย {item.thai} | ต่างชาติ {item.foreigner})</span>
-                              </span>
+                              <div 
+                                style={{ height }}
+                                className={`w-full ${theme.barGradient} ${theme.barHoverGradient} rounded-t-lg shadow-sm transition-all duration-200`}
+                              />
                             </div>
                           );
                         })}
                       </div>
+
+                      {/* Month Label */}
+                      <span className="text-[10px] sm:text-xs font-extrabold text-slate-700 mt-2 group-hover:text-emerald-700 transition-colors">
+                        {mLabel}
+                      </span>
                     </div>
-
-                    {/* Group of Bars for this Month */}
-                    <div className="w-full flex justify-center items-end gap-1 sm:gap-2 h-[82%] pb-1">
-                      {compareYears.map(y => {
-                        const item = monthlyStatsByYear[y]?.history?.[actualMonthIdx] || { thai: 0, foreigner: 0 };
-                        const val = compareMetric === "thai" ? item.thai : compareMetric === "foreigner" ? item.foreigner : item.thai + item.foreigner;
-                        const height = `${Math.min(100, Math.max(12, (val / maxValCompare) * 100))}%`;
-                        const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
-
-                        return (
-                          <div key={y} className="flex flex-col items-center h-full justify-end w-3 sm:w-5 md:w-6 group/bar">
-                            <span className="text-[8px] sm:text-[10px] font-extrabold text-slate-700 mb-0.5 opacity-90 group-hover/bar:scale-110 transition-transform">
-                              {val}
-                            </span>
-                            <div 
-                              style={{ height }}
-                              className={`w-full ${theme.barGradient} ${theme.barHoverGradient} rounded-t-lg shadow-sm transition-all duration-200`}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Month Label */}
-                    <span className="text-[10px] sm:text-xs font-extrabold text-slate-700 mt-2 group-hover:text-emerald-700 transition-colors">
-                      {mLabel}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )
           ) : filter === "monthly" ? (
             /* MONTHLY / PERIOD VIEW BARS (SINGLE YEAR) */
             <div className="h-64 flex items-end justify-around gap-1.5 sm:gap-2.5 pt-10 pb-4 px-3 sm:px-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 relative">
@@ -1183,134 +1544,235 @@ export default function ViewVisitStatistics() {
 
       {/* 5. SUMMARY DATA TABLE SECTION */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide flex items-center gap-2.5">
             <Users className="w-5 h-5 text-emerald-600" />
             {filter === "comparison" 
-              ? `ตารางเปรียบเทียบสถิติผู้เข้าชมรายเดือน (${compareYears.map(y => y.replace("ปี ", "")).join(" vs ")}) ช่วง ${FULL_MONTH_NAMES[startMonth]} - ${FULL_MONTH_NAMES[endMonth]}`
+              ? comparisonTableView === "yearly"
+                ? `ตารางสรุปเปรียบเทียบสถิติผู้เข้าชมรายปี (${compareYears.map(y => y.replace("ปี ", "")).join(" vs ")}) ${isCustomRange ? `ช่วง ${FULL_MONTH_NAMES[startMonth]} - ${FULL_MONTH_NAMES[endMonth]}` : "(12 เดือน)"}`
+                : `ตารางเปรียบเทียบสถิติผู้เข้าชมรายเดือน (${compareYears.map(y => y.replace("ปี ", "")).join(" vs ")}) ช่วง ${FULL_MONTH_NAMES[startMonth]} - ${FULL_MONTH_NAMES[endMonth]}`
               : `ตารางสรุปจำนวนสแตมป์ผู้เข้าชมอุทยาน (${filter === "monthly" ? (isCustomRange ? `ช่วงเดือน ${FULL_MONTH_NAMES[startMonth]} - ${FULL_MONTH_NAMES[endMonth]} ประจำ${currentSelectedYearLabel}` : `แยกรายเดือน 12 เดือนประจำ${currentSelectedYearLabel}`) : "เปรียบเทียบในแต่ละปี"})`}
           </h3>
+
+          {/* Table View Switcher in Comparison Mode */}
+          {filter === "comparison" && (
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs font-bold border border-slate-200">
+              <button
+                onClick={() => setComparisonTableView("yearly")}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  comparisonTableView === "yearly"
+                    ? "bg-white text-emerald-900 shadow-xs border border-slate-200 font-black"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                สรุปรายปี
+              </button>
+              <button
+                onClick={() => setComparisonTableView("monthly")}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  comparisonTableView === "monthly"
+                    ? "bg-white text-emerald-900 shadow-xs border border-slate-200 font-black"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                แจกแจงรายเดือน
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border border-slate-300 rounded-2xl shadow-sm">
           {filter === "comparison" ? (
-            /* COMPARISON TABLE: MONTHS AS ROWS, SELECTED YEARS AS COLUMNS */
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gradient-to-r from-[#042410] via-[#094721] to-[#042410] text-white text-xs sm:text-sm">
-                  <th className="py-4 px-4 font-extrabold">เดือน</th>
-                  {compareYears.map(y => {
-                    const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
-                    return (
-                      <th key={y} className="py-4 px-4 font-extrabold text-center border-l border-emerald-800/40">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className={`w-2.5 h-2.5 rounded-full ${theme.dotBg}`} />
-                          <span>{y}</span>
-                        </div>
-                      </th>
-                    );
-                  })}
-                  {compareYears.length >= 2 && (
-                    <th className="py-4 px-4 font-extrabold text-center text-amber-300 border-l border-emerald-800/40">
-                      แนวโน้ม ({compareYears[compareYears.length - 1].replace("ปี ", "")} vs {compareYears[compareYears.length - 2].replace("ปี ", "")})
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-800 bg-white text-xs sm:text-sm">
-                {allFilteredMonths.map((mLabel, mRelIdx) => {
-                  const actualMonthIdx = startMonth + mRelIdx;
-                  
-                  // Compute growth between last two compared years
-                  const lastYearVal = (monthlyStatsByYear[compareYears[compareYears.length - 1]]?.history?.[actualMonthIdx]?.thai || 0) + 
-                                     (monthlyStatsByYear[compareYears[compareYears.length - 1]]?.history?.[actualMonthIdx]?.foreigner || 0);
-                  const prevYearVal = compareYears.length >= 2
-                    ? (monthlyStatsByYear[compareYears[compareYears.length - 2]]?.history?.[actualMonthIdx]?.thai || 0) + 
-                      (monthlyStatsByYear[compareYears[compareYears.length - 2]]?.history?.[actualMonthIdx]?.foreigner || 0)
-                    : 0;
-                  const diffVal = lastYearVal - prevYearVal;
-                  const diffPct = prevYearVal > 0 ? Number(((diffVal / prevYearVal) * 100).toFixed(1)) : null;
+            comparisonTableView === "yearly" ? (
+              /* COMPARISON TABLE: YEARLY SUMMARY */
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#042410] via-[#094721] to-[#042410] text-white text-sm sm:text-base">
+                    <th className="py-4 px-6 font-extrabold">ปีที่เปรียบเทียบ</th>
+                    <th className="py-4 px-6 font-extrabold text-center text-emerald-300">สแตมป์ชาวไทย</th>
+                    <th className="py-4 px-6 font-extrabold text-center text-sky-300">สแตมป์ชาวต่างชาติ</th>
+                    <th className="py-4 px-6 font-extrabold text-center text-amber-300">รวมผู้เข้าชมสุทธิ ({rangeText})</th>
+                    <th className="py-4 px-6 font-extrabold text-center text-emerald-200">แนวโน้มการเติบโต</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
+                  {comparisonYearStats.map((item, idx) => {
+                    const theme = YEAR_THEMES[item.year] || YEAR_THEMES["ปี 2026"];
+                    const prev = idx > 0 ? comparisonYearStats[idx - 1] : null;
+                    const diff = prev ? item.total - prev.total : null;
+                    const diffPct = prev && prev.total > 0 && diff !== null 
+                      ? Number(((diff / prev.total) * 100).toFixed(1)) 
+                      : null;
 
-                  return (
-                    <tr key={mLabel} className="hover:bg-emerald-50/70 transition-colors duration-150">
-                      <td className="py-3.5 px-4 font-extrabold text-slate-900 whitespace-nowrap">
-                        เดือน{FULL_MONTH_NAMES[actualMonthIdx]} ({mLabel})
-                      </td>
-                      {compareYears.map(y => {
-                        const item = monthlyStatsByYear[y]?.history?.[actualMonthIdx] || { thai: 0, foreigner: 0 };
-                        const total = item.thai + item.foreigner;
-                        return (
-                          <td key={y} className="py-3.5 px-4 text-center border-l border-slate-100">
-                            <span className="inline-block px-3 py-1 rounded-full font-black text-xs sm:text-sm bg-slate-100 text-slate-900 border border-slate-200">
-                              {total.toLocaleString()} คน
-                            </span>
-                            <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">
-                              (ไทย {item.thai} | ต่างชาติ {item.foreigner})
-                            </span>
-                          </td>
-                        );
-                      })}
-                      {compareYears.length >= 2 && (
-                        <td className="py-3.5 px-4 text-center border-l border-slate-100">
-                          {diffVal === 0 ? (
+                    return (
+                      <tr key={item.year} className="hover:bg-emerald-50/70 transition-colors duration-150">
+                        <td className="py-4 px-6 font-black text-sm sm:text-base text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-3 h-3 rounded-full ${theme.dotBg}`} />
+                            <span>{item.year}</span>
+                            {item.year === "ปี 2026" && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                ปัจจุบัน
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-900 rounded-full border border-emerald-300/80 font-black text-sm sm:text-base shadow-2xs">
+                            {item.thai.toLocaleString()} คน
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className="inline-block px-4 py-1.5 bg-sky-50 text-sky-900 rounded-full border border-sky-300/80 font-black text-sm sm:text-base shadow-2xs">
+                            {item.foreigner.toLocaleString()} คน
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className="inline-block px-4.5 py-1.5 bg-slate-100 text-slate-950 rounded-full font-black text-sm sm:text-base border border-slate-300 shadow-2xs">
+                            {item.total.toLocaleString()} คน
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          {diff === null ? (
+                            <span className="text-xs text-slate-400 font-bold">ปีฐานอ้างอิง</span>
+                          ) : diff === 0 ? (
                             <span className="text-xs font-bold text-slate-400">0 (เท่าเดิม)</span>
                           ) : (
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black ${
-                              diffVal > 0 
+                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black ${
+                              diff > 0 
                                 ? "bg-emerald-50 text-emerald-800 border border-emerald-300" 
                                 : "bg-rose-50 text-rose-800 border border-rose-300"
                             }`}>
-                              {diffVal > 0 ? <TrendingUp className="w-3 h-3 text-emerald-600" /> : <TrendingDown className="w-3 h-3 text-rose-600" />}
-                              <span>{diffVal > 0 ? `+${diffVal}` : diffVal} คน</span>
-                              {diffPct !== null && <span>({diffVal > 0 ? `+${diffPct}%` : `${diffPct}%`})</span>}
+                              {diff > 0 ? <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> : <TrendingDown className="w-3.5 h-3.5 text-rose-600" />}
+                              <span>{diff > 0 ? `+${diff}` : diff} คน</span>
+                              {diffPct !== null && <span>({diff > 0 ? `+${diffPct}%` : `${diffPct}%`})</span>}
                             </span>
                           )}
                         </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {/* Table Footer Total Summary for Comparison */}
-              <tfoot>
-                <tr className="bg-slate-950 text-white font-extrabold text-xs sm:text-sm border-t-2 border-slate-800">
-                  <td className="py-4 px-4 uppercase tracking-wider text-emerald-300 font-extrabold">
-                    ยอดรวมสะสม ({selectedMonthsCount} เดือน)
-                  </td>
-                  {compareYears.map(y => {
-                    const stats = getYearRangeStats(y);
-                    return (
-                      <td key={y} className="py-4 px-4 text-center border-l border-slate-800">
-                        <span className="text-base sm:text-lg font-black text-amber-300 block">
-                          {stats.total.toLocaleString()} คน
-                        </span>
-                        <span className="text-[11px] text-emerald-300 block">
-                          (ไทย {stats.thai.toLocaleString()} | ต่างชาติ {stats.foreigner.toLocaleString()})
-                        </span>
-                      </td>
+                      </tr>
                     );
                   })}
-                  {compareYears.length >= 2 && (
-                    <td className="py-4 px-4 text-center border-l border-slate-800">
-                      {(() => {
-                        const lastTotal = getYearRangeStats(compareYears[compareYears.length - 1]).total;
-                        const prevTotal = getYearRangeStats(compareYears[compareYears.length - 2]).total;
-                        const totalDiff = lastTotal - prevTotal;
-                        const totalPct = prevTotal > 0 ? ((totalDiff / prevTotal) * 100).toFixed(1) : null;
-                        return (
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-black ${
-                            totalDiff >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
-                          }`}>
-                            {totalDiff >= 0 ? `+${totalDiff}` : totalDiff} คน
-                            {totalPct !== null && ` (${totalDiff >= 0 ? `+${totalPct}%` : `${totalPct}%`})`}
-                          </span>
-                        );
-                      })()}
+                </tbody>
+              </table>
+            ) : (
+              /* COMPARISON TABLE: MONTHS AS ROWS, SELECTED YEARS AS COLUMNS */
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#042410] via-[#094721] to-[#042410] text-white text-xs sm:text-sm">
+                    <th className="py-4 px-4 font-extrabold">เดือน</th>
+                    {compareYears.map(y => {
+                      const theme = YEAR_THEMES[y] || YEAR_THEMES["ปี 2026"];
+                      return (
+                        <th key={y} className="py-4 px-4 font-extrabold text-center border-l border-emerald-800/40">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className={`w-2.5 h-2.5 rounded-full ${theme.dotBg}`} />
+                            <span>{y}</span>
+                          </div>
+                        </th>
+                      );
+                    })}
+                    {compareYears.length >= 2 && (
+                      <th className="py-4 px-4 font-extrabold text-center text-amber-300 border-l border-emerald-800/40">
+                        แนวโน้ม ({compareYears[compareYears.length - 1].replace("ปี ", "")} vs {compareYears[compareYears.length - 2].replace("ปี ", "")})
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-800 bg-white text-xs sm:text-sm">
+                  {allFilteredMonths.map((mLabel, mRelIdx) => {
+                    const actualMonthIdx = startMonth + mRelIdx;
+                    
+                    // Compute growth between last two compared years
+                    const lastYearVal = (monthlyStatsByYear[compareYears[compareYears.length - 1]]?.history?.[actualMonthIdx]?.thai || 0) + 
+                                       (monthlyStatsByYear[compareYears[compareYears.length - 1]]?.history?.[actualMonthIdx]?.foreigner || 0);
+                    const prevYearVal = compareYears.length >= 2
+                      ? (monthlyStatsByYear[compareYears[compareYears.length - 2]]?.history?.[actualMonthIdx]?.thai || 0) + 
+                        (monthlyStatsByYear[compareYears[compareYears.length - 2]]?.history?.[actualMonthIdx]?.foreigner || 0)
+                      : 0;
+                    const diffVal = lastYearVal - prevYearVal;
+                    const diffPct = prevYearVal > 0 ? Number(((diffVal / prevYearVal) * 100).toFixed(1)) : null;
+
+                    return (
+                      <tr key={mLabel} className="hover:bg-emerald-50/70 transition-colors duration-150">
+                        <td className="py-3.5 px-4 font-extrabold text-slate-900 whitespace-nowrap">
+                          เดือน{FULL_MONTH_NAMES[actualMonthIdx]} ({mLabel})
+                        </td>
+                        {compareYears.map(y => {
+                          const item = monthlyStatsByYear[y]?.history?.[actualMonthIdx] || { thai: 0, foreigner: 0 };
+                          const total = item.thai + item.foreigner;
+                          return (
+                            <td key={y} className="py-3.5 px-4 text-center border-l border-slate-100">
+                              <span className="inline-block px-3 py-1 rounded-full font-black text-xs sm:text-sm bg-slate-100 text-slate-900 border border-slate-200">
+                                {total.toLocaleString()} คน
+                              </span>
+                              <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">
+                                (ไทย {item.thai} | ต่างชาติ {item.foreigner})
+                              </span>
+                            </td>
+                          );
+                        })}
+                        {compareYears.length >= 2 && (
+                          <td className="py-3.5 px-4 text-center border-l border-slate-100">
+                            {diffVal === 0 ? (
+                              <span className="text-xs font-bold text-slate-400">0 (เท่าเดิม)</span>
+                            ) : (
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black ${
+                                diffVal > 0 
+                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-300" 
+                                  : "bg-rose-50 text-rose-800 border border-rose-300"
+                              }`}>
+                                {diffVal > 0 ? <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> : <TrendingDown className="w-3.5 h-3.5 text-rose-600" />}
+                                <span>{diffVal > 0 ? `+${diffVal}` : diffVal} คน</span>
+                                {diffPct !== null && <span>({diffVal > 0 ? `+${diffPct}%` : `${diffPct}%`})</span>}
+                              </span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Table Footer Total Summary for Comparison */}
+                <tfoot>
+                  <tr className="bg-slate-950 text-white font-extrabold text-xs sm:text-sm border-t-2 border-slate-800">
+                    <td className="py-4 px-4 uppercase tracking-wider text-emerald-300 font-extrabold">
+                      ยอดรวมสะสม ({selectedMonthsCount} เดือน)
                     </td>
-                  )}
-                </tr>
-              </tfoot>
-            </table>
+                    {compareYears.map(y => {
+                      const stats = getYearRangeStats(y);
+                      return (
+                        <td key={y} className="py-4 px-4 text-center border-l border-slate-800">
+                          <span className="text-base sm:text-lg font-black text-amber-300 block">
+                            {stats.total.toLocaleString()} คน
+                          </span>
+                          <span className="text-[11px] text-emerald-300 block">
+                            (ไทย {stats.thai.toLocaleString()} | ต่างชาติ {stats.foreigner.toLocaleString()})
+                          </span>
+                        </td>
+                      );
+                    })}
+                    {compareYears.length >= 2 && (
+                      <td className="py-4 px-4 text-center border-l border-slate-800">
+                        {(() => {
+                          const lastTotal = getYearRangeStats(compareYears[compareYears.length - 1]).total;
+                          const prevTotal = getYearRangeStats(compareYears[compareYears.length - 2]).total;
+                          const totalDiff = lastTotal - prevTotal;
+                          const totalPct = prevTotal > 0 ? ((totalDiff / prevTotal) * 100).toFixed(1) : null;
+                          return (
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-black ${
+                              totalDiff >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                            }`}>
+                              {totalDiff >= 0 ? `+${totalDiff}` : totalDiff} คน
+                              {totalPct !== null && ` (${totalDiff >= 0 ? `+${totalPct}%` : `${totalPct}%`})`}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
+                  </tr>
+                </tfoot>
+              </table>
+            )
           ) : (
             /* STANDARD SINGLE YEAR / ALL YEARS TABLE */
             <table className="w-full text-left border-collapse">
